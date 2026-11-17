@@ -1,0 +1,54 @@
+{
+	"name": "moros-harness",
+	"version": "0.1.0",
+	"description": "Local-first coding agent harness for the terminal.",
+	"private": true,
+	"author": "Moros",
+	"license": "MIT",
+	"type": "module",
+	"engines": {
+		"node": ">=22.18"
+	},
+	"bin": {
+		"moros": "./src/cli/bin.ts",
+		"mrh": "./src/cli/bin.ts"
+	},
+	"imports": {
+		"#src/*": "./src/*",
+		"#tests/*": "./tests/*",
+		"#package.json": "./package.json"
+	},
+	"scripts": {
+		"dev": "node src/cli/bin.ts",
+		"typecheck": "tsc --noEmit",
+		"format:check": "prettier --check .",
+		"test": "vitest run",
+		"check": "npm run format:check && npm run typecheck && npm run test"
+	},
+	"prettier": {
+		"semi": true,
+		"singleQuote": false,
+		"trailingComma": "all",
+		"useTabs": true,
+		"printWidth": 120,
+		"endOfLine": "lf"
+	},
+	"dependencies": {
+		"get-east-asian-width": "^1.7.0",
+		"highlight.js": "11.11.2",
+		"lowlight": "^3.3.0",
+		"marked": "18.1.1",
+		"micromatch": "^4.0.8",
+		"smol-toml": "^1.4.2",
+		"undici": "^6.21.3",
+		"zod": "^4.1.12"
+	},
+	"devDependencies": {
+		"@types/micromatch": "^4.0.9",
+		"@types/node": "^22.19.0",
+		"prettier": "^3.6.2",
+		"typescript": "~5.9.3",
+		"vite": "7.2.2",
+		"vitest": "^3.2.4"
+	}
+}

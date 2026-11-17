@@ -1,0 +1,11 @@
+# 统一换行符：仓库内一律 LF。
+# 不加这条时，Windows 检出会是 CRLF，而 prettier 要求 LF——format:check 在 Windows 上
+# 永远失败，同一份代码在不同平台上结果不一致。属性优先级高于 core.autocrlf。
+* text=auto eol=lf
+
+# 二进制文件不做文本转换
+*.png binary
+*.jpg binary
+*.gif binary
+*.webp binary
+*.ico binary

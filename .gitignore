@@ -1,0 +1,31 @@
+# Read-only reference project
+/reference/
+
+# Dependencies and build outputs
+node_modules/
+dist/
+coverage/
+# 历史桌面端打包产物，仅剩一个被占用的 asar，可手动删除
+release/
+.turbo/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+.moros/
+/.zcode/
+
+# Logs and temporary files
+*.log
+tmp/
+temp/
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# WorkBuddy workspace memory (session-local)
+.workbuddy/
