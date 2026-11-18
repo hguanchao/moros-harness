@@ -253,20 +253,15 @@ try {
 	});
 	await page.screenshot({ path: join(shots, "06-plan-approved.png") });
 
-	await page.locator('.workspace-tools button[title="会话管理"]').click();
-	await page.waitForSelector(".session-table-row", { timeout: 10_000 });
-	await page.screenshot({ path: join(shots, "07-sessions.png") });
-
-	await page.locator('.workspace-tools button[title="设置"]').click();
+	await page.locator('.sidebar-footer button[aria-label="设置"]').click();
 	await page.getByRole("button", { name: "供应商", exact: true }).click();
 	await page.waitForSelector(".provider-card", { timeout: 10_000 });
-	await page.screenshot({ path: join(shots, "08-settings.png") });
+	await page.screenshot({ path: join(shots, "07-settings.png") });
 
-	const themeButton = page.locator('.workspace-tools button[aria-label^="主题"]');
-	await themeButton.click();
-	await themeButton.click();
-	await page.waitForTimeout(400);
-	await page.screenshot({ path: join(shots, "09-theme.png") });
+	await page.getByRole("button", { name: "外观", exact: true }).click();
+	await page.locator(".settings-section select").first().selectOption("dark");
+	await page.waitForTimeout(500);
+	await page.screenshot({ path: join(shots, "08-theme.png") });
 
 	const { Core } = await import("#src/core/index.ts");
 	const core = new Core({ homeDir: home });

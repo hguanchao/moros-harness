@@ -182,24 +182,6 @@
 	font-size: 14px;
 }
 
-.workspace-tools {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-}
-
-.workspace-tools .icon-button {
-	width: 20px;
-	height: 20px;
-	border-radius: 5px;
-	color: var(--text-dim);
-}
-
-.workspace-tools .icon-button:hover:not(:disabled) {
-	background: transparent;
-	color: var(--text-primary);
-}
-
 .project-group {
 	display: flex;
 	flex-direction: column;
@@ -919,4 +901,24 @@
 
 .titlebar-toggle.is-active {
 	background: transparent;
+}
+
+.sidebar-footer {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	padding: 8px 12px;
+	border-top: 0.5px solid var(--line);
+}
+
+.sidebar-footer .icon-button {
+	width: 28px;
+	height: 28px;
+	color: var(--text-dim);
+}
+
+.sidebar-footer .icon-button:hover:not(:disabled) {
+	background: var(--fill-soft);
+	color: var(--text-primary);
 }
