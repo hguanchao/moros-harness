@@ -13,15 +13,17 @@
 
 .composer {
 	padding: 8px;
-	border: 1px solid var(--line-strong);
-	border-radius: var(--r-surface);
+	border: none;
+	outline: 1px solid var(--line-strong);
+	outline-offset: -1px;
+	border-radius: 16px;
 	background: var(--surface-chrome);
 	box-shadow: 0 4px 16px var(--shadow-soft);
-	transition: border-color 0.2s ease;
+	transition: outline-color 0.2s ease;
 }
 
 .composer:focus-within {
-	border-color: var(--accent-ring);
+	outline-color: var(--accent-ring);
 	box-shadow: 0 4px 16px var(--shadow-soft);
 }
 
