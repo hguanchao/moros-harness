@@ -334,7 +334,7 @@
 
 /* 表单控件外观 */
 .dropdown-box .dropdown-trigger {
-	height: 30px;
+	height: 34px;
 	justify-content: space-between;
 	padding: 0 11px;
 	border: 1px solid var(--line-strong);
@@ -505,7 +505,7 @@
 }
 
 .prov-field .dropdown-box .dropdown-trigger {
-	height: 30px;
+	height: 36px;
 }
 
 .prov-key-wrap {
