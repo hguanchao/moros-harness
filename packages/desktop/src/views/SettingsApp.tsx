@@ -16,6 +16,7 @@ import {
 	MaximizeIcon,
 	MinusIcon,
 	MonitorIcon,
+	MoonIcon,
 	PlugIcon,
 	PuzzleIcon,
 	RestoreIcon,
@@ -321,9 +322,9 @@ function AppearanceSettings({
 							<Dropdown
 								value={ui.theme}
 								options={[
-									{ value: "auto", label: "系统" },
-									{ value: "light", label: "浅色" },
-									{ value: "dark", label: "深色" },
+									{ value: "auto", label: "系统", icon: <MonitorIcon size={14} /> },
+									{ value: "light", label: "浅色", icon: <SunIcon size={14} /> },
+									{ value: "dark", label: "深色", icon: <MoonIcon size={14} /> },
 								]}
 								onChange={(theme) => {
 									void onUpdate({ ui: { theme: theme as "auto" | "light" | "dark" } }, "主题已更新");

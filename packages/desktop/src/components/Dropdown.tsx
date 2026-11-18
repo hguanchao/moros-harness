@@ -2,10 +2,12 @@ import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import { CheckIcon, ChevronDownIcon } from "./Icons.tsx";
 
-/** 下拉选项，可带分组标题与禁用态。 */
+/** 下拉选项，可带分组标题、图标与禁用态。 */
 export interface DropdownOption {
 	readonly value: string;
 	readonly label: string;
+	/** 选项前的图标。 */
+	readonly icon?: ReactNode;
 	/** 分组名；同一分组的连续选项共用一个小标题。 */
 	readonly group?: string;
 	readonly disabled?: boolean;
@@ -70,7 +72,12 @@ export function Dropdown({
 				aria-expanded={open}
 				onClick={() => setOpen((previous) => !previous)}
 			>
-				{trigger ?? <span className="dropdown-label">{label}</span>}
+				{trigger ?? (
+					<span className="dropdown-label">
+						{selected?.icon !== undefined ? <span className="dropdown-option-icon">{selected.icon}</span> : null}
+						<span>{label}</span>
+					</span>
+				)}
 				<ChevronDownIcon size={variant === "inline" ? 12 : 15} />
 			</button>
 			{open ? (
@@ -92,7 +99,10 @@ export function Dropdown({
 										setOpen(false);
 									}}
 								>
-									<span>{option.label}</span>
+									<span className="dropdown-option-text">
+										{option.icon !== undefined ? <span className="dropdown-option-icon">{option.icon}</span> : null}
+										<span>{option.label}</span>
+									</span>
 									{option.value === value ? <CheckIcon size={14} /> : null}
 								</button>
 							))}

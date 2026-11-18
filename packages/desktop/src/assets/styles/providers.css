@@ -367,9 +367,33 @@
 }
 
 .dropdown-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+
+/* 选项/触发器中的前导图标 */
+.dropdown-option-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	color: var(--text-dim);
+}
+
+.dropdown-option-text {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+	overflow: hidden;
+}
+
+.dropdown-option.is-selected .dropdown-option-icon {
+	color: var(--accent);
 }
 
 .dropdown-trigger > svg:last-child {
