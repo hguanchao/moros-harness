@@ -7,7 +7,7 @@
 	height: 100vh;
 	display: flex;
 	flex-direction: column;
-	background: var(--surface-main);
+	background: var(--surface-sidebar);
 	color: var(--text-primary);
 }
 
@@ -21,7 +21,7 @@
 	padding: 0 8px 0 12px;
 	-webkit-app-region: drag;
 	user-select: none;
-	border-bottom: 1px solid var(--line);
+	background: var(--surface-sidebar);
 }
 
 .settings-back {
@@ -215,6 +215,8 @@
 	min-width: 0;
 	overflow-y: auto;
 	scrollbar-gutter: stable;
+	background: var(--surface-main);
+	border-top-left-radius: var(--r-surface);
 }
 
 .settings-content-inner {
