@@ -92,7 +92,7 @@
 .sidebar {
 	width: 260px;
 	background: var(--surface-sidebar);
-	font-size: 14px;
+	font-size: 0.875rem;
 }
 
 .sidebar .brand {
@@ -106,7 +106,7 @@
 }
 
 .brand-name {
-	font-size: 20px;
+	font-size: 1.25rem;
 	font-weight: 700;
 	letter-spacing: -0.02em;
 	line-height: 1;
@@ -117,7 +117,7 @@
 	padding: 2px 5px;
 	border: 1px solid var(--line-strong);
 	border-radius: 4px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: 600;
 	letter-spacing: 0.08em;
 	color: var(--text-dim);
@@ -151,7 +151,7 @@
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
-	font-size: 14px;
+	font-size: 0.875rem;
 }
 
 .menu-row:hover:not(:disabled) {
@@ -179,7 +179,7 @@
 	margin: 12px 0 4px;
 	padding: 0 8px;
 	color: var(--text-dim);
-	font-size: 14px;
+	font-size: 0.875rem;
 }
 
 .project-group {
@@ -283,7 +283,7 @@
 
 .side-empty {
 	padding: 10px 8px 10px 28px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--text-faint);
 }
 
@@ -320,7 +320,7 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 17px;
+	font-size: 1.0625rem;
 	font-weight: 500;
 	color: var(--text-muted);
 }
@@ -329,7 +329,7 @@
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	font-size: 11px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 	white-space: nowrap;
 }
@@ -369,7 +369,7 @@
 	max-width: 760px;
 	margin: 0 auto;
 	padding: 20px 0;
-	font-size: 15px;
+	font-size: 0.9375rem;
 	user-select: text;
 	flex: 1;
 	display: flex;
@@ -399,16 +399,16 @@
 	border-radius: 16px;
 	background: var(--surface-chrome);
 	color: var(--text-primary);
-	font-size: 15px;
-	line-height: 24px;
+	font-size: 0.9375rem;
+	line-height: 1.6;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
 
 .prose {
 	color: var(--text-primary);
-	font-size: 15px;
-	line-height: 27px;
+	font-size: 0.9375rem;
+	line-height: 1.7;
 	overflow-wrap: anywhere;
 }
 
@@ -494,7 +494,7 @@
 	outline: none;
 	background: transparent;
 	color: var(--text-primary);
-	font-size: 15px;
+	font-size: 0.9375rem;
 	line-height: 1.5;
 	resize: none;
 	user-select: text;
@@ -510,7 +510,7 @@
 	justify-content: space-between;
 	gap: 12px;
 	margin-top: 12px;
-	font-size: 13px;
+	font-size: 0.875rem;
 	color: var(--text-muted);
 }
 
@@ -580,7 +580,7 @@
 	border-radius: 6px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	text-align: left;
 }
 
@@ -600,7 +600,7 @@
 	background: transparent;
 	white-space: nowrap;
 	color: var(--text-muted);
-	font-size: 13px;
+	font-size: 0.875rem;
 	cursor: pointer;
 }
 
@@ -620,7 +620,7 @@
 	height: 100%;
 	opacity: 0;
 	cursor: pointer;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .model-picker {
@@ -656,7 +656,7 @@
 	border-radius: 7px;
 	background: transparent;
 	color: var(--text-faint);
-	font-size: 13px;
+	font-size: 0.875rem;
 	white-space: nowrap;
 }
 
@@ -742,7 +742,7 @@
 .queue-bar {
 	padding: 4px 6px 6px;
 	color: var(--text-faint);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .composer-wrap.is-dragging .composer {
@@ -784,14 +784,12 @@
 
 .page-head h2 {
 	margin: 0;
-	font-size: 15px;
-	font-weight: 500;
 	color: var(--text-muted);
 }
 
 .page-subtitle {
 	margin: 1px 0 0;
-	font-size: 11px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 	max-width: 680px;
 	overflow: hidden;
@@ -810,7 +808,7 @@
 .page-actions .danger-button {
 	height: 28px;
 	padding: 0 9px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	border-radius: 7px;
 }
 
@@ -822,7 +820,6 @@
 }
 
 .welcome h1 {
-	font-size: 25px;
 	color: var(--text-primary);
 }
 

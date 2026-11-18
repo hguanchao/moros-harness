@@ -3,7 +3,6 @@
 	--font-ui:
 		-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
 		"Helvetica Neue", Helvetica, Arial, sans-serif;
-	--font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, "Liberation Mono", monospace;
 	--surface-sidebar: #202020;
 	--surface-main: #131313;
 	--surface-chrome: #262626;
@@ -121,8 +120,7 @@ body,
 body {
 	background: var(--surface-main);
 	color: var(--text-primary);
-	font-family: var(--font-ui);
-	font-size: 14px;
+	font-size: 0.875rem;
 	line-height: 1.6;
 	overflow: hidden;
 	-webkit-font-smoothing: antialiased;
@@ -195,13 +193,13 @@ button:disabled {
 	display: flex;
 	align-items: baseline;
 	gap: 6px;
-	font-size: 15px;
-	font-weight: 650;
+	font-size: 0.9375rem;
+	font-weight: 600;
 	letter-spacing: -0.01em;
 }
 
 .brand-badge {
-	font-size: 9px;
+	font-size: 0.6875rem;
 	font-weight: 600;
 	letter-spacing: 0.1em;
 	text-transform: uppercase;
@@ -213,7 +211,7 @@ button:disabled {
 }
 
 .titlebar-project {
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--text-faint);
 	max-width: 320px;
 	overflow: hidden;
@@ -262,14 +260,14 @@ button:disabled {
 	padding: 0 12px;
 	border-radius: 8px;
 	border: 1px solid transparent;
-	font-size: 13px;
+	font-size: 0.875rem;
 	white-space: nowrap;
 }
 
 .primary-button {
 	background: var(--accent);
 	color: var(--accent-contrast);
-	font-weight: 550;
+	font-weight: 500;
 }
 
 .primary-button:hover:not(:disabled) {
@@ -301,7 +299,7 @@ button:disabled {
 .ghost-button.small {
 	height: 26px;
 	padding: 0 8px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .pill {
@@ -312,7 +310,7 @@ button:disabled {
 	border-radius: 999px;
 	background: var(--fill-soft);
 	color: var(--text-secondary);
-	font-size: 11px;
+	font-size: 0.75rem;
 	white-space: nowrap;
 }
 
@@ -369,7 +367,7 @@ button:disabled {
 	border-radius: 9px;
 	background: var(--fill-soft);
 	color: var(--text-secondary);
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .new-task:hover:not(:disabled) {
@@ -394,7 +392,7 @@ button:disabled {
 	border-radius: 7px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 13px;
+	font-size: 0.875rem;
 	text-align: left;
 }
 
@@ -421,17 +419,17 @@ button:disabled {
 	align-items: center;
 	justify-content: space-between;
 	padding: 14px 6px 6px;
-	font-size: 11px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 }
 
 .side-section-title small {
-	font-size: 10px;
+	font-size: 0.6875rem;
 }
 
 .side-empty {
 	padding: 10px 8px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--text-faint);
 }
 
@@ -483,11 +481,11 @@ button:disabled {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .session-time {
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	color: var(--text-faint);
 	flex: none;
 }
@@ -527,7 +525,7 @@ button:disabled {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .project-action {
@@ -574,7 +572,6 @@ button:disabled {
 
 .welcome h1 {
 	margin: 0;
-	font-size: 25px;
 	letter-spacing: -0.03em;
 }
 
@@ -582,7 +579,7 @@ button:disabled {
 	margin: 0 0 8px;
 	max-width: 460px;
 	color: var(--text-secondary);
-	font-size: 13.5px;
+	font-size: 0.875rem;
 }
 
 .recent-projects {
@@ -616,7 +613,7 @@ button:disabled {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 }
 
 /* ---------- 对话页 ---------- */
@@ -646,8 +643,6 @@ button:disabled {
 
 .chat-title h2 {
 	margin: 0;
-	font-size: 15.5px;
-	font-weight: 600;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -657,7 +652,7 @@ button:disabled {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	font-size: 11px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 	margin-top: 2px;
 }
@@ -704,7 +699,7 @@ button:disabled {
 	padding: 56px 24px;
 	color: var(--text-faint);
 	text-align: center;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .chat-empty p {
@@ -721,7 +716,7 @@ button:disabled {
 	border-radius: 999px;
 	background: var(--surface-chrome);
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .load-error {
@@ -733,7 +728,7 @@ button:disabled {
 	border: 1px solid var(--danger);
 	border-radius: 9px;
 	color: var(--danger);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 }
 
 .turns {
@@ -760,7 +755,7 @@ button:disabled {
 	background: var(--bubble);
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
-	font-size: 14px;
+	font-size: 0.875rem;
 }
 
 .image-count {
@@ -772,7 +767,7 @@ button:disabled {
 	border-radius: 999px;
 	background: var(--fill-soft);
 	color: var(--text-secondary);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	vertical-align: 1px;
 }
 
@@ -789,7 +784,7 @@ button:disabled {
 /* ---------- Markdown ---------- */
 
 .prose {
-	font-size: 14px;
+	font-size: 0.875rem;
 	line-height: 1.72;
 	color: var(--text-primary);
 	overflow-wrap: anywhere;
@@ -810,26 +805,10 @@ button:disabled {
 .prose h1,
 .prose h2,
 .prose h3,
-.prose h4 {
+.prose h4,
+.prose h5,
+.prose h6 {
 	margin: 20px 0 8px;
-	line-height: 1.35;
-	font-weight: 620;
-}
-
-.prose h1 {
-	font-size: 21px;
-}
-
-.prose h2 {
-	font-size: 18px;
-}
-
-.prose h3 {
-	font-size: 16px;
-}
-
-.prose h4 {
-	font-size: 14.5px;
 }
 
 .prose ul,
@@ -854,8 +833,7 @@ button:disabled {
 }
 
 .prose code {
-	font-family: var(--font-mono);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	background: var(--fill-soft);
 	padding: 1.5px 4px;
 	border-radius: 4px;
@@ -873,7 +851,7 @@ button:disabled {
 .prose pre code {
 	background: transparent;
 	padding: 0;
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	line-height: 1.58;
 }
 
@@ -893,7 +871,7 @@ button:disabled {
 	width: 100%;
 	border-collapse: collapse;
 	margin: 0 0 14px;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .prose th,
@@ -969,7 +947,7 @@ button:disabled {
 	gap: 6px;
 	padding: 3px 0;
 	color: var(--text-faint);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	cursor: pointer;
 	list-style: none;
 }
@@ -987,7 +965,7 @@ button:disabled {
 	padding-left: 12px;
 	border-left: 2px solid var(--line);
 	color: var(--text-secondary);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	white-space: pre-wrap;
 	max-height: 320px;
 	overflow: auto;
@@ -1007,7 +985,7 @@ button:disabled {
 	border-radius: 6px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .tool-group-head:hover {
@@ -1020,7 +998,7 @@ button:disabled {
 }
 
 .tool-error-count {
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	color: var(--danger);
 }
 
@@ -1049,7 +1027,7 @@ button:disabled {
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .tool-row-main:hover {
@@ -1064,7 +1042,7 @@ button:disabled {
 }
 
 .tool-name {
-	font-weight: 550;
+	font-weight: 500;
 	color: var(--text-primary);
 	white-space: nowrap;
 }
@@ -1076,13 +1054,12 @@ button:disabled {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	color: var(--text-secondary);
-	font-family: var(--font-mono);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .tool-duration {
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	flex: none;
 }
 
@@ -1101,7 +1078,7 @@ button:disabled {
 	gap: 8px;
 	margin: 1px 0 4px 30px;
 	color: var(--text-faint);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	white-space: nowrap;
 	overflow: hidden;
 }
@@ -1116,7 +1093,7 @@ button:disabled {
 	border-radius: 4px;
 	background: var(--fill-soft);
 	color: var(--text-secondary);
-	font-size: 9.5px;
+	font-size: 0.6875rem;
 }
 
 .tool-detail-panel {
@@ -1134,7 +1111,8 @@ button:disabled {
 	overflow: auto;
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
-	font: 11.5px/1.55 var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.55;
 	color: var(--text-secondary);
 }
 
@@ -1149,7 +1127,7 @@ pre.is-error {
 }
 
 .detail-label {
-	font-size: 10px;
+	font-size: 0.6875rem;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	color: var(--text-faint);
@@ -1171,7 +1149,7 @@ pre.is-error {
 	border-radius: 6px;
 	background: var(--fill-soft);
 	color: var(--text-secondary);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .file-row:hover {
@@ -1180,7 +1158,7 @@ pre.is-error {
 }
 
 .file-op {
-	font-size: 10px;
+	font-size: 0.6875rem;
 	padding: 0 4px;
 	border-radius: 3px;
 	background: var(--fill-hover);
@@ -1199,7 +1177,6 @@ pre.is-error {
 }
 
 .file-path {
-	font-family: var(--font-mono);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -1213,7 +1190,7 @@ pre.is-error {
 	border-radius: 8px;
 	background: var(--fill-soft);
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	margin: 4px 0;
 }
 
@@ -1242,7 +1219,7 @@ pre.is-error {
 	display: flex;
 	align-items: center;
 	gap: 7px;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--text-secondary);
 	margin-bottom: 10px;
 }
@@ -1277,7 +1254,7 @@ pre.is-error {
 	display: flex;
 	align-items: center;
 	gap: 7px;
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .approval-title {
@@ -1291,7 +1268,7 @@ pre.is-error {
 	display: inline-flex;
 	align-items: center;
 	border-radius: 999px;
-	font-size: 10px;
+	font-size: 0.6875rem;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	background: var(--fill-soft);
@@ -1309,14 +1286,13 @@ pre.is-error {
 
 .approval-reason {
 	margin-top: 6px;
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	color: var(--text-secondary);
 }
 
 .approval-summary {
 	margin-top: 4px;
-	font-family: var(--font-mono);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1332,7 +1308,7 @@ pre.is-error {
 	border: none;
 	background: transparent;
 	color: var(--text-faint);
-	font-size: 11px;
+	font-size: 0.75rem;
 }
 
 .approval-preview {
@@ -1343,7 +1319,8 @@ pre.is-error {
 	border: 1px solid var(--line);
 	border-radius: 8px;
 	background: var(--code-bg);
-	font: 11.5px/1.55 var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.55;
 	white-space: pre-wrap;
 }
 
@@ -1366,7 +1343,7 @@ pre.is-error {
 	gap: 10px;
 	padding: 4px 4px 6px;
 	color: var(--text-faint);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .composer {
@@ -1394,7 +1371,7 @@ pre.is-error {
 	background: transparent;
 	padding: 3px 4px;
 	line-height: 1.55;
-	font-size: 14px;
+	font-size: 0.875rem;
 }
 
 .composer textarea::placeholder {
@@ -1461,7 +1438,7 @@ pre.is-error {
 	border-radius: 7px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	padding: 0 5px;
 	outline: none;
 }
@@ -1493,7 +1470,7 @@ pre.is-error {
 	border-radius: 6px;
 	background: transparent;
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 }
 
 .approval-option:hover {
@@ -1516,7 +1493,7 @@ pre.is-error {
 	border-radius: 8px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .chip-button:hover:not(:disabled) {
@@ -1565,7 +1542,7 @@ pre.is-error {
 	gap: 12px;
 	padding: 5px 7px 0;
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 }
 
 .running-text {
@@ -1585,7 +1562,7 @@ pre.is-error {
 	border-radius: 18px;
 	background: var(--surface-chrome);
 	color: var(--text-secondary);
-	font-size: 13px;
+	font-size: 0.875rem;
 	pointer-events: none;
 }
 
@@ -1625,7 +1602,7 @@ pre.is-error {
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 }
 
 .dropdown button:hover {
@@ -1669,13 +1646,12 @@ pre.is-error {
 
 .trust-card h2 {
 	margin: 0 0 6px;
-	font-size: 19px;
 }
 
 .trust-card p {
 	margin: 0 0 12px;
 	color: var(--text-secondary);
-	font-size: 13px;
+	font-size: 0.875rem;
 }
 
 .trust-files {
@@ -1686,7 +1662,8 @@ pre.is-error {
 	border-radius: 9px;
 	background: var(--code-bg);
 	color: var(--text-secondary);
-	font: 11.5px/1.7 var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.7;
 }
 
 .trust-actions {
@@ -1721,7 +1698,6 @@ pre.is-error {
 .modal-head h2,
 .modal-head h3 {
 	margin: 0;
-	font-size: 17px;
 }
 
 .modal-actions {
@@ -1763,7 +1739,7 @@ pre.is-error {
 	justify-content: center;
 	gap: 10px;
 	color: var(--text-faint);
-	font-size: 13px;
+	font-size: 0.875rem;
 	text-align: center;
 }
 
@@ -1784,12 +1760,11 @@ pre.is-error {
 
 .page-head h2 {
 	margin: 0;
-	font-size: 16px;
 }
 
 .page-subtitle {
 	margin: 2px 0 0;
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 	max-width: 680px;
 	overflow: hidden;
@@ -1844,7 +1819,7 @@ pre.is-error {
 	border-radius: 6px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	text-align: left;
 }
 
@@ -1874,14 +1849,14 @@ pre.is-error {
 
 .tree-row small {
 	margin-left: auto;
-	font-size: 10px;
+	font-size: 0.6875rem;
 	color: var(--text-faint);
 	flex: none;
 }
 
 .tree-empty {
 	padding: 5px 0 5px 38px;
-	font-size: 11px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 }
 
@@ -1904,15 +1879,14 @@ pre.is-error {
 }
 
 .file-preview-head strong {
-	font-family: var(--font-mono);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: 500;
 }
 
 .file-preview-head small {
 	display: block;
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	margin-top: 1px;
 }
 
@@ -1931,7 +1905,8 @@ pre.is-error {
 
 .code-view {
 	margin: 0;
-	font: 12px/1.58 var(--font-mono);
+	font-size: 0.8125rem;
+	line-height: 1.58;
 }
 
 .code-line {
@@ -1977,7 +1952,7 @@ pre.is-error {
 	border-radius: 7px;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	text-align: left;
 }
 
@@ -1996,13 +1971,12 @@ pre.is-error {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-family: var(--font-mono);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .change-row small {
 	color: var(--text-faint);
-	font-size: 10px;
+	font-size: 0.6875rem;
 	flex: none;
 }
 
@@ -2025,16 +1999,14 @@ pre.is-error {
 }
 
 .diff-head strong {
-	font-family: var(--font-mono);
-	font-size: 12px;
+	font-size: 0.8125rem;
 	font-weight: 500;
 }
 
 .diff-stats {
 	display: flex;
 	gap: 8px;
-	font-family: var(--font-mono);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .diff-stats .added {
@@ -2063,14 +2035,16 @@ pre.is-error {
 	padding: 4px 10px;
 	background: var(--fill-soft);
 	color: var(--text-faint);
-	font: 10.5px/1.5 var(--font-mono);
+	font-size: 0.6875rem;
+	line-height: 1.5;
 }
 
 .diff-line {
 	display: grid;
 	grid-template-columns: 44px 44px 18px 1fr;
 	min-height: 19px;
-	font: 11.5px/1.55 var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.55;
 }
 
 .diff-line.add {
@@ -2112,7 +2086,7 @@ pre.is-error {
 
 .trace-stats {
 	color: var(--text-faint);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .trace-list {
@@ -2135,7 +2109,7 @@ pre.is-error {
 }
 
 .turn-index {
-	font-size: 10px;
+	font-size: 0.6875rem;
 	font-weight: 600;
 	letter-spacing: 0.06em;
 	color: var(--text-faint);
@@ -2148,12 +2122,12 @@ pre.is-error {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	color: var(--text-secondary);
 }
 
 .trace-turn-head small {
-	font-size: 10px;
+	font-size: 0.6875rem;
 	color: var(--text-faint);
 }
 
@@ -2178,7 +2152,7 @@ pre.is-error {
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	position: relative;
 }
 
@@ -2216,7 +2190,7 @@ pre.is-error {
 }
 
 .trace-tag {
-	font-size: 9px;
+	font-size: 0.6875rem;
 	letter-spacing: 0.05em;
 	padding: 0 5px;
 	border-radius: 4px;
@@ -2249,7 +2223,7 @@ pre.is-error {
 }
 
 .trace-step small {
-	font-size: 10px;
+	font-size: 0.6875rem;
 	color: var(--text-faint);
 }
 
@@ -2269,12 +2243,11 @@ pre.is-error {
 
 .trace-detail-head h3 {
 	margin: 0;
-	font-size: 16px;
 }
 
 .status-pill {
 	margin-left: auto;
-	font-size: 10px;
+	font-size: 0.6875rem;
 	padding: 1px 7px;
 	border-radius: 999px;
 	background: var(--fill-soft);
@@ -2303,7 +2276,7 @@ pre.is-error {
 	padding-bottom: 12px;
 	border-bottom: 1px solid var(--line);
 	color: var(--text-faint);
-	font-size: 11px;
+	font-size: 0.75rem;
 }
 
 /* ---------- 会话 ---------- */
@@ -2335,7 +2308,7 @@ pre.is-error {
 	border: none;
 	outline: none;
 	background: transparent;
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 }
 
 .toggle-label {
@@ -2343,7 +2316,7 @@ pre.is-error {
 	align-items: center;
 	gap: 6px;
 	color: var(--text-secondary);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .sessions-table {
@@ -2368,7 +2341,7 @@ pre.is-error {
 	height: 34px;
 	background: var(--surface-main);
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	padding: 0 10px;
@@ -2405,19 +2378,18 @@ pre.is-error {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	font-size: 13px;
+	font-size: 0.875rem;
 	color: var(--text-primary);
 }
 
 .session-table-title small {
-	font-family: var(--font-mono);
-	font-size: 9.5px;
+	font-size: 0.6875rem;
 	color: var(--text-faint);
 }
 
 .session-table-time {
 	color: var(--text-faint);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .session-table-state {
@@ -2438,7 +2410,7 @@ pre.is-error {
 }
 
 .text-icon {
-	font-size: 11px;
+	font-size: 0.75rem;
 	font-weight: 600;
 }
 
@@ -2457,7 +2429,7 @@ pre.is-error {
 	gap: 9px;
 	padding: 6px 10px;
 	border-bottom: 1px solid var(--line);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .replay-row:last-child {
@@ -2468,16 +2440,14 @@ pre.is-error {
 	width: 42px;
 	flex: none;
 	color: var(--text-faint);
-	font-family: var(--font-mono);
-	font-size: 10px;
+	font-size: 0.6875rem;
 }
 
 .replay-type {
 	width: 122px;
 	flex: none;
 	color: var(--text-secondary);
-	font-family: var(--font-mono);
-	font-size: 10px;
+	font-size: 0.6875rem;
 }
 
 .replay-text {
@@ -2491,7 +2461,7 @@ pre.is-error {
 
 .replay-row small {
 	color: var(--text-faint);
-	font-size: 10px;
+	font-size: 0.6875rem;
 }
 
 /* ---------- 设置 ---------- */
@@ -2510,7 +2480,7 @@ pre.is-error {
 	border-bottom: 2px solid transparent;
 	background: transparent;
 	color: var(--text-secondary);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 }
 
 .settings-tab:hover {
@@ -2535,7 +2505,6 @@ pre.is-error {
 
 .settings-section h3 {
 	margin: 20px 0 6px;
-	font-size: 14px;
 }
 
 .settings-section h3:first-child {
@@ -2544,13 +2513,12 @@ pre.is-error {
 
 .settings-section h4 {
 	margin: 0;
-	font-size: 12.5px;
 }
 
 .settings-note {
 	margin: 0 0 14px;
 	color: var(--text-faint);
-	font-size: 12px;
+	font-size: 0.8125rem;
 }
 
 .section-head {
@@ -2565,7 +2533,7 @@ pre.is-error {
 	display: flex;
 	flex-direction: column;
 	gap: 5px;
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	color: var(--text-secondary);
 	max-width: 520px;
 	margin-bottom: 12px;
@@ -2579,7 +2547,7 @@ pre.is-error {
 	background: var(--surface-chrome);
 	padding: 0 10px;
 	outline: none;
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 }
 
 .field input:focus,
@@ -2614,7 +2582,7 @@ pre.is-error {
 	display: grid;
 	grid-template-columns: 110px 1fr 110px 1fr 80px 1fr;
 	gap: 6px;
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	color: var(--text-faint);
 }
 
@@ -2653,14 +2621,13 @@ pre.is-error {
 }
 
 .provider-title strong {
-	font-size: 13.5px;
+	font-size: 0.875rem;
 }
 
 .provider-url {
 	margin-top: 3px;
 	color: var(--text-faint);
-	font-family: var(--font-mono);
-	font-size: 11px;
+	font-size: 0.75rem;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -2672,7 +2639,7 @@ pre.is-error {
 	gap: 7px;
 	margin-top: 5px;
 	color: var(--text-faint);
-	font-size: 11px;
+	font-size: 0.75rem;
 }
 
 .provider-secret code {
@@ -2683,7 +2650,6 @@ pre.is-error {
 	padding: 1px 5px;
 	border-radius: 4px;
 	background: var(--fill-soft);
-	font-family: var(--font-mono);
 }
 
 .provider-actions {
@@ -2723,7 +2689,7 @@ pre.is-error {
 	background: var(--surface-main);
 	padding: 0 8px;
 	outline: none;
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .check {
@@ -2731,7 +2697,7 @@ pre.is-error {
 	align-items: center;
 	gap: 4px;
 	color: var(--text-secondary);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 }
 
 .button-row {
@@ -2756,12 +2722,12 @@ pre.is-error {
 	padding: 7px 9px;
 	border-radius: 7px;
 	background: var(--surface-chrome);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 	color: var(--text-secondary);
 }
 
 .skill-row strong {
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	color: var(--text-primary);
 }
 
@@ -2772,11 +2738,11 @@ pre.is-error {
 	padding: 7px 9px;
 	border-radius: 7px;
 	background: var(--surface-chrome);
-	font-size: 11.5px;
+	font-size: 0.75rem;
 }
 
 .mcp-row strong {
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 }
 
 .mcp-detail {
@@ -2786,14 +2752,13 @@ pre.is-error {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	color: var(--text-faint);
-	font-size: 11px;
+	font-size: 0.75rem;
 }
 
 .mcp-health {
 	padding: 4px 9px;
 	color: var(--text-faint);
-	font-family: var(--font-mono);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 }
 
 .status-dot {
@@ -2818,8 +2783,7 @@ pre.is-error {
 	border: 1px solid var(--line);
 	border-radius: 9px;
 	color: var(--text-faint);
-	font-family: var(--font-mono);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 	overflow-wrap: anywhere;
 }
 
@@ -2846,7 +2810,7 @@ pre.is-error {
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 	color: var(--text-secondary);
-	font-size: 12.5px;
+	font-size: 0.8125rem;
 	animation: toast-in 0.18s ease-out;
 }
 
@@ -2979,7 +2943,7 @@ pre.is-error {
 	border-radius: 5px;
 	background: transparent;
 	color: var(--text-faint);
-	font-size: 10.5px;
+	font-size: 0.6875rem;
 }
 
 .view-toggle button.is-active {
@@ -3002,7 +2966,8 @@ pre.is-error {
 	display: grid;
 	grid-template-columns: 44px 1fr;
 	min-width: 0;
-	font: 11.5px/1.55 var(--font-mono);
+	font-size: 0.75rem;
+	line-height: 1.55;
 	border-right: 1px solid var(--line);
 }
 
@@ -3061,6 +3026,6 @@ pre.is-error {
 	border: none;
 	outline: none;
 	background: transparent;
-	font-size: 12px;
+	font-size: 0.8125rem;
 	color: var(--text-primary);
 }

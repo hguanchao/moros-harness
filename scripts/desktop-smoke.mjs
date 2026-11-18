@@ -226,6 +226,37 @@ try {
 	await page.getByRole("button", { name: "信任并记住" }).click();
 	await page.waitForSelector(".trust-card", { state: "detached", timeout: 10_000 });
 	await page.screenshot({ path: join(shots, "02-chat-empty.png") });
+
+	const typography = await page.evaluate(() => {
+		const host = document.createElement("div");
+		host.style.cssText = "position:fixed;left:-9999px;top:0;visibility:hidden";
+		host.innerHTML = "<h1>x</h1><h2>x</h2><h3>x</h3><h4>x</h4><h5>x</h5><h6>x</h6><p>x</p><small>x</small>";
+		document.body.append(host);
+		const read = (element) => {
+			const style = getComputedStyle(element);
+			return { size: Number.parseFloat(style.fontSize), family: style.fontFamily, weight: style.fontWeight };
+		};
+		const entries = [...host.querySelectorAll("h1,h2,h3,h4,h5,h6,p,small")].map((element) => [
+			element.tagName.toLowerCase(),
+			read(element),
+		]);
+		host.remove();
+		return { entries, body: read(document.body) };
+	});
+	const fonts = Object.fromEntries(typography.entries);
+	const expected = { h1: 28, h2: 22, h3: 20, h4: 18, h5: 17, h6: 16, p: 15, small: 13 };
+	for (const [tag, size] of Object.entries(expected)) {
+		if (fonts[tag]?.size !== size) throw new Error(`typography ${tag}: expected ${size}px, got ${fonts[tag]?.size}`);
+	}
+	const families = new Set([typography.body.family, ...Object.values(fonts).map((entry) => entry.family)]);
+	if (families.size !== 1) throw new Error(`typography has ${families.size} font families`);
+	process.stdout.write(
+		`typography: ${Object.entries(fonts)
+			.map(([tag, entry]) => `${tag}=${entry.size}px/${entry.weight}`)
+			.join(", ")}; body=${typography.body.size}px; family unified
+`,
+	);
+
 	await page.fill(".composer textarea", "写一个说明文件");
 	await page.click(".send-button");
 	await page.waitForSelector(".approval-card", { timeout: 20_000 });
