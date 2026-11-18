@@ -1,30 +1,73 @@
-import type { JSX } from "react";
+import { useEffect, type JSX } from "react";
 
-import { PanelIcon } from "#src/desktop/renderer/icons.tsx";
+import { call } from "#src/desktop/renderer/api.ts";
+import { MaximizeIcon, MinusIcon, PanelIcon, RestoreIcon, XIcon } from "#src/desktop/renderer/icons.tsx";
+import { useApp } from "#src/desktop/renderer/state.tsx";
 
 export interface TitleBarProps {
-	readonly projectName?: string;
 	readonly sidebarOpen: boolean;
 	readonly onToggleSidebar: () => void;
 }
 
-/** 顶部标题栏；窗口控制按钮交给系统 overlay，避免自己实现拖拽/吸附语义。 */
-export function TitleBar({ projectName, sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.Element {
+/** Windows 11 风格标题栏：左侧只留侧栏开关，右侧自绘最小化/最大化/关闭。 */
+export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.Element {
+	const { state, dispatch } = useApp();
+	const isMac = state.app?.platform === "darwin";
+
+	useEffect(() => {
+		void call(window.moros.windowState())
+			.then((windowState) => {
+				dispatch({ type: "push", message: { type: "window-state", state: windowState } });
+			})
+			.catch(() => undefined);
+	}, [dispatch]);
+
 	return (
-		<header className="titlebar">
-			<button
-				className={`icon-button titlebar-toggle ${sidebarOpen ? "is-active" : ""}`}
-				aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
-				title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
-				onClick={onToggleSidebar}
-			>
-				<PanelIcon size={16} />
-			</button>
-			<div className="brand">
-				moros<span className="brand-badge">harness</span>
+		<header
+			className="titlebar"
+			onDoubleClick={(event) => {
+				if ((event.target as HTMLElement).closest("button") !== null) return;
+				void window.moros.windowToggleMaximize();
+			}}
+		>
+			<div className="titlebar-left">
+				<button
+					className={`titlebar-toggle ${sidebarOpen ? "is-active" : ""}`}
+					aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
+					title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
+					onClick={onToggleSidebar}
+				>
+					<PanelIcon size={16} />
+				</button>
 			</div>
-			{projectName !== undefined ? <div className="titlebar-project">{projectName}</div> : null}
-			<div className="titlebar-drag" />
+			{isMac ? null : (
+				<div className="caption-group">
+					<button
+						className="caption"
+						aria-label="最小化"
+						title="最小化"
+						onClick={() => void window.moros.windowMinimize()}
+					>
+						<MinusIcon size={14} />
+					</button>
+					<button
+						className="caption"
+						aria-label={state.windowMaximized ? "向下还原" : "最大化"}
+						title={state.windowMaximized ? "向下还原" : "最大化"}
+						onClick={() => void window.moros.windowToggleMaximize()}
+					>
+						{state.windowMaximized ? <RestoreIcon size={14} /> : <MaximizeIcon size={14} />}
+					</button>
+					<button
+						className="caption caption-close"
+						aria-label="关闭"
+						title="关闭"
+						onClick={() => void window.moros.windowClose()}
+					>
+						<XIcon size={14} />
+					</button>
+				</div>
+			)}
 		</header>
 	);
 }

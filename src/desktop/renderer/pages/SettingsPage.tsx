@@ -6,6 +6,7 @@ import type { SkillSummary } from "#src/core/skills.ts";
 import type { ModelCatalog } from "#src/core/core.ts";
 import type { ConfigSummary } from "#src/desktop/shared/contract.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
+import { PageHeader } from "#src/desktop/renderer/PageHeader.tsx";
 import {
 	AlertIcon,
 	CheckIcon,
@@ -105,16 +106,16 @@ export function SettingsPage(): JSX.Element {
 
 	return (
 		<div className="settings-page">
-			<header className="page-head">
-				<div>
-					<h2>设置</h2>
-					<p className="page-subtitle">全局配置写入 ~/.moros；当前会话的模型/强度选择会立即生效。</p>
-				</div>
-				<button className="ghost-button" onClick={() => void refresh()}>
-					<RefreshIcon size={14} />
-					刷新
-				</button>
-			</header>
+			<PageHeader
+				title="设置"
+				subtitle="全局配置写入 ~/.moros；当前会话的模型/强度选择会立即生效。"
+				actions={
+					<button className="ghost-button" onClick={() => void refresh()}>
+						<RefreshIcon size={14} />
+						刷新
+					</button>
+				}
+			/>
 
 			{loadError !== undefined ? <div className="inline-notice notice-error">{loadError}</div> : null}
 			<div className="settings-tabs">

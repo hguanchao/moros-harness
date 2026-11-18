@@ -3,6 +3,7 @@ import { useEffect, useState, type JSX, type ReactNode } from "react";
 import type { EventRecord } from "#src/core/events/schema.ts";
 import type { SessionMeta } from "#src/core/session/session-manager.ts";
 import { useDesktopActions } from "#src/desktop/renderer/actions.ts";
+import { PageHeader } from "#src/desktop/renderer/PageHeader.tsx";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
 import { firstLine, relativeTime } from "#src/desktop/renderer/format.ts";
 import {
@@ -87,22 +88,22 @@ export function SessionsPage(): JSX.Element {
 
 	return (
 		<div className="sessions-page">
-			<header className="page-head">
-				<div>
-					<h2>会话</h2>
-					<p className="page-subtitle">归档、回放、分叉与导出；与 TUI 共享同一份会话目录。</p>
-				</div>
-				<button
-					className="ghost-button"
-					onClick={() => {
-						void actions.refreshSessions();
-						dispatch({ type: "sessions-changed" });
-					}}
-				>
-					<RefreshIcon size={14} />
-					刷新
-				</button>
-			</header>
+			<PageHeader
+				title="会话"
+				subtitle="归档、回放、分叉与导出；与 TUI 共享同一份会话目录。"
+				actions={
+					<button
+						className="ghost-button"
+						onClick={() => {
+							void actions.refreshSessions();
+							dispatch({ type: "sessions-changed" });
+						}}
+					>
+						<RefreshIcon size={14} />
+						刷新
+					</button>
+				}
+			/>
 
 			<div className="sessions-toolbar">
 				<label className="search-box">

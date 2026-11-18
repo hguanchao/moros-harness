@@ -2,7 +2,17 @@ import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type 
 
 import type { PreparedImage, SessionView } from "#src/desktop/shared/contract.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
-import { CheckIcon, LinkIcon, PaperclipIcon, SendIcon, StopIcon, XIcon } from "#src/desktop/renderer/icons.tsx";
+import {
+	ArrowUpIcon,
+	ChevronDownIcon,
+	ImageIcon,
+	LinkIcon,
+	PlusIcon,
+	ShieldIcon,
+	SparklesIcon,
+	StopIcon,
+	XIcon,
+} from "#src/desktop/renderer/icons.tsx";
 import { useApp } from "#src/desktop/renderer/state.tsx";
 
 const MAX_IMAGES = 8;
@@ -16,6 +26,7 @@ export function Composer(): JSX.Element {
 	const [images, setImages] = useState<readonly PreparedImage[]>([]);
 	const [sending, setSending] = useState(false);
 	const [dragging, setDragging] = useState(false);
+	const [attachMenu, setAttachMenu] = useState(false);
 	const [showUrlInput, setShowUrlInput] = useState(false);
 	const [imageUrl, setImageUrl] = useState("");
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
@@ -25,19 +36,14 @@ export function Composer(): JSX.Element {
 	const running =
 		current?.running === true || (current !== undefined && state.runStates[current.meta.id] === "running");
 	const disabled = current === undefined || project === undefined || readOnly || trustBlocked;
+	const canSend = !disabled && !sending && (text.trim().length > 0 || images.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
-	const contextWindow =
-		current?.model === undefined
-			? undefined
-			: state.models.providers
-					.find((provider) => provider.name === current.model?.provider)
-					?.models.find((model) => model.id === current.model?.model)?.contextWindow;
 
 	useEffect(() => {
 		const element = textarea.current;
 		if (element === null) return;
 		element.style.height = "auto";
-		element.style.height = `${Math.min(element.scrollHeight, 220)}px`;
+		element.style.height = `${Math.min(element.scrollHeight, 140)}px`;
 	}, [text]);
 
 	useEffect(() => {
@@ -71,6 +77,7 @@ export function Composer(): JSX.Element {
 	};
 
 	const attach = async (): Promise<void> => {
+		setAttachMenu(false);
 		try {
 			const image = await call(window.moros.imagesPick());
 			if (image !== null) addImage(image);
@@ -222,6 +229,7 @@ export function Composer(): JSX.Element {
 				) : null}
 
 				<textarea
+					className="composer-input"
 					ref={textarea}
 					value={text}
 					rows={1}
@@ -243,27 +251,47 @@ export function Composer(): JSX.Element {
 					}}
 				/>
 
-				<div className="composer-bar">
+				<div className="composer-toolbar">
 					<div className="composer-left">
-						<button className="icon-button" title="附加图片" disabled={disabled} onClick={() => void attach()}>
-							<PaperclipIcon size={16} />
-						</button>
-						<button
-							className="icon-button"
-							title="从链接添加图片"
-							disabled={disabled}
-							onClick={() => setShowUrlInput(!showUrlInput)}
-						>
-							<LinkIcon size={15} />
-						</button>
-						{current !== undefined ? <ModelSelect current={current} onChange={changeModel} /> : null}
-						{current !== undefined ? <EffortSelect current={current} /> : null}
-					</div>
-					<div className="composer-right">
-						{current !== undefined ? <ApprovalSelect current={current} /> : null}
+						<div className="attach-wrap">
+							<button
+								className="add-button"
+								title="添加附件"
+								aria-label="添加附件"
+								disabled={disabled}
+								onClick={() => setAttachMenu(!attachMenu)}
+							>
+								<PlusIcon size={16} />
+							</button>
+							{attachMenu ? (
+								<>
+									<div className="menu-backdrop" onClick={() => setAttachMenu(false)} />
+									<div className="attach-menu">
+										<button
+											onClick={() => {
+												void attach();
+											}}
+										>
+											<ImageIcon size={15} />
+											图片文件
+										</button>
+										<button
+											onClick={() => {
+												setAttachMenu(false);
+												setShowUrlInput(true);
+											}}
+										>
+											<LinkIcon size={15} />
+											图片链接
+										</button>
+									</div>
+								</>
+							) : null}
+						</div>
+						{current !== undefined ? <ApprovalPicker current={current} /> : null}
 						{current !== undefined ? (
 							<button
-								className={`chip-button ${current.plan ? "is-active" : ""}`}
+								className={`plan-control ${current.plan ? "is-active" : ""}`}
 								disabled={running}
 								title="只读规划：模型只探索并提交计划"
 								onClick={() => {
@@ -272,10 +300,14 @@ export function Composer(): JSX.Element {
 									});
 								}}
 							>
-								{current.plan ? <CheckIcon size={13} /> : null}
-								计划
+								<SparklesIcon size={15} />
+								<span>{current.plan ? "计划模式" : "计划"}</span>
 							</button>
 						) : null}
+					</div>
+					<div className="composer-right">
+						{current !== undefined ? <ModelPicker current={current} onChange={changeModel} /> : null}
+						{current !== undefined ? <EffortPicker current={current} /> : null}
 						{running ? (
 							<button
 								className="stop-button"
@@ -288,33 +320,22 @@ export function Composer(): JSX.Element {
 							</button>
 						) : null}
 						<button
-							className="send-button"
+							className={`send-button ${canSend ? "is-ready" : ""}`}
 							title={running ? "加入队列" : "发送"}
 							disabled={disabled || sending}
 							onClick={() => void send()}
 						>
-							<SendIcon size={16} />
+							<ArrowUpIcon size={19} />
 						</button>
 					</div>
 				</div>
 			</div>
-			{current !== undefined ? (
-				<div className="composer-meta">
-					<span>
-						上下文 {formatTokens(current.metrics.contextUsed)}
-						{contextWindow === undefined ? "" : ` / ${formatTokens(contextWindow)}`}
-					</span>
-					<span>缓存命中 {(current.metrics.cacheHitRate * 100).toFixed(0)}%</span>
-					{running ? <span className="running-text">运行中…</span> : null}
-					{current.readOnly ? <span className="warn-text">只读</span> : null}
-				</div>
-			) : null}
 			{dragging ? <div className="drop-hint">松开以添加图片</div> : null}
 		</div>
 	);
 }
 
-function ModelSelect({
+function ModelPicker({
 	current,
 	onChange,
 }: {
@@ -325,85 +346,97 @@ function ModelSelect({
 	const providers = state.models.providers;
 	const selected = current.model;
 	const selectedValue = selected === undefined ? "" : JSON.stringify([selected.provider, selected.model]);
+	const label =
+		selected === undefined
+			? "选择模型"
+			: (providers
+					.find((provider) => provider.name === selected.provider)
+					?.models.find((model) => model.id === selected.model)?.name ?? selected.model);
 	return (
-		<select
-			className="composer-select"
-			value={selectedValue}
-			onChange={(event) => void onChange(event.target.value)}
-			title="切换模型（同时写入全局默认）"
-			onClick={(event) => event.stopPropagation()}
-		>
-			<option value="" disabled>
-				选择模型
-			</option>
-			{providers.map((provider) => (
-				<optgroup key={provider.name} label={provider.name}>
-					{provider.models.map((model) => (
-						<option key={`${provider.name}/${model.id}`} value={JSON.stringify([provider.name, model.id])}>
-							{model.name ?? model.id}
-						</option>
-					))}
-				</optgroup>
-			))}
-		</select>
+		<label className="composer-control model-picker" title="切换模型（同时写入全局默认）">
+			<span>{label}</span>
+			<ChevronDownIcon size={12} />
+			<select className="control-overlay" value={selectedValue} onChange={(event) => void onChange(event.target.value)}>
+				<option value="" disabled>
+					选择模型
+				</option>
+				{providers.map((provider) => (
+					<optgroup key={provider.name} label={provider.name}>
+						{provider.models.map((model) => (
+							<option key={`${provider.name}/${model.id}`} value={JSON.stringify([provider.name, model.id])}>
+								{model.name ?? model.id}
+							</option>
+						))}
+					</optgroup>
+				))}
+			</select>
+		</label>
 	);
 }
 
-function EffortSelect({ current }: { readonly current: SessionView }): JSX.Element {
+function EffortPicker({ current }: { readonly current: SessionView }): JSX.Element {
 	const { dispatch } = useApp();
 	return (
-		<select
-			className="composer-select"
-			value={current.effort}
-			title="推理强度（同时写入全局默认）"
-			onChange={(event) => {
-				const effort = event.target.value;
-				void call(window.moros.sessionSelectEffort(effort as SessionView["effort"])).catch((error: unknown) => {
-					dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-				});
-			}}
-		>
-			<option value="off">Effort Off</option>
-			<option value="minimal">Minimal</option>
-			<option value="low">Low</option>
-			<option value="medium">Medium</option>
-			<option value="high">High</option>
-			<option value="max">Max</option>
-		</select>
+		<label className="composer-control effort-picker" title="推理强度（同时写入全局默认）">
+			<span>{effortLabel(current.effort)}</span>
+			<ChevronDownIcon size={12} />
+			<select
+				className="control-overlay"
+				value={current.effort}
+				onChange={(event) => {
+					void call(window.moros.sessionSelectEffort(event.target.value as SessionView["effort"])).catch(
+						(error: unknown) => dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
+					);
+				}}
+			>
+				<option value="off">Off</option>
+				<option value="minimal">Minimal</option>
+				<option value="low">Low</option>
+				<option value="medium">Medium</option>
+				<option value="high">High</option>
+				<option value="max">Max</option>
+			</select>
+		</label>
 	);
 }
 
-function ApprovalSelect({ current }: { readonly current: SessionView }): JSX.Element {
+function ApprovalPicker({ current }: { readonly current: SessionView }): JSX.Element {
 	const { dispatch } = useApp();
-	const modes: readonly { value: SessionView["approval"]; label: string; title: string }[] = [
-		{ value: "ask", label: "Ask", title: "每次高风险动作都询问" },
-		{ value: "auto", label: "Auto", title: "低/中风险自动放行，高风险交审查模型" },
-		{ value: "yolo", label: "Yolo", title: "全部放行（denylist 仍硬拦截）" },
-	];
 	return (
-		<div className="approval-select" title="审批档位（仅本会话，不回写配置）">
-			{modes.map((mode) => (
-				<button
-					key={mode.value}
-					className={`approval-option ${current.approval === mode.value ? "is-active" : ""}`}
-					title={mode.title}
-					onClick={() => {
-						void call(window.moros.sessionSelectApproval(mode.value)).catch((error: unknown) => {
-							dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-						});
-					}}
-				>
-					{mode.label}
-				</button>
-			))}
-		</div>
+		<label className="composer-control permission" title="审批档位（仅本会话，不回写配置）">
+			<ShieldIcon size={16} />
+			<span>{approvalLabel(current.approval)}</span>
+			<ChevronDownIcon size={12} />
+			<select
+				className="control-overlay"
+				value={current.approval}
+				onChange={(event) => {
+					void call(window.moros.sessionSelectApproval(event.target.value as SessionView["approval"])).catch(
+						(error: unknown) => dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
+					);
+				}}
+			>
+				<option value="ask">每次确认</option>
+				<option value="auto">自动审批</option>
+				<option value="yolo">全部放行</option>
+			</select>
+		</label>
 	);
 }
 
-function formatTokens(tokens: number): string {
-	if (tokens < 1_000) return `${tokens}`;
-	if (tokens < 1_000_000) return `${(tokens / 1_000).toFixed(1)}k`;
-	return `${(tokens / 1_000_000).toFixed(1)}m`;
+function approvalLabel(mode: SessionView["approval"]): string {
+	if (mode === "ask") return "每次确认";
+	if (mode === "auto") return "自动审批";
+	return "全部放行";
+}
+
+function effortLabel(effort: SessionView["effort"]): string {
+	if (effort === "off") return "Off";
+	if (effort === "minimal") return "Minimal";
+	if (effort === "low") return "Low";
+	if (effort === "medium") return "Medium";
+	if (effort === "high") return "High";
+	return "Max";
 }
 
 function truncate(text: string, limit: number): string {

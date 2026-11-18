@@ -4,6 +4,8 @@
 
 桌面端是 Core 的第二个宿主：与 TUI 共用同一套会话目录、事件流、配置、审批与沙箱规则。桌面端不复制 Agent 业务逻辑，只负责窗口、IPC、状态投影与可视化页面。
 
+视觉基线是 `docs/reference/dsh-desktop-preview/replica.html`：40px 全宽标题栏 + 自绘窗口控制、侧栏项目树、左上圆角凹陷主区、760px 对话列与 22px 圆角输入框。壳与对话页的覆盖样式集中在 `src/desktop/renderer/replica.css`，设计令牌在 `styles.css`。
+
 对应 PRD 功能 34~38：
 
 - 功能 34 文件树：懒加载目录 + 文件监听失效

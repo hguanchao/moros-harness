@@ -4,6 +4,7 @@ import type { TraceStep, TraceTurn } from "#src/desktop/shared/contract.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
 import { firstLine, formatDuration, relativeTime } from "#src/desktop/renderer/format.ts";
 import { ListTreeIcon, RefreshIcon } from "#src/desktop/renderer/icons.tsx";
+import { PageHeader } from "#src/desktop/renderer/PageHeader.tsx";
 import { useApp } from "#src/desktop/renderer/state.tsx";
 
 interface Selection {
@@ -64,21 +65,21 @@ export function TracePage(): JSX.Element {
 
 	return (
 		<div className="trace-page">
-			<header className="page-head">
-				<div>
-					<h2>执行轨迹</h2>
-					<p className="page-subtitle">按回合展开模型请求、工具调用、审批与文件变更；事件流是唯一事实源。</p>
-				</div>
-				<div className="page-actions">
-					<span className="trace-stats">
-						{turns.length} 回合 · {turns.reduce((sum, turn) => sum + turn.steps.length, 0)} 步
-					</span>
-					<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
-						<RefreshIcon size={14} />
-						刷新
-					</button>
-				</div>
-			</header>
+			<PageHeader
+				title="执行轨迹"
+				subtitle="按回合展开模型请求、工具调用、审批与文件变更；事件流是唯一事实源。"
+				actions={
+					<>
+						<span className="trace-stats">
+							{turns.length} 回合 · {turns.reduce((sum, turn) => sum + turn.steps.length, 0)} 步
+						</span>
+						<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
+							<RefreshIcon size={14} />
+							刷新
+						</button>
+					</>
+				}
+			/>
 			{error !== undefined ? <div className="inline-notice notice-error">{error}</div> : null}
 			<div className="trace-body">
 				<div className="trace-list">

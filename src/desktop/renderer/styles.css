@@ -1,29 +1,43 @@
 :root {
 	color-scheme: dark;
 	--font-ui:
-		-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+		-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+		"Helvetica Neue", Helvetica, Arial, sans-serif;
 	--font-mono: ui-monospace, SFMono-Regular, "Cascadia Code", Consolas, "Liberation Mono", monospace;
 	--surface-sidebar: #202020;
-	--surface-main: #1b1c1f;
-	--surface-chrome: #252528;
-	--surface-raised: #2c2c30;
-	--text-primary: #f3f3f4;
-	--text-secondary: #a6a9b1;
-	--text-faint: #72757d;
-	--line: #34353a;
-	--line-strong: #46474d;
-	--fill-soft: rgba(255, 255, 255, 0.055);
-	--fill-hover: rgba(255, 255, 255, 0.08);
-	--row-selected: rgba(255, 255, 255, 0.13);
-	--accent: #f4f4f5;
-	--accent-contrast: #141416;
+	--surface-main: #131313;
+	--surface-chrome: #262626;
+	--surface-raised: #333333;
+	--surface-sunken: #0f0f0f;
+	--text-primary: #ffffff;
+	--text-secondary: #ededed;
+	--text-muted: #c4c4c4;
+	--text-dim: #9a9a9a;
+	--text-faint: #6e6e6e;
+	--line: rgba(255, 255, 255, 0.09);
+	--line-strong: rgba(255, 255, 255, 0.14);
+	--fill-soft: rgba(255, 255, 255, 0.06);
+	--fill-hover: rgba(255, 255, 255, 0.05);
+	--fill-strong: rgba(255, 255, 255, 0.12);
+	--row-selected: rgba(255, 255, 255, 0.14);
+	--accent: #ffffff;
+	--accent-soft: rgba(255, 255, 255, 0.16);
+	--accent-contrast: #101010;
+	--on-accent: #101010;
+	--accent-ring: rgba(255, 255, 255, 0.6);
+	--caption-hover: rgba(255, 255, 255, 0.08);
+	--caption-press: rgba(255, 255, 255, 0.13);
+	--close-hover: #4a4a4a;
+	--close-press: #3d3d3d;
 	--danger: #ff7b72;
 	--danger-soft: rgba(255, 123, 114, 0.12);
 	--ok: #72d69e;
 	--warn: #e6c07b;
-	--bubble: #28282b;
-	--shadow: 0 11px 30px rgba(0, 0, 0, 0.32);
-	--code-bg: #151517;
+	--bubble: #262626;
+	--send-idle-fg: rgba(255, 255, 255, 0.5);
+	--shadow: 0 24px 72px rgba(0, 0, 0, 0.32);
+	--shadow-soft: rgba(0, 0, 0, 0.1);
+	--code-bg: #0f0f0f;
 	--diff-add: rgba(63, 185, 80, 0.14);
 	--diff-remove: rgba(248, 81, 73, 0.13);
 	--diff-add-text: #7ee787;
@@ -38,31 +52,48 @@
 	--syn-comment: #7f848e;
 	--syn-function: #61afef;
 	--syn-variable: #e06c75;
+	--r-surface: 22px;
+	--recess-shadow:
+		inset 0 2px 12px -2px rgba(0, 0, 0, 0.85), inset 2px 0 10px -3px rgba(0, 0, 0, 0.55),
+		inset 0 1px 0 0 rgba(255, 255, 255, 0.16), inset 1px 0 0 0 rgba(255, 255, 255, 0.1);
 }
 
 :root[data-theme="light"] {
 	color-scheme: light;
 	--surface-sidebar: #ebebeb;
-	--surface-main: #f6f7fa;
-	--surface-chrome: #ffffff;
-	--surface-raised: #f0f1f4;
-	--text-primary: #17181b;
-	--text-secondary: #5e626b;
-	--text-faint: #8b8f98;
-	--line: #dddfe4;
-	--line-strong: #c9ccd3;
-	--fill-soft: rgba(0, 0, 0, 0.045);
-	--fill-hover: rgba(0, 0, 0, 0.065);
+	--surface-main: #f5f5f5;
+	--surface-chrome: #ececec;
+	--surface-raised: #ffffff;
+	--surface-sunken: #f7f7f7;
+	--text-primary: #0a0a0a;
+	--text-secondary: #262626;
+	--text-muted: #4a4a4a;
+	--text-dim: #707070;
+	--text-faint: #9e9e9e;
+	--line: rgba(0, 0, 0, 0.08);
+	--line-strong: rgba(0, 0, 0, 0.14);
+	--fill-soft: rgba(0, 0, 0, 0.05);
+	--fill-hover: rgba(0, 0, 0, 0.04);
+	--fill-strong: rgba(0, 0, 0, 0.09);
 	--row-selected: rgba(0, 0, 0, 0.1);
-	--accent: #0d0d0f;
+	--accent: #0a0a0a;
+	--accent-soft: rgba(10, 10, 10, 0.14);
 	--accent-contrast: #ffffff;
+	--on-accent: #ffffff;
+	--accent-ring: rgba(0, 0, 0, 0.5);
+	--caption-hover: rgba(0, 0, 0, 0.06);
+	--caption-press: rgba(0, 0, 0, 0.11);
+	--close-hover: #b5b5b5;
+	--close-press: #a0a0a0;
 	--danger: #c93c37;
 	--danger-soft: rgba(201, 60, 55, 0.1);
 	--ok: #1f8a4c;
 	--warn: #9a6b00;
-	--bubble: #f2f2f2;
-	--shadow: 0 11px 30px rgba(16, 24, 40, 0.08);
-	--code-bg: #f2f3f5;
+	--bubble: #ececec;
+	--send-idle-fg: rgba(10, 10, 10, 0.42);
+	--shadow: 0 24px 72px rgba(0, 0, 0, 0.14);
+	--shadow-soft: rgba(0, 0, 0, 0.08);
+	--code-bg: #f7f7f7;
 	--diff-add: rgba(31, 138, 76, 0.12);
 	--diff-remove: rgba(201, 60, 55, 0.1);
 	--diff-add-text: #176b3b;
@@ -77,6 +108,9 @@
 	--syn-comment: #8b8f98;
 	--syn-function: #2f6fd0;
 	--syn-variable: #b23b3b;
+	--recess-shadow:
+		inset 0 2px 12px -2px rgba(0, 0, 0, 0.16), inset 2px 0 10px -3px rgba(0, 0, 0, 0.1),
+		inset 0 1px 0 0 rgba(255, 255, 255, 1), inset 1px 0 0 0 rgba(255, 255, 255, 0.9);
 }
 
 * {
@@ -110,6 +144,9 @@ textarea {
 
 button {
 	cursor: pointer;
+	border: 0;
+	padding: 0;
+	background: none;
 }
 
 button:disabled {

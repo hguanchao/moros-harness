@@ -63,13 +63,6 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 		const window = getWindow();
 		if (window === undefined || window.isDestroyed()) return;
 		window.setBackgroundColor(dark ? "#202020" : "#ebebeb");
-		if (process.platform !== "darwin") {
-			window.setTitleBarOverlay({
-				color: dark ? "#202020" : "#ebebeb",
-				symbolColor: dark ? "#e6e6e6" : "#1f1f1f",
-				height: 44,
-			});
-		}
 	});
 
 	handle(IPC.sessionsList, getWindow, z.tuple([SessionListQuerySchema]), ([query]) =>

@@ -4,6 +4,7 @@ import type { WorkspaceEntry, ReadTextFileResult } from "#src/core/workspace/fil
 import { useDesktopActions } from "#src/desktop/renderer/actions.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
 import { formatBytes } from "#src/desktop/renderer/format.ts";
+import { PageHeader } from "#src/desktop/renderer/PageHeader.tsx";
 import {
 	ChevronDownIcon,
 	ChevronRightIcon,
@@ -90,18 +91,16 @@ export function FilesPage(): JSX.Element {
 
 	return (
 		<div className="files-page">
-			<header className="page-head">
-				<div>
-					<h2>文件</h2>
-					<p className="page-subtitle" title={project.root}>
-						{project.root}
-					</p>
-				</div>
-				<button className="ghost-button" onClick={() => setLocalVersion((value) => value + 1)}>
-					<RefreshIcon size={14} />
-					刷新
-				</button>
-			</header>
+			<PageHeader
+				title="文件"
+				subtitle={project.root}
+				actions={
+					<button className="ghost-button" onClick={() => setLocalVersion((value) => value + 1)}>
+						<RefreshIcon size={14} />
+						刷新
+					</button>
+				}
+			/>
 			<div className="files-body">
 				<div className="file-tree-pane">
 					<DirectoryNode

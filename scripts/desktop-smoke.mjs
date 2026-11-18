@@ -226,7 +226,6 @@ try {
 	await page.getByRole("button", { name: "信任并记住" }).click();
 	await page.waitForSelector(".trust-card", { state: "detached", timeout: 10_000 });
 	await page.screenshot({ path: join(shots, "02-chat-empty.png") });
-
 	await page.fill(".composer textarea", "写一个说明文件");
 	await page.click(".send-button");
 	await page.waitForSelector(".approval-card", { timeout: 20_000 });
@@ -238,13 +237,15 @@ try {
 	await page.waitForSelector(".file-row", { timeout: 10_000 });
 	await page.screenshot({ path: join(shots, "04-chat-tool.png") });
 
-	await page.locator(".side-nav").getByRole("button", { name: "文件", exact: true }).click();
+	await page.locator('.main-bar button[title="文件"]').click();
 	await page.waitForSelector(".file-tree-pane .tree-row.file", { timeout: 10_000 });
 	await page.locator(".tree-row", { hasText: "notes" }).first().click();
 	await page.locator(".tree-row.file", { hasText: "hello.txt" }).waitFor({ timeout: 10_000 });
 	await page.screenshot({ path: join(shots, "05-files-live.png") });
 
-	await page.locator(".side-nav").getByRole("button", { name: "变更", exact: true }).click();
+	await page.locator(".page-back").click();
+	await page.waitForSelector(".main-bar", { timeout: 10_000 });
+	await page.locator('.main-bar button[title="变更"]').click();
 	await page.waitForSelector(".change-row", { timeout: 10_000 });
 	await page.waitForSelector(".diff-hunk", { timeout: 10_000 });
 	await page.screenshot({ path: join(shots, "06-changes.png") });
@@ -263,7 +264,9 @@ try {
 	}
 	if (fileExists) throw new Error("rollback did not remove the written file");
 
-	await page.locator(".side-nav").getByRole("button", { name: "文件", exact: true }).click();
+	await page.locator(".page-back").click();
+	await page.waitForSelector(".main-bar", { timeout: 10_000 });
+	await page.locator('.main-bar button[title="文件"]').click();
 	await page.waitForSelector(".file-tree-pane .tree-row.file", { timeout: 10_000 });
 	await page.getByRole("button", { name: /README\.md/ }).click();
 	await page.waitForSelector(".code-view", { timeout: 10_000 });
@@ -282,24 +285,31 @@ try {
 	});
 	await page.screenshot({ path: join(shots, "10-plan-approved.png") });
 
-	await page.locator(".side-nav").getByRole("button", { name: "轨迹", exact: true }).click();
+	await page.locator('.main-bar button[title="快速操作"]').click();
+	await page.waitForSelector(".side-panel.is-open", { timeout: 10_000 });
+	await page.waitForTimeout(400);
+	await page.screenshot({ path: join(shots, "11-panel.png") });
+	await page.locator(".side-panel .tab-close").click();
+	await page.waitForTimeout(300);
+
+	await page.locator('.main-bar button[title="轨迹"]').click();
 	await page.waitForSelector(".trace-turn", { timeout: 10_000 });
-	await page.screenshot({ path: join(shots, "11-trace.png") });
+	await page.screenshot({ path: join(shots, "12-trace.png") });
 
-	await page.locator(".side-nav").getByRole("button", { name: "会话", exact: true }).click();
+	await page.locator('.workspace-tools button[title="会话管理"]').click();
 	await page.waitForSelector(".session-table-row", { timeout: 10_000 });
-	await page.screenshot({ path: join(shots, "12-sessions.png") });
+	await page.screenshot({ path: join(shots, "13-sessions.png") });
 
-	await page.locator(".side-nav").getByRole("button", { name: "设置", exact: true }).click();
+	await page.locator('.workspace-tools button[title="设置"]').click();
 	await page.getByRole("button", { name: "供应商", exact: true }).click();
 	await page.waitForSelector(".provider-card", { timeout: 10_000 });
-	await page.screenshot({ path: join(shots, "13-settings.png") });
+	await page.screenshot({ path: join(shots, "14-settings.png") });
 
-	const themeButton = page.locator(".sidebar-footer button[aria-label^='主题']");
+	const themeButton = page.locator('.workspace-tools button[aria-label^="主题"]');
 	await themeButton.click();
 	await themeButton.click();
 	await page.waitForTimeout(400);
-	await page.screenshot({ path: join(shots, "14-theme.png") });
+	await page.screenshot({ path: join(shots, "15-theme.png") });
 
 	const { Core } = await import("#src/core/index.ts");
 	const core = new Core({ homeDir: home });

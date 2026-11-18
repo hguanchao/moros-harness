@@ -45,3 +45,9 @@ export function firstLine(text: string, limit = 120): string {
 export function displayPath(path: string): string {
 	return path.replaceAll("\\", "/");
 }
+
+export function formatTokens(tokens: number): string {
+	if (tokens < 1_000) return `${tokens}`;
+	if (tokens < 1_000_000) return `${(tokens / 1_000).toFixed(1)}k`;
+	return `${(tokens / 1_000_000).toFixed(1)}m`;
+}

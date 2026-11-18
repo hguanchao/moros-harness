@@ -5,6 +5,7 @@ import type { DiffHunk, DiffLine } from "#src/core/diff/line-diff.ts";
 import type { CheckpointView, FileChangeSummary } from "#src/desktop/shared/contract.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
 import { displayPath, relativeTime } from "#src/desktop/renderer/format.ts";
+import { PageHeader } from "#src/desktop/renderer/PageHeader.tsx";
 import { AlertIcon, CheckIcon, DiffIcon, RefreshIcon, XIcon } from "#src/desktop/renderer/icons.tsx";
 import { useApp } from "#src/desktop/renderer/state.tsx";
 
@@ -83,60 +84,60 @@ export function ChangesPage(): JSX.Element {
 
 	return (
 		<div className="changes-page">
-			<header className="page-head">
-				<div>
-					<h2>变更</h2>
-					<p className="page-subtitle">文件工具产生的快照；shell 改动由审批与审计兜底。</p>
-				</div>
-				<div className="page-actions">
-					<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
-						<RefreshIcon size={14} />
-						刷新
-					</button>
-					{checkpoint !== null ? (
+			<PageHeader
+				title="变更"
+				subtitle="文件工具产生的快照；shell 改动由审批与审计兜底。"
+				actions={
+					<>
+						<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
+							<RefreshIcon size={14} />
+							刷新
+						</button>
+						{checkpoint !== null ? (
+							<button
+								className="ghost-button"
+								onClick={() => {
+									if (!window.confirm("恢复到最近检查点？当前工作区中该检查点涉及的文件会被写回。")) return;
+									void (async () => {
+										try {
+											const result = await call(window.moros.sessionsRestore(checkpoint.id));
+											dispatch({
+												type: "notice",
+												level: "info",
+												message: `已恢复 ${result.restored} 个文件，删除 ${result.removed} 个`,
+											});
+											setVersion((value) => value + 1);
+										} catch (restoreError) {
+											dispatch({ type: "notice", level: "error", message: errorMessage(restoreError) });
+										}
+									})();
+								}}
+							>
+								<CheckIcon size={14} />
+								恢复检查点
+							</button>
+						) : null}
 						<button
-							className="ghost-button"
+							className="danger-button"
 							onClick={() => {
-								if (!window.confirm("恢复到最近检查点？当前工作区中该检查点涉及的文件会被写回。")) return;
+								if (!window.confirm("撤销最近一次文件改动？")) return;
 								void (async () => {
 									try {
-										const result = await call(window.moros.sessionsRestore(checkpoint.id));
-										dispatch({
-											type: "notice",
-											level: "info",
-											message: `已恢复 ${result.restored} 个文件，删除 ${result.removed} 个`,
-										});
+										await call(window.moros.sessionsRollback());
+										dispatch({ type: "notice", level: "info", message: "已撤销最近一步改动" });
 										setVersion((value) => value + 1);
-									} catch (restoreError) {
-										dispatch({ type: "notice", level: "error", message: errorMessage(restoreError) });
+									} catch (rollbackError) {
+										dispatch({ type: "notice", level: "error", message: errorMessage(rollbackError) });
 									}
 								})();
 							}}
 						>
-							<CheckIcon size={14} />
-							恢复检查点
+							<XIcon size={14} />
+							撤销最近一步
 						</button>
-					) : null}
-					<button
-						className="danger-button"
-						onClick={() => {
-							if (!window.confirm("撤销最近一次文件改动？")) return;
-							void (async () => {
-								try {
-									await call(window.moros.sessionsRollback());
-									dispatch({ type: "notice", level: "info", message: "已撤销最近一步改动" });
-									setVersion((value) => value + 1);
-								} catch (rollbackError) {
-									dispatch({ type: "notice", level: "error", message: errorMessage(rollbackError) });
-								}
-							})();
-						}}
-					>
-						<XIcon size={14} />
-						撤销最近一步
-					</button>
-				</div>
-			</header>
+					</>
+				}
+			/>
 
 			{error !== undefined ? <div className="inline-notice notice-error">{error}</div> : null}
 			<div className="changes-body">

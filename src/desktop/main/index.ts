@@ -7,7 +7,7 @@ import { DesktopHost } from "#src/desktop/main/core-host.ts";
 import { registerIpc } from "#src/desktop/main/ipc.ts";
 import { PUSH_CHANNEL } from "#src/desktop/shared/contract.ts";
 
-const TITLEBAR_HEIGHT = 44;
+const TITLEBAR_HEIGHT = 40;
 const DARK_SURFACE = "#202020";
 const LIGHT_SURFACE = "#ebebeb";
 
@@ -77,21 +77,16 @@ function createWindow(
 	const initialSurface = initialDark ? DARK_SURFACE : LIGHT_SURFACE;
 	const window = new BrowserWindow({
 		...(safeBounds ?? { width: 1440, height: 900 }),
-		minWidth: 980,
-		minHeight: 640,
+		minWidth: 860,
+		minHeight: 560,
+		resizable: true,
+		minimizable: true,
+		maximizable: true,
 		show: false,
 		title: "Moros Harness",
 		backgroundColor: initialSurface,
 		titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
-		...(process.platform === "darwin"
-			? { trafficLightPosition: { x: 16, y: 16 } }
-			: {
-					titleBarOverlay: {
-						color: initialSurface,
-						symbolColor: initialDark ? "#e6e6e6" : "#1f1f1f",
-						height: TITLEBAR_HEIGHT,
-					},
-				}),
+		...(process.platform === "darwin" ? { trafficLightPosition: { x: 16, y: 14 } } : {}),
 		webPreferences: {
 			preload: join(__dirname, "../preload/index.cjs"),
 			contextIsolation: true,

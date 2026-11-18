@@ -335,3 +335,70 @@ export function LinkIcon(props: IconProps): JSX.Element {
 		</Icon>
 	);
 }
+
+export function MinusIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M5 12h14" />
+		</Icon>
+	);
+}
+
+export function MaximizeIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="4" y="4" width="16" height="16" rx="1.5" />
+		</Icon>
+	);
+}
+
+export function RestoreIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="8" y="8" width="12" height="12" rx="1.5" />
+			<path d="M4 16V5a1 1 0 0 1 1-1h11" />
+		</Icon>
+	);
+}
+
+export function ChevronLeftIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="m15 18-6-6 6-6" />
+		</Icon>
+	);
+}
+
+export function ShieldIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.49 20.5 4 18 4 13V5a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 2.8 17 4 19 4a1 1 0 0 1 1 1Z" />
+		</Icon>
+	);
+}
+
+export function ArrowUpIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M12 19V5M5 12l7-7 7 7" />
+		</Icon>
+	);
+}
+
+export function MessagePlusIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+			<path d="M12 7v6M9 10h6" />
+		</Icon>
+	);
+}
+
+export function PanelRightIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="3" y="3" width="18" height="18" rx="2" />
+			<path d="M15 3v18" />
+		</Icon>
+	);
+}
