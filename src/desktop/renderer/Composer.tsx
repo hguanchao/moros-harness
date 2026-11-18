@@ -26,6 +26,12 @@ export function Composer(): JSX.Element {
 		current?.running === true || (current !== undefined && state.runStates[current.meta.id] === "running");
 	const disabled = current === undefined || project === undefined || readOnly || trustBlocked;
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
+	const contextWindow =
+		current?.model === undefined
+			? undefined
+			: state.models.providers
+					.find((provider) => provider.name === current.model?.provider)
+					?.models.find((model) => model.id === current.model?.model)?.contextWindow;
 
 	useEffect(() => {
 		const element = textarea.current;
@@ -294,7 +300,10 @@ export function Composer(): JSX.Element {
 			</div>
 			{current !== undefined ? (
 				<div className="composer-meta">
-					<span>上下文 {formatTokens(current.metrics.contextUsed)}</span>
+					<span>
+						上下文 {formatTokens(current.metrics.contextUsed)}
+						{contextWindow === undefined ? "" : ` / ${formatTokens(contextWindow)}`}
+					</span>
 					<span>缓存命中 {(current.metrics.cacheHitRate * 100).toFixed(0)}%</span>
 					{running ? <span className="running-text">运行中…</span> : null}
 					{current.readOnly ? <span className="warn-text">只读</span> : null}

@@ -29,6 +29,13 @@ const marked = new Marked({
 			const titleAttr = title === null || title === undefined ? "" : ` title="${escapeHtml(title)}"`;
 			return `<a href="${escapeHtml(safeHref)}"${titleAttr} target="_blank" rel="noreferrer noopener">${text}</a>`;
 		},
+		image({ href, title, text }) {
+			// 模型输出不自动加载图片：远程图片会泄露访问行为，data: 图片也可能无限膨胀。
+			const label = text.length > 0 ? text : "image";
+			if (!isSafeLink(href)) return `<span>${escapeHtml(label)}</span>`;
+			const titleAttr = title === null || title === undefined ? "" : ` title="${escapeHtml(title)}"`;
+			return `<a href="${escapeHtml(href)}"${titleAttr} target="_blank" rel="noreferrer noopener">${escapeHtml(label)}</a>`;
+		},
 	},
 });
 

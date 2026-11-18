@@ -731,7 +731,7 @@ export class DesktopHost {
 		const window = this.#getWindow();
 		const result = await showOpenDialog(window, {
 			title: "附加图片",
-			properties: ["openFile", "multiSelections"],
+			properties: ["openFile"],
 			filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "gif"] }],
 		});
 		if (result.canceled || result.filePaths.length === 0) return null;

@@ -138,7 +138,7 @@ export function SettingsPage(): JSX.Element {
 
 			<div className="settings-body">
 				{tab === "models" && settings !== undefined ? (
-					<ModelsTab settings={settings} models={models} onUpdate={update} />
+					<ModelsTab settings={settings} models={models} onUpdate={update} onRefresh={refresh} />
 				) : null}
 				{tab === "providers" && settings !== undefined ? (
 					<ProvidersTab
@@ -146,7 +146,16 @@ export function SettingsPage(): JSX.Element {
 						editing={editing}
 						revealed={revealed}
 						onEdit={setEditing}
-						onRevealed={(name, value) => setRevealed((existing) => ({ ...existing, [name]: value }))}
+						onRevealed={(name, value) =>
+							setRevealed((existing) => {
+								if (value === undefined) {
+									const next = { ...existing };
+									delete next[name];
+									return next;
+								}
+								return { ...existing, [name]: value };
+							})
+						}
 						onRefresh={refresh}
 						onNotice={(level, message) => dispatch({ type: "notice", level, message })}
 					/>
@@ -207,10 +216,12 @@ function ModelsTab({
 	settings,
 	models,
 	onUpdate,
+	onRefresh,
 }: {
 	readonly settings: SettingsSnapshot;
 	readonly models: ModelCatalog | undefined;
 	readonly onUpdate: (patch: SettingsPatch, message?: string) => Promise<SettingsSnapshot | undefined>;
+	readonly onRefresh: () => Promise<void>;
 }): JSX.Element {
 	const { state, dispatch } = useApp();
 	const provider = settings.config.provider ?? "";
@@ -223,6 +234,7 @@ function ModelsTab({
 			const [nextProvider, nextModel] = JSON.parse(value) as [string, string];
 			if (state.current !== undefined) {
 				await call(window.moros.sessionSelectModel(nextProvider, nextModel));
+				await onRefresh();
 			} else {
 				await onUpdate({ provider: nextProvider, model: nextModel }, "默认模型已更新");
 			}
@@ -333,7 +345,7 @@ function ProvidersTab({
 	readonly editing: ProviderForm | undefined;
 	readonly revealed: Record<string, string>;
 	readonly onEdit: (form: ProviderForm | undefined) => void;
-	readonly onRevealed: (name: string, value: string) => void;
+	readonly onRevealed: (name: string, value: string | undefined) => void;
 	readonly onRefresh: () => Promise<void>;
 	readonly onNotice: (level: "info" | "warn" | "error", message: string) => void;
 }): JSX.Element {
@@ -409,7 +421,7 @@ function ProvidersTab({
 									title={revealed[provider.name] === undefined ? "显示原始表达式" : "隐藏"}
 									onClick={() => {
 										if (revealed[provider.name] !== undefined) {
-											onRevealed(provider.name, "");
+											onRevealed(provider.name, undefined);
 											return;
 										}
 										void call(window.moros.settingsRevealSecret(provider.name))

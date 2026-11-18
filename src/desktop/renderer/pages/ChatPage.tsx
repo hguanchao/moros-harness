@@ -237,6 +237,7 @@ function ApprovalPanel({
 			await call(window.moros.approvalRespond(card.id, decision));
 		} catch (error) {
 			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+		} finally {
 			setBusy(false);
 		}
 	};

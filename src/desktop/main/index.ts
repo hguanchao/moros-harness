@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
-import { BrowserWindow, Menu, app, dialog, screen, session } from "electron";
+import { BrowserWindow, Menu, app, dialog, nativeTheme, screen, session } from "electron";
 
 import { DesktopHost } from "#src/desktop/main/core-host.ts";
 import { registerIpc } from "#src/desktop/main/ipc.ts";
@@ -73,20 +73,22 @@ function createWindow(
 	maximized: boolean,
 ): BrowserWindow {
 	const safeBounds = visibleBounds(bounds);
+	const initialDark = nativeTheme.shouldUseDarkColors;
+	const initialSurface = initialDark ? DARK_SURFACE : LIGHT_SURFACE;
 	const window = new BrowserWindow({
 		...(safeBounds ?? { width: 1440, height: 900 }),
 		minWidth: 980,
 		minHeight: 640,
 		show: false,
 		title: "Moros Harness",
-		backgroundColor: DARK_SURFACE,
+		backgroundColor: initialSurface,
 		titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
 		...(process.platform === "darwin"
 			? { trafficLightPosition: { x: 16, y: 16 } }
 			: {
 					titleBarOverlay: {
-						color: DARK_SURFACE,
-						symbolColor: "#e6e6e6",
+						color: initialSurface,
+						symbolColor: initialDark ? "#e6e6e6" : "#1f1f1f",
 						height: TITLEBAR_HEIGHT,
 					},
 				}),
