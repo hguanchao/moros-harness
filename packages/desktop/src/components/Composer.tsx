@@ -230,7 +230,7 @@ export function Composer(): JSX.Element {
 							? "请先确认工作区信任"
 							: readOnly
 								? "该会话正在另一个窗口中使用，当前为只读"
-									: "描述你的任务，/调用指令，@文件或对话"
+								: "描述你的任务，/调用指令，@文件或对话"
 					}
 					onChange={(event) => setText(event.target.value)}
 					onPaste={onPaste}
