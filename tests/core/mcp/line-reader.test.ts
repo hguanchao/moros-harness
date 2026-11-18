@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { JsonRpcLineReader } from "#src/core/mcp/line-reader.ts";
-import type { JsonRpcMessage } from "#src/core/mcp/json-rpc.ts";
+import { JsonRpcLineReader } from "@moros/core/mcp/line-reader.ts";
+import type { JsonRpcMessage } from "@moros/core/mcp/json-rpc.ts";
 
 function reader(options: { maxMessageBytes?: number; maxStderrBytes?: number } = {}) {
 	const messages: JsonRpcMessage[] = [];

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseReviewVerdict } from "#src/core/review.ts";
+import { parseReviewVerdict } from "@moros/core/review.ts";
 
 describe("parseReviewVerdict", () => {
 	it("解析 allow 布尔结论", () => {

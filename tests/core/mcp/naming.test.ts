@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createMcpToolName, mcpNamespace } from "#src/core/mcp/naming.ts";
+import { createMcpToolName, mcpNamespace } from "@moros/core/mcp/naming.ts";
 
 describe("MCP 工具命名", () => {
 	it("使用 mcp__<server>__<tool>，并把非法字符转成下划线", () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { normalizeConfigKeys } from "#src/core/config/keys.ts";
-import { parseConfig } from "#src/core/config/schema.ts";
+import { normalizeConfigKeys } from "@moros/core/config/keys.ts";
+import { parseConfig } from "@moros/core/config/schema.ts";
 
 describe("辅助模型配置", () => {
 	it("接受顶层的 compact_model 与 review_model", () => {

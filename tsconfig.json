@@ -18,8 +18,8 @@
 		"verbatimModuleSyntax": true,
 		"types": ["node", "vitest/globals", "vite/client"],
 		"paths": {
-			"highlight.js": ["./src/types/highlight.js.d.ts"]
+			"highlight.js": ["./packages/desktop/src/types/highlight.js.d.ts"]
 		}
 	},
-	"include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"]
+	"include": ["packages/**/*.ts", "packages/**/*.tsx", "tests/**/*.ts"]
 }

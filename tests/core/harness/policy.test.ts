@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createPolicy } from "#src/core/harness/policy.ts";
+import { createPolicy } from "@moros/core/harness/policy.ts";
 
 describe("createPolicy", () => {
 	it("只读档拒绝写入与命令，且不启用快照", () => {

@@ -4,7 +4,7 @@
 
 桌面端是 Core 的第二个宿主：与 TUI 共用同一套会话目录、事件流、配置、审批与沙箱规则。桌面端不复制 Agent 业务逻辑，只负责窗口、IPC、状态投影与可视化页面。
 
-视觉基线是 `docs/reference/dsh-desktop-preview/replica.html`：40px 全宽标题栏 + 自绘窗口控制、侧栏项目树、左上圆角凹陷主区、760px 对话列与 22px 圆角输入框。壳与对话页的覆盖样式集中在 `src/desktop/renderer/replica.css`，设计令牌在 `styles.css`。
+视觉基线是 `docs/reference/dsh-desktop-preview/replica.html`：40px 全宽标题栏 + 自绘窗口控制、侧栏项目树、左上圆角凹陷主区、760px 对话列与 22px 圆角输入框。设计令牌在 `styles/base.css`，页面样式按职责拆分在 `styles/` 目录。
 
 对应 PRD 功能 34~38：
 
@@ -43,20 +43,26 @@ Renderer（React，无 Node 权限）
 ## 3. 目录
 
 ```text
-src/desktop/
-├─ shared/contract.ts     # IPC 通道、DTO、推送消息、RpcResult
-├─ main/
-│  ├─ index.ts            # app 生命周期、窗口、CSP、权限、PATH
-│  ├─ core-host.ts        # 项目/会话/租约/运行队列/审批/流式缓冲
-│  ├─ ipc.ts              # 白名单 handler、zod 校验、错误码
-│  ├─ trace.ts            # 事件 -> 回合/步骤投影
-│  └─ store.ts            # 最近项目与窗口位置（userData）
-├─ preload/index.ts
-└─ renderer/
-   ├─ App.tsx / state.tsx / actions.ts
-   ├─ pages/              # chat / files / changes / trace / sessions / settings
-   ├─ Composer.tsx / transcript.tsx / Sidebar.tsx / TitleBar.tsx
-   └─ styles.css
+packages/desktop/                # @moros/desktop
+├─ electron.vite.config.ts / electron-builder.yml
+├─ build/                        # 应用图标（icon.png/ico/svg）
+├─ out/                          # 构建产物 main/preload/renderer
+├─ dist-desktop/                 # 安装包产物
+├─ scripts/desktop-smoke.mjs     # 本地冒烟脚本
+└─ src/
+   ├─ shared/contract.ts         # IPC 通道、DTO、推送消息、RpcResult
+   ├─ main/
+   │  ├─ index.ts                # app 生命周期、窗口、CSP、权限、PATH
+   │  ├─ core-host.ts            # 项目/会话/租约/运行队列/审批/流式缓冲
+   │  ├─ ipc.ts                  # 白名单 handler、zod 校验、错误码
+   │  ├─ trace.ts                # 事件 -> 回合/步骤投影
+   │  └─ store.ts                # 最近项目与窗口位置（userData）
+   ├─ preload/index.ts
+   └─ renderer/
+      ├─ App.tsx / state.tsx / actions.ts
+      ├─ pages/                  # chat / files / changes / trace / sessions / settings
+      ├─ Composer.tsx / transcript.tsx / Sidebar.tsx / TitleBar.tsx
+      └─ styles.css / styles/    # 聚合入口 + 按职责拆分的样式文件
 ```
 
 ## 4. 开发与构建
@@ -64,20 +70,20 @@ src/desktop/
 CLI/TUI 仍由 Node 原生类型擦除直接运行，不经过桌面端构建：
 
 ```bash
-npm run dev            # TUI
-npm test               # 单元测试
-npm run typecheck      # 全仓类型检查
-npm run desktop:dev    # Electron + Vite dev server
-npm run desktop:build  # 产出 out/main、out/preload、out/renderer
-npm run desktop:smoke  # 构建后跑本地 mock 端到端冒烟
-npm run desktop:package
+pnpm dev               # TUI
+pnpm test              # 单元测试
+pnpm typecheck         # 全仓类型检查
+pnpm desktop:dev       # Electron + Vite dev server
+pnpm desktop:build     # 产出 packages/desktop/out/{main,preload,renderer}
+pnpm desktop:smoke     # 构建后跑本地 mock 端到端冒烟
+pnpm desktop:package
 ```
 
-`electron-vite` 负责 main/preload/renderer 三入口打包；`electron-builder.yml` 提供 Windows NSIS、macOS DMG、Linux AppImage 目标。`package.json` 的 `imports` 是 `#src/*` 的唯一映射，构建器直接复用。
+`electron-vite` 负责 main/preload/renderer 三入口打包；`electron-builder.yml` 提供 Windows NSIS、macOS DMG、Linux AppImage 目标。跨包引用使用 `@moros/*` workspace 包名（由 pnpm 软链与 core 包 `exports` 解析），包内用相对路径，均带显式 `.ts` 后缀。
 
 ## 5. 本地冒烟
 
-`scripts/desktop-smoke.mjs` 会创建临时 HOME、临时项目与本地 mock Chat Completions，覆盖：
+`packages/desktop/scripts/desktop-smoke.mjs` 会创建临时 HOME、临时项目与本地 mock Chat Completions，覆盖：
 
 1. 工作区信任页与 AGENTS.md 门控
 2. 流式对话

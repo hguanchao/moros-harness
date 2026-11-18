@@ -6,29 +6,19 @@
 	"author": "Moros",
 	"license": "MIT",
 	"type": "module",
-	"main": "out/main/index.cjs",
 	"engines": {
 		"node": ">=22.18"
 	},
-	"bin": {
-		"moros": "./src/cli/bin.ts",
-		"mrh": "./src/cli/bin.ts"
-	},
-	"imports": {
-		"#src/*": "./src/*",
-		"#tests/*": "./tests/*",
-		"#package.json": "./package.json"
-	},
 	"scripts": {
-		"dev": "node src/cli/bin.ts",
-		"desktop:dev": "electron-vite dev",
-		"desktop:build": "electron-vite build",
-		"desktop:package": "npm run desktop:build && electron-builder",
-		"desktop:smoke": "npm run desktop:build && node scripts/desktop-smoke.mjs",
+		"dev": "pnpm --filter @moros/terminal dev",
+		"desktop:dev": "pnpm --filter @moros/desktop dev",
+		"desktop:build": "pnpm --filter @moros/desktop build",
+		"desktop:package": "pnpm --filter @moros/desktop package",
+		"desktop:smoke": "pnpm --filter @moros/desktop smoke",
 		"typecheck": "tsc --noEmit",
 		"format:check": "prettier --check .",
 		"test": "vitest run",
-		"check": "npm run format:check && npm run typecheck && npm run test && npm run desktop:build"
+		"check": "pnpm format:check && pnpm typecheck && pnpm test && pnpm desktop:build"
 	},
 	"prettier": {
 		"semi": true,
@@ -38,34 +28,13 @@
 		"printWidth": 120,
 		"endOfLine": "lf"
 	},
-	"dependencies": {
-		"cross-spawn": "^7.0.6",
-		"dompurify": "^3.4.18",
-		"get-east-asian-width": "^1.7.0",
-		"highlight.js": "11.11.2",
-		"lowlight": "^3.3.0",
-		"marked": "18.1.1",
-		"micromatch": "^4.0.8",
-		"react": "^19.3.1",
-		"react-dom": "^19.3.1",
-		"smol-toml": "^1.4.2",
-		"undici": "^6.21.3",
-		"zod": "^4.1.12"
-	},
 	"devDependencies": {
-		"@types/cross-spawn": "^6.0.6",
-		"@types/micromatch": "^4.0.9",
+		"@moros/core": "workspace:*",
+		"@moros/desktop": "workspace:*",
+		"@moros/terminal": "workspace:*",
 		"@types/node": "^22.19.0",
-		"@types/react": "^19.3.0",
-		"@types/react-dom": "^19.3.0",
-		"@vitejs/plugin-react": "^5.2.0",
-		"electron": "^45.3.4",
-		"electron-builder": "^26.18.0",
-		"electron-vite": "^5.0.0",
-		"playwright-core": "^1.65.1",
 		"prettier": "^3.6.2",
 		"typescript": "~5.9.3",
-		"vite": "7.2.2",
 		"vitest": "^3.2.4"
 	}
 }

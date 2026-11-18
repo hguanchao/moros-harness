@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { EventRecord, UserInputImage } from "#src/core/events/schema.ts";
-import { replayMessages } from "#src/core/loop/message-replay.ts";
-import type { CanonicalMessage } from "#src/core/llm/types.ts";
+import type { EventRecord, UserInputImage } from "@moros/core/events/schema.ts";
+import { replayMessages } from "@moros/core/loop/message-replay.ts";
+import type { CanonicalMessage } from "@moros/core/llm/types.ts";
 
 const MB = 1024 * 1024;
 

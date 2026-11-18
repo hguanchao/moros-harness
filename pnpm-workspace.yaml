@@ -1,0 +1,5 @@
+packages:
+  - "packages/*"
+dangerouslyAllowAllBuilds: true
+minimumReleaseAgeExclude:
+  - electron@45.3.4

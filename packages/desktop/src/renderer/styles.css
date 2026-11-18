@@ -1,0 +1,17 @@
+/* 桌面端全局样式：按职责拆分，以下 @import 顺序即级联顺序，勿随意调整。 */
+@import "./styles/base.css";
+@import "./styles/shell.css";
+@import "./styles/welcome.css";
+@import "./styles/chat.css";
+@import "./styles/markdown.css";
+@import "./styles/agent.css";
+@import "./styles/modal.css";
+@import "./styles/pages.css";
+@import "./styles/settings.css";
+@import "./styles/feedback.css";
+@import "./styles/shell-late.css";
+@import "./styles/composer.css";
+@import "./styles/overrides.css";
+@import "./styles/responsive.css";
+@import "./styles/settings-app.css";
+@import "./styles/providers.css";

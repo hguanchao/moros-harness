@@ -1,0 +1,131 @@
+import { StringDecoder } from "node:string_decoder";
+
+import { createBuiltinCommands } from "../commands.ts";
+import type { TuiOptions } from "../options.ts";
+import type { TuiState } from "./types.ts";
+import { createPasteStore } from "../paste.ts";
+
+/** 按启动选项造出初始状态；历史与任务表由调用方先行灌入。 */
+export function createState(options: TuiOptions): TuiState {
+	return {
+		stdin: options.stdin ?? process.stdin,
+		stdout: options.stdout ?? process.stdout,
+		ready: options.ready ?? true,
+		activeWarning: options.warning,
+		configurationError: options.configurationError,
+		sandboxNotice: options.sandboxWarning,
+		startupProblems:
+			options.startupProblems === undefined || options.startupProblems.length === 0
+				? undefined
+				: options.startupProblems.join("\n"),
+		runtimeWarnings: [],
+		builtinCommands: createBuiltinCommands(options),
+		input: "",
+		inputCursor: 0,
+		pendingImages: [],
+		imageLoading: false,
+		attachmentEpoch: 0,
+		queued: [],
+		sendQueuedAfterAbort: false,
+		inputHistory: [],
+		historyIndex: -1,
+		historyDraft: "",
+		pastes: createPasteStore(),
+		escClearArmed: false,
+		escClearTimer: undefined,
+		undoStack: [],
+		pasting: false,
+		inputTail: "",
+		inputTailTimer: undefined,
+		pastingTimer: undefined,
+		turns: (options.history ?? []).map((turn) => ({
+			prompt: turn.prompt,
+			response: [...turn.response],
+		})),
+		currentTodo: options.historyTodo,
+		hasInput: (options.history?.length ?? 0) > 0,
+		pendingCommandTurns: [],
+		initialScroll: (options.history?.length ?? 0) > 0,
+		focused: true,
+		windowFocused: true,
+		scrollTop: 0,
+		lastClick: undefined,
+		selection: undefined,
+		dragScroll: undefined,
+		follow: true,
+		transcriptView: undefined,
+		transcriptViewPrefix: undefined,
+		transcriptViewWidth: -1,
+		transcriptViewNotice: undefined,
+		transcriptDirty: true,
+		transcriptPrefix: undefined,
+		draggingScrollbar: false,
+		layoutOverflow: false,
+		buttonHovered: false,
+		decoder: new StringDecoder("utf8"),
+		statusText: undefined,
+		statusTone: undefined,
+		statusElapsedMs: 0,
+		statusTokens: 0,
+		copyNotice: undefined,
+		copyNoticeTimer: undefined,
+		statusPhaseStartedAt: 0,
+		spinnerFrame: 0,
+		sweepPhase: 0,
+		activeTurn: undefined,
+		reviewing: false,
+		reviewAbort: undefined,
+		trustPrompt:
+			options.trustPrompt === undefined
+				? undefined
+				: {
+						root: options.trustPrompt.root,
+						files: options.trustPrompt.files,
+						skillDirectories: options.trustPrompt.skillDirectories,
+						selection: "trust",
+						pending: false,
+					},
+		trustScrollTop: 0,
+		approvalPrompt: undefined,
+		approvalPromptId: undefined,
+		approvalSelection: "once",
+		approvalExpanded: false,
+		approvalScrollTop: 0,
+		modelMenu: undefined,
+		effortMenu: undefined,
+		sessionMenu: undefined,
+		commandMenu: undefined,
+		commandMenuDismissed: false,
+		fileMenu: undefined,
+		fileMenuDismissed: false,
+		fileFiles: undefined,
+		fileIndexStart: undefined,
+		skillMenu: undefined,
+		skillMenuDismissed: false,
+		skillEntries: undefined,
+		skillIndexStart: undefined,
+		openPage: undefined,
+		pageScrollTop: 0,
+		viewer: undefined,
+		viewerTool: undefined,
+		planReview: undefined,
+		latestPlan: options.historyPlan,
+		pendingPlan: undefined,
+		restoringCheckpoint: false,
+		mcpCursor: 0,
+		mcpStatus: undefined,
+		mcpStatusTone: undefined,
+		pageCache: undefined,
+		spinnerTimer: undefined,
+		statusClearTimer: undefined,
+		exitArmed: false,
+		exitTimer: undefined,
+		finished: false,
+		finish: () => {},
+	};
+}
+
+/** 动作行当前可选的审批结论；没有保存范围时没有 always。 */
+export function approvalActions(saveShort: string | undefined): readonly string[] {
+	return saveShort === undefined ? ["once", "deny"] : ["once", "always", "deny"];
+}

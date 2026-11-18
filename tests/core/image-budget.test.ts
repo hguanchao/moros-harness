@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { applyImageBudget, planImageRetention } from "#src/core/loop/image-budget.ts";
-import type { CanonicalMessage, ImageMediaType } from "#src/core/llm/types.ts";
+import { applyImageBudget, planImageRetention } from "@moros/core/loop/image-budget.ts";
+import type { CanonicalMessage, ImageMediaType } from "@moros/core/llm/types.ts";
 
 /** 生成解码后恰好 `bytes` 字节的 Base64 字符串，避免在测试里手算长度。 */
 function image(

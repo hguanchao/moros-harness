@@ -1,6 +1,7 @@
 # Static reference captures (external HTML/Markdown kept byte-for-byte)
 docs/reference/
 
-# Electron build outputs
+# Build outputs and lockfiles (generated)
 out/
 dist-desktop/
+pnpm-lock.yaml

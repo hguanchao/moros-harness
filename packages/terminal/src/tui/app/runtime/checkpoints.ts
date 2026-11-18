@@ -1,0 +1,79 @@
+import { describeError } from "../contract/describe-error.ts";
+import { STATUS, failure, FAILURE_ACTIONS, reviewBlocks, undoResult } from "../copy/index.ts";
+import { flashStatus } from "./status.ts";
+import type { TuiHost } from "./types.ts";
+
+/**
+ * /undo:恢复最近一个与当前工作区有差异的回合检查点。
+ *
+ * 没有页面可确认，所以恢复直接执行，结果通过对话流留下记录。恢复要跑 git，期间工作区
+ * 必须是稳定状态：回合在跑或审查在读工作区时明确拒绝，不做一半的恢复。
+ */
+
+/** /undo:取最近一个与当前工作区有差异的回合检查点并恢复。 */
+export function executeUndo(host: TuiHost): void {
+	const source = host.options.checkpoints;
+	const state = host.state;
+	if (source === undefined || !source.available()) {
+		flashStatus(host, source?.error() ?? STATUS.checkpointsUnavailable, "notice");
+		return;
+	}
+	if (state.restoringCheckpoint) return;
+	if (state.reviewing) {
+		// 审查子代理正在读工作区：此时恢复文件会让结论建立在变动中的内容上
+		flashStatus(host, reviewBlocks("Checkpoint restore"), "notice");
+		return;
+	}
+
+	state.restoringCheckpoint = true;
+	host.resetStatusMeta();
+	host.setStatus(STATUS.readingCheckpoints, "notice");
+	host.render();
+	void source
+		.latestUndoable()
+		.then((preview) => {
+			if (state.finished) return;
+			// 读检查点要跑 git，期间使用者可能已经提交了新的一轮；回合在改文件时也不能恢复
+			if (state.activeTurn !== undefined || state.reviewing || preview === undefined || preview.changes.length === 0) {
+				state.restoringCheckpoint = false;
+				host.setStatus(
+					preview === undefined || preview.changes.length === 0
+						? "No file changes to undo"
+						: "Wait for the running turn to finish before restoring files",
+					"notice",
+				);
+				host.scheduleStatusClear();
+				host.render();
+				return;
+			}
+			host.clearStatus();
+			host.render();
+			return source
+				.restore(preview.entry.id)
+				.then((result) => {
+					state.restoringCheckpoint = false;
+					if (state.finished) return;
+					host.appendCommandTurn("/undo", [
+						{
+							kind: "info",
+							text: undoResult(result.entry.kind, result.entry.label, result.restored, result.removed),
+						},
+					]);
+					host.clearStatus();
+					host.render();
+				})
+				.catch((error) => {
+					state.restoringCheckpoint = false;
+					if (state.finished) return;
+					host.appendCommandTurn("/undo", [{ kind: "error", text: `Error: ${describeError(error)}` }]);
+					host.setStatus(STATUS.error, "error");
+					host.scheduleStatusClear();
+					host.render();
+				});
+		})
+		.catch((error) => {
+			state.restoringCheckpoint = false;
+			if (state.finished) return;
+			flashStatus(host, failure(FAILURE_ACTIONS.undo, describeError(error)), "error", host.render);
+		});
+}

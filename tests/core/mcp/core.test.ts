@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { Core } from "#src/core/core.ts";
+import { Core } from "@moros/core/core.ts";
 
 const fixture = resolve(process.cwd(), "tests/fixtures/mcp-stdio-server.mjs");
 const roots: string[] = [];

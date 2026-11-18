@@ -1,0 +1,20 @@
+{
+	"name": "@moros/terminal",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"bin": {
+		"moros": "./src/cli/bin.ts",
+		"mrh": "./src/cli/bin.ts"
+	},
+	"scripts": {
+		"dev": "node src/cli/bin.ts"
+	},
+	"dependencies": {
+		"@moros/core": "workspace:*",
+		"get-east-asian-width": "^1.7.0",
+		"highlight.js": "11.11.2",
+		"lowlight": "^3.3.0",
+		"marked": "18.1.1"
+	}
+}

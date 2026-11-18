@@ -5,16 +5,16 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { ToolPipeline } from "#src/core/harness/pipeline.ts";
+import { ToolPipeline } from "@moros/core/harness/pipeline.ts";
 import type {
 	ApprovalDecision,
 	ApprovalRequest,
 	ReviewRequest,
 	ReviewVerdict,
 	ToolDefinition,
-} from "#src/core/harness/types.ts";
-import { EventStore } from "#src/core/session/event-store.ts";
-import { SnapshotStore } from "#src/core/session/snapshot-store.ts";
+} from "@moros/core/harness/types.ts";
+import { EventStore } from "@moros/core/session/event-store.ts";
+import { SnapshotStore } from "@moros/core/session/snapshot-store.ts";
 
 const mcpTool: ToolDefinition = {
 	name: "mcp__fixture__write",

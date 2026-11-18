@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { McpClient } from "#src/core/mcp/client.ts";
-import { McpHttpError, StreamableHttpTransport } from "#src/core/mcp/http-transport.ts";
-import { McpManager } from "#src/core/mcp/manager.ts";
-import type { McpServerConfig } from "#src/core/mcp/types.ts";
+import { McpClient } from "@moros/core/mcp/client.ts";
+import { McpHttpError, StreamableHttpTransport } from "@moros/core/mcp/http-transport.ts";
+import { McpManager } from "@moros/core/mcp/manager.ts";
+import type { McpServerConfig } from "@moros/core/mcp/types.ts";
 
 const ECHO_TOOL = {
 	name: "echo",

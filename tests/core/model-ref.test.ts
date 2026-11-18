@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { parseModelRef } from "#src/core/config/model-ref.ts";
-import type { ProvidersFile } from "#src/core/config/schema.ts";
+import { parseModelRef } from "@moros/core/config/model-ref.ts";
+import type { ProvidersFile } from "@moros/core/config/schema.ts";
 
 const providers: ProvidersFile = {
 	providers: {

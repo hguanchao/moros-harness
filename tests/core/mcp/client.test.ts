@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { McpClient, LATEST_PROTOCOL_VERSION } from "#src/core/mcp/client.ts";
-import { McpAbortError, McpTimeoutError, type JsonRpcMessage, type JsonRpcRequest } from "#src/core/mcp/json-rpc.ts";
-import { TransportEvents, type McpTransport } from "#src/core/mcp/transport.ts";
+import { McpClient, LATEST_PROTOCOL_VERSION } from "@moros/core/mcp/client.ts";
+import { McpAbortError, McpTimeoutError, type JsonRpcMessage, type JsonRpcRequest } from "@moros/core/mcp/json-rpc.ts";
+import { TransportEvents, type McpTransport } from "@moros/core/mcp/transport.ts";
 
 type Handler = (message: JsonRpcRequest) => unknown | Promise<unknown>;
 

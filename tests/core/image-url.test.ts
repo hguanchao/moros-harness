@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isBlockedAddress, prepareImageUrl, type LookupAll } from "#src/core/session/image-url.ts";
+import { isBlockedAddress, prepareImageUrl, type LookupAll } from "@moros/core/session/image-url.ts";
 
 const publicLookup: LookupAll = async () => [{ address: "93.184.216.34", family: 4 }];
 

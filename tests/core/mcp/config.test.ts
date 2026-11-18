@@ -4,11 +4,11 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { normalizeConfigKeys } from "#src/core/config/keys.ts";
-import { loadConfig } from "#src/core/config/loader.ts";
-import { parseConfig } from "#src/core/config/schema.ts";
-import { resolveMcpEnvironment } from "#src/core/mcp/config.ts";
-import type { McpServerConfig } from "#src/core/mcp/types.ts";
+import { normalizeConfigKeys } from "@moros/core/config/keys.ts";
+import { loadConfig } from "@moros/core/config/loader.ts";
+import { parseConfig } from "@moros/core/config/schema.ts";
+import { resolveMcpEnvironment } from "@moros/core/mcp/config.ts";
+import type { McpServerConfig } from "@moros/core/mcp/types.ts";
 
 const roots: string[] = [];
 

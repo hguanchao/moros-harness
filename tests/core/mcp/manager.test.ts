@@ -2,10 +2,10 @@ import { resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { createPolicy } from "#src/core/harness/policy.ts";
-import type { ToolContext } from "#src/core/harness/types.ts";
-import { McpManager } from "#src/core/mcp/manager.ts";
-import type { McpServerConfig } from "#src/core/mcp/types.ts";
+import { createPolicy } from "@moros/core/harness/policy.ts";
+import type { ToolContext } from "@moros/core/harness/types.ts";
+import { McpManager } from "@moros/core/mcp/manager.ts";
+import type { McpServerConfig } from "@moros/core/mcp/types.ts";
 
 const projectRoot = process.cwd();
 const fixture = resolve(projectRoot, "tests/fixtures/mcp-stdio-server.mjs");

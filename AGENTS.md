@@ -9,18 +9,23 @@
 
 ## 目录与模块规范
 
-1. 目录优先按业务/领域划分，不单纯按文件类型一刀切；工具、通用能力单独抽离。
-2. 入口文件清晰直观；内部私有模块使用对应语言约定私有标识（`_`前缀、internal、private等）。
-3. 配置、常量、类型定义、工具函数、错误定义、日志、中间件独立拆分，不散落业务代码。
-4. 第三方依赖集中管理、锁定版本；区分生产依赖与开发依赖。
+1. 项目为 pnpm workspace 多包仓库：根目录 `packages/` 下按职责分三个独立包，各自有 `package.json`。
+   - `packages/core`（`@moros/core`）：核心实现，不依赖其他内部包。
+   - `packages/terminal`（`@moros/terminal`）：CLI + TUI，依赖 core。
+   - `packages/desktop`（`@moros/desktop`）：Electron 桌面端（源码 + build/out/dist-desktop/scripts），依赖 core。
+2. 目录优先按业务/领域划分，不单纯按文件类型一刀切；工具、通用能力单独抽离。
+3. 入口文件清晰直观；内部私有模块使用对应语言约定私有标识（`_`前缀、internal、private等）。
+4. 配置、常量、类型定义、工具函数、错误定义、日志、中间件独立拆分，不散落业务代码。
+5. 第三方依赖按包就近声明、锁定版本；区分生产依赖与开发依赖。
 
 ## 运行与模块解析（TypeScript 直接运行）
 
-1. 本项目无构建步骤：CLI 由 Node ≥22.18 的原生类型擦除（type stripping）直接执行 `src/cli/bin.ts`，不再产出 `dist/`。
-2. 内部模块一律写成 `#src/<相对 src 的路径>.ts`，测试引用源码同样走 `#src/*`，测试之间互相引用走 `#tests/*`。禁止 `./`、`../` 相对导入：Node 的 ESM 解析要求显式扩展名，漏写后缀是运行时报错，而 tsc 与 vitest 仍可能通过。
-3. `package.json` 的 `imports` 字段是唯一映射来源（`#src/*`、`#tests/*`、`#package.json`），不要在 vitest、tsconfig 里另配等价的 alias。
-4. 源码只能使用「可擦除语法」：禁止 `enum`、`namespace`、构造函数参数属性（`constructor(private x: T)`），由 `tsconfig` 的 `erasableSyntaxOnly` 拦截。
-5. 类型导入必须显式 `import type` 或内联 `type` 修饰（`verbatimModuleSyntax` 强制），否则擦除后仍会保留 import，运行时找不到对应绑定。
+1. 依赖通过 pnpm workspace 管理（根 `pnpm-workspace.yaml`）；跨包引用写成 `@moros/<包名>` 或 `@moros/core/子路径`，由 core 包 `package.json` 的 `exports` 暴露，pnpm 软链解析。不要在 vitest、tsconfig 里另配等价 alias。
+2. **跨包**用 `@moros/*` 包名；**包内**与测试用相对路径（`./`、`../`）。两种方式都必须写显式 `.ts`/`.tsx` 扩展名：Node 的 ESM 解析要求扩展名，漏写是运行时报错，而 tsc 与 vitest 仍可能通过。
+3. 不使用 `#src/*`、`#tests/*`、`#package.json` 这类 imports 别名。
+4. CLI/TUI 无构建步骤：由 Node ≥22.18 的原生类型擦除（type stripping）直接执行 `packages/terminal/src/cli/bin.ts`，不产出 `dist/`。
+5. 源码只能使用「可擦除语法」：禁止 `enum`、`namespace`、构造函数参数属性（`constructor(private x: T)`），由 `tsconfig` 的 `erasableSyntaxOnly` 拦截。
+6. 类型导入必须显式 `import type` 或内联 `type` 修饰（`verbatimModuleSyntax` 强制），否则擦除后仍会保留 import，运行时找不到对应绑定。
 
 ## 命名规范（全语言通用准则）
 

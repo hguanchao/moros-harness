@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { assessCommandRisk, isAutoApproved } from "#src/core/harness/risk.ts";
+import { assessCommandRisk, isAutoApproved } from "@moros/core/harness/risk.ts";
 
 describe("assessCommandRisk", () => {
 	it.each([
