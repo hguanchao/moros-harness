@@ -55,7 +55,7 @@
 .spinner.small {
 	width: 11px;
 	height: 11px;
-	border-width: 1.5px;
+	border-width: 2px;
 }
 
 ::-webkit-scrollbar-track {
