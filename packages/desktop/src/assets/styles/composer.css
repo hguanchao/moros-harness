@@ -13,20 +13,16 @@
 
 .composer {
 	padding: 8px;
-	border: none;
+	border: 1px solid var(--line-strong);
 	border-radius: var(--r-surface);
 	background: var(--surface-chrome);
-	box-shadow:
-		0 0 0 0.5px var(--line-strong),
-		0 4px 16px var(--shadow-soft);
-	transition: box-shadow 0.2s ease;
+	box-shadow: 0 4px 16px var(--shadow-soft);
+	transition: border-color 0.2s ease;
 }
 
 .composer:focus-within {
-	border: none;
-	box-shadow:
-		0 0 0 1px var(--accent-ring),
-		0 4px 16px var(--shadow-soft);
+	border-color: var(--accent-ring);
+	box-shadow: 0 4px 16px var(--shadow-soft);
 }
 
 .composer .composer-input {
