@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { ApprovalPrompt } from "../../packages/terminal/src/tui/app/contract/approval.ts";
-import { renderApprovalPanel } from "../../packages/terminal/src/tui/app/panel/approval-panel.ts";
+import type { ApprovalPrompt } from "../src/tui/app/contract/approval.ts";
+import { renderApprovalPanel } from "../src/tui/app/panel/approval-panel.ts";
 
 function prompt(risk: string): ApprovalPrompt {
 	return { tool: "bash", risk, detail: 'bash · { "command": "curl https://example.com" }' };

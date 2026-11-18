@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { DesktopStore } from "../../packages/desktop/src/main/store.ts";
+import { DesktopStore } from "../src/main/store.ts";
 
 const directories: string[] = [];
 

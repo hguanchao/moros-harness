@@ -51,12 +51,15 @@ pnpm workspace（多包仓库，每个包独立 `package.json`）：
 ```text
 packages/
   core/        # @moros/core：内核，会话、LLM、工具、Harness、配置、MCP
-  terminal/    # @moros/terminal：CLI 入口 + TUI 终端界面
+               #   src/ 源码 + tests/ 测试（含 mcp fixture）
+  terminal/    # @moros/terminal：CLI 入口 + TUI 终端界面（src/ + tests/）
   desktop/     # @moros/desktop：Electron 主进程 / preload / React 渲染层
-               #   含 build/（图标）、out/（构建产物）、dist-desktop/（安装包）、scripts/（冒烟）
-tests/         # Vitest 测试
+               #   src/ 源码 + tests/ 测试 + build/（图标）、out/（构建产物）、
+               #   dist-desktop/（安装包）、scripts/（冒烟）
 docs/          # 需求、MCP、桌面端文档
 ```
+
+测试就近放在各包的 `tests/` 目录（与 `src/` 平级），由根 `vitest.config.ts` 统一收集。
 
 跨包引用使用 `@moros/*` workspace 包名，包内使用相对路径（均带显式 `.ts` 后缀）。
 

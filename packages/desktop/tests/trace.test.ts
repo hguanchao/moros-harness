@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EventRecord } from "@moros/core/events/schema.ts";
-import { buildTrace } from "../../packages/desktop/src/main/trace.ts";
+import { buildTrace } from "../src/main/trace.ts";
 
 function event(seq: number, type: EventRecord["type"], payload: unknown, ts?: string): EventRecord {
 	return {

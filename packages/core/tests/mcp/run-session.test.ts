@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { Core } from "@moros/core/core.ts";
 
-const fixture = resolve(process.cwd(), "tests/fixtures/mcp-stdio-server.mjs");
+const fixture = resolve(import.meta.dirname, "../fixtures/mcp-stdio-server.mjs");
 const roots: string[] = [];
 
 afterEach(async () => {

@@ -8,7 +8,7 @@ import { McpManager } from "@moros/core/mcp/manager.ts";
 import type { McpServerConfig } from "@moros/core/mcp/types.ts";
 
 const projectRoot = process.cwd();
-const fixture = resolve(projectRoot, "tests/fixtures/mcp-stdio-server.mjs");
+const fixture = resolve(import.meta.dirname, "../fixtures/mcp-stdio-server.mjs");
 
 function server(args: readonly string[] = []): McpServerConfig {
 	return {
