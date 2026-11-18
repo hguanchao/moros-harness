@@ -20,7 +20,7 @@ export function Sidebar(): JSX.Element {
 	const { state, dispatch } = useApp();
 	const actions = useDesktopActions();
 	const [expanded, setExpanded] = useState(true);
-	const { project, current, page } = state;
+	const { project, current } = state;
 
 	const report = (error: unknown): void => {
 		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
@@ -114,7 +114,7 @@ export function Sidebar(): JSX.Element {
 									<SessionRow
 										key={meta.id}
 										meta={meta}
-										selected={page === "chat" && current?.meta.id === meta.id}
+										selected={current?.meta.id === meta.id}
 										running={state.runStates[meta.id] === "running"}
 										onSelect={() => {
 											void actions.activateSession(meta.id).catch(report);

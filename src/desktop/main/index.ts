@@ -73,10 +73,19 @@ function createWindow(
 	maximized: boolean,
 ): BrowserWindow {
 	const safeBounds = visibleBounds(bounds);
+	const workArea = screen.getPrimaryDisplay().workArea;
+	const defaultWidth = Math.max(860, Math.min(1440, workArea.width - 80));
+	const defaultHeight = Math.max(560, Math.min(900, workArea.height - 80));
+	const defaultBounds = {
+		x: workArea.x + Math.round((workArea.width - defaultWidth) / 2),
+		y: workArea.y + Math.round((workArea.height - defaultHeight) / 2),
+		width: defaultWidth,
+		height: defaultHeight,
+	};
 	const initialDark = nativeTheme.shouldUseDarkColors;
 	const initialSurface = initialDark ? DARK_SURFACE : LIGHT_SURFACE;
 	const window = new BrowserWindow({
-		...(safeBounds ?? { width: 1440, height: 900 }),
+		...(safeBounds ?? defaultBounds),
 		minWidth: 860,
 		minHeight: 560,
 		resizable: true,
