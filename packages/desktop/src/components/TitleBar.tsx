@@ -1,7 +1,7 @@
 import { useEffect, type JSX } from "react";
 
 import { call } from "../api/api.ts";
-import { MaximizeIcon, MinusIcon, PanelIcon, RestoreIcon, XIcon } from "./icons.tsx";
+import { MaximizeIcon, MinusIcon, PanelIcon, RestoreIcon, XIcon } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 export interface TitleBarProps {

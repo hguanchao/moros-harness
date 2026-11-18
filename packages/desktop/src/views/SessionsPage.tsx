@@ -14,7 +14,7 @@ import {
 	SearchIcon,
 	TrashIcon,
 	XIcon,
-} from "../components/icons.tsx";
+} from "../components/Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 export function SessionsPage(): JSX.Element {

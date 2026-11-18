@@ -14,8 +14,8 @@ import {
 	MetaIcon,
 	SparklesIcon,
 	TerminalIcon,
-} from "./icons.tsx";
-import { Markdown } from "./markdown.tsx";
+} from "./Icons.tsx";
+import { Markdown } from "./Markdown.tsx";
 import type { SubagentProgressView } from "../store/state.tsx";
 
 export interface ToolBlock {

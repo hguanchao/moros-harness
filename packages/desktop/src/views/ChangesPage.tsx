@@ -6,7 +6,7 @@ import type { CheckpointView, FileChangeSummary } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { displayPath, relativeTime } from "../utils/format.ts";
 import { PageHeader } from "../components/PageHeader.tsx";
-import { AlertIcon, CheckIcon, DiffIcon, RefreshIcon, XIcon } from "../components/icons.tsx";
+import { AlertIcon, CheckIcon, DiffIcon, RefreshIcon, XIcon } from "../components/Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 export function ChangesPage(): JSX.Element {

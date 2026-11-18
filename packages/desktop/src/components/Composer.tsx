@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type 
 import type { PreparedImage, SessionView } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
-import { ArrowUpIcon, ImageIcon, LinkIcon, PlusIcon, ShieldIcon, SparklesIcon, StopIcon, XIcon } from "./icons.tsx";
+import { ArrowUpIcon, ImageIcon, LinkIcon, PlusIcon, ShieldIcon, SparklesIcon, StopIcon, XIcon } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 const MAX_IMAGES = 8;

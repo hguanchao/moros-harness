@@ -3,7 +3,7 @@ import { useState, type JSX } from "react";
 import type { SessionMeta } from "@moros/core/session/session-manager.ts";
 import { useDesktopActions } from "../hooks/actions.ts";
 import { errorMessage } from "../api/api.ts";
-import { MessagePlusIcon, SettingsIcon } from "./icons.tsx";
+import { MessagePlusIcon, SettingsIcon } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 /** 侧栏：品牌、新建任务、项目树与会话列表；设置固定在底部图标按钮。 */

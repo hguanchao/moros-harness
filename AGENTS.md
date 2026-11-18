@@ -35,6 +35,7 @@
 - 类型、结构体、类：使用名词短语描述实体。
 - 私有/内部成员：遵循语言约定标记私有，限制外部访问。
 - 文件、文件夹：语义清晰，禁止拼音、中文、特殊符号；多单词命名遵循语言社区惯例（snake_case / kebab-case / PascalCase）。
+- 前端文件命名：导出 React 组件的文件用 PascalCase（如 `Sidebar.tsx`、`Transcript.tsx`）；纯工具/状态/数据模块用 camelCase 或全小写（如 `format.ts`、`state.ts`、`api.ts`）。
 
 ## 代码格式与排版
 

@@ -19,7 +19,7 @@ import {
 	ServerIcon,
 	TrashIcon,
 	XIcon,
-} from "../components/icons.tsx";
+} from "../components/Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 const NEW_PROVIDER = "__new__";

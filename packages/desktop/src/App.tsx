@@ -11,7 +11,7 @@ import { TracePage } from "./views/TracePage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useApp } from "./store/state.tsx";
-import { FolderPlusIcon, SparklesIcon, XIcon } from "./components/icons.tsx";
+import { FolderPlusIcon, SparklesIcon, XIcon } from "./components/Icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 

@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from "react";
 
 import { useDesktopActions } from "../hooks/actions.ts";
-import { ChevronLeftIcon } from "./icons.tsx";
+import { ChevronLeftIcon } from "./Icons.tsx";
 
 export interface PageHeaderProps {
 	readonly title: string;

@@ -13,7 +13,7 @@ import {
 	FolderOpenIcon,
 	RefreshIcon,
 	XIcon,
-} from "../components/icons.tsx";
+} from "../components/Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "avif"]);

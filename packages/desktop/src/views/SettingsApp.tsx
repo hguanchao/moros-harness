@@ -28,7 +28,7 @@ import {
 	SunIcon,
 	TerminalIcon,
 	XIcon,
-} from "../components/icons.tsx";
+} from "../components/Icons.tsx";
 import { ProvidersTab, WorkspaceTab } from "./SettingsPage.tsx";
 import { useApp } from "../store/state.tsx";
 
