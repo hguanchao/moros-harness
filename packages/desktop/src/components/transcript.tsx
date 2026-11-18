@@ -2,7 +2,7 @@ import { useEffect, useState, type JSX } from "react";
 
 import type { EventRecord } from "@moros/core/events/schema.ts";
 import type { LiveState } from "../shared/contract.ts";
-import { displayPath, firstLine, formatDuration } from "./format.ts";
+import { displayPath, firstLine, formatDuration } from "../utils/format.ts";
 import {
 	AlertIcon,
 	CheckIcon,
@@ -16,7 +16,7 @@ import {
 	TerminalIcon,
 } from "./icons.tsx";
 import { Markdown } from "./markdown.tsx";
-import type { SubagentProgressView } from "./state.tsx";
+import type { SubagentProgressView } from "../store/state.tsx";
 
 export interface ToolBlock {
 	kind: "tool";

@@ -1,17 +1,17 @@
 import { useEffect, type JSX } from "react";
 
-import { useDesktopActions } from "./actions.ts";
-import { call, errorMessage } from "./api.ts";
-import { ChangesPage } from "./pages/ChangesPage.tsx";
-import { ChatPage } from "./pages/ChatPage.tsx";
-import { FilesPage } from "./pages/FilesPage.tsx";
-import { SessionsPage } from "./pages/SessionsPage.tsx";
-import { SettingsApp } from "./pages/SettingsApp.tsx";
-import { TracePage } from "./pages/TracePage.tsx";
-import { Sidebar } from "./Sidebar.tsx";
-import { TitleBar } from "./TitleBar.tsx";
-import { useApp } from "./state.tsx";
-import { FolderPlusIcon, SparklesIcon, XIcon } from "./icons.tsx";
+import { useDesktopActions } from "./hooks/actions.ts";
+import { call, errorMessage } from "./api/api.ts";
+import { ChangesPage } from "./views/ChangesPage.tsx";
+import { ChatPage } from "./views/ChatPage.tsx";
+import { FilesPage } from "./views/FilesPage.tsx";
+import { SessionsPage } from "./views/SessionsPage.tsx";
+import { SettingsApp } from "./views/SettingsApp.tsx";
+import { TracePage } from "./views/TracePage.tsx";
+import { Sidebar } from "./components/Sidebar.tsx";
+import { TitleBar } from "./components/TitleBar.tsx";
+import { useApp } from "./store/state.tsx";
+import { FolderPlusIcon, SparklesIcon, XIcon } from "./components/icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 

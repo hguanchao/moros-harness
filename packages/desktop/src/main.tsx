@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App.tsx";
-import { AppProvider } from "./state.tsx";
-import "./styles.css";
+import { AppProvider } from "./store/state.tsx";
+import "./assets/styles/styles.css";
 
 const container = document.getElementById("root");
 if (container === null) throw new Error("Renderer root element is missing");

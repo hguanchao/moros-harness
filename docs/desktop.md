@@ -4,7 +4,7 @@
 
 桌面端是 Core 的第二个宿主：与 TUI 共用同一套会话目录、事件流、配置、审批与沙箱规则。桌面端不复制 Agent 业务逻辑，只负责窗口、IPC、状态投影与可视化页面。
 
-视觉基线是 `docs/reference/dsh-desktop-preview/replica.html`：40px 全宽标题栏 + 自绘窗口控制、侧栏项目树、左上圆角凹陷主区、760px 对话列与 22px 圆角输入框。设计令牌在 `styles/base.css`，页面样式按职责拆分在 `styles/` 目录。
+视觉基线是 `docs/reference/dsh-desktop-preview/replica.html`：40px 全宽标题栏 + 自绘窗口控制、侧栏项目树、左上圆角凹陷主区、760px 对话列与 22px 圆角输入框。设计令牌在 `src/assets/styles/base.css`，页面样式按职责拆分在同一目录。
 
 对应 PRD 功能 34~38：
 
@@ -44,12 +44,23 @@ Renderer（React，无 Node 权限）
 
 ```text
 packages/desktop/                # @moros/desktop
+├─ index.html                    # 渲染层 HTML 入口（Vite root = 包根）
 ├─ electron.vite.config.ts / electron-builder.yml
 ├─ build/                        # 应用图标（icon.png/ico/svg）
 ├─ out/                          # 构建产物 main/preload/renderer
 ├─ dist-desktop/                 # 安装包产物
 ├─ scripts/desktop-smoke.mjs     # 本地冒烟脚本
 └─ src/
+   ├─ main.tsx / App.tsx         # 渲染层入口 + 根组件
+   ├─ components/                # 共享组件：Composer/Dropdown/Sidebar/TitleBar/
+   │                            #   icons/markdown/transcript/PageHeader
+   ├─ views/                     # 页面：chat/files/changes/trace/sessions/settings
+   ├─ store/state.tsx            # Context + reducer 状态
+   ├─ hooks/actions.ts           # useDesktopActions
+   ├─ api/api.ts                 # IPC 封装
+   ├─ utils/format.ts            # 格式化工具
+   ├─ types/                     # 类型声明（global/assets/highlight.js）
+   ├─ assets/styles/             # styles.css 聚合入口 + 按职责拆分的样式文件
    ├─ shared/contract.ts         # IPC 通道、DTO、推送消息、RpcResult
    ├─ main/
    │  ├─ index.ts                # app 生命周期、窗口、CSP、权限、PATH
@@ -57,13 +68,10 @@ packages/desktop/                # @moros/desktop
    │  ├─ ipc.ts                  # 白名单 handler、zod 校验、错误码
    │  ├─ trace.ts                # 事件 -> 回合/步骤投影
    │  └─ store.ts                # 最近项目与窗口位置（userData）
-   ├─ preload/index.ts
-   └─ renderer/
-      ├─ App.tsx / state.tsx / actions.ts
-      ├─ pages/                  # chat / files / changes / trace / sessions / settings
-      ├─ Composer.tsx / transcript.tsx / Sidebar.tsx / TitleBar.tsx
-      └─ styles.css / styles/    # 聚合入口 + 按职责拆分的样式文件
+   └─ preload/index.ts
 ```
+
+渲染层按 React/Vue3 主流 Type-based 结构组织：组件、页面、状态、hooks、API、工具、类型各归其位；全局样式放 `assets/styles/`，`styles.css` 的 `@import` 顺序即级联顺序，不可调整。
 
 ## 4. 开发与构建
 

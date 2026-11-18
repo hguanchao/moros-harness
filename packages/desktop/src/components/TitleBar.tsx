@@ -1,8 +1,8 @@
 import { useEffect, type JSX } from "react";
 
-import { call } from "./api.ts";
+import { call } from "../api/api.ts";
 import { MaximizeIcon, MinusIcon, PanelIcon, RestoreIcon, XIcon } from "./icons.tsx";
-import { useApp } from "./state.tsx";
+import { useApp } from "../store/state.tsx";
 
 export interface TitleBarProps {
 	readonly sidebarOpen: boolean;

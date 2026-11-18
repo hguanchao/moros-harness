@@ -3,9 +3,9 @@ import { useEffect, useRef, useState, type JSX } from "react";
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft, ProviderView } from "@moros/core/config/settings.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
 import type { SkillSummary } from "@moros/core/skills.ts";
-import type { ConfigSummary } from "../../shared/contract.ts";
-import { call, errorMessage } from "../api.ts";
-import { Dropdown } from "../Dropdown.tsx";
+import type { ConfigSummary } from "../shared/contract.ts";
+import { call, errorMessage } from "../api/api.ts";
+import { Dropdown } from "../components/Dropdown.tsx";
 import {
 	AlertIcon,
 	CheckIcon,
@@ -19,8 +19,8 @@ import {
 	ServerIcon,
 	TrashIcon,
 	XIcon,
-} from "../icons.tsx";
-import { useApp } from "../state.tsx";
+} from "../components/icons.tsx";
+import { useApp } from "../store/state.tsx";
 
 const NEW_PROVIDER = "__new__";
 

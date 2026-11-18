@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
-import type { ApprovalCard } from "../../shared/contract.ts";
-import { call, errorMessage } from "../api.ts";
-import { Composer } from "../Composer.tsx";
-import { AlertIcon, CheckIcon, ChevronDownIcon, SparklesIcon, XIcon } from "../icons.tsx";
-import { Markdown } from "../markdown.tsx";
-import { useApp } from "../state.tsx";
-import { buildTimeline, Transcript } from "../transcript.tsx";
+import type { ApprovalCard } from "../shared/contract.ts";
+import { call, errorMessage } from "../api/api.ts";
+import { Composer } from "../components/Composer.tsx";
+import { AlertIcon, CheckIcon, ChevronDownIcon, SparklesIcon, XIcon } from "../components/icons.tsx";
+import { Markdown } from "../components/markdown.tsx";
+import { useApp } from "../store/state.tsx";
+import { buildTimeline, Transcript } from "../components/transcript.tsx";
 
 const IMPLEMENTATION_PREFIX = "Implement this plan:\n\n";
 const IMPLEMENTATION_SUFFIX = "\n\nRe-read the files you need before changing them.";

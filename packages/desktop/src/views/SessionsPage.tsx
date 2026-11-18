@@ -2,12 +2,20 @@ import { useEffect, useState, type JSX, type ReactNode } from "react";
 
 import type { EventRecord } from "@moros/core/events/schema.ts";
 import type { SessionMeta } from "@moros/core/session/session-manager.ts";
-import { useDesktopActions } from "../actions.ts";
-import { PageHeader } from "../PageHeader.tsx";
-import { call, errorMessage } from "../api.ts";
-import { firstLine, relativeTime } from "../format.ts";
-import { ArchiveIcon, DownloadIcon, ForkIcon, RefreshIcon, SearchIcon, TrashIcon, XIcon } from "../icons.tsx";
-import { useApp } from "../state.tsx";
+import { useDesktopActions } from "../hooks/actions.ts";
+import { PageHeader } from "../components/PageHeader.tsx";
+import { call, errorMessage } from "../api/api.ts";
+import { firstLine, relativeTime } from "../utils/format.ts";
+import {
+	ArchiveIcon,
+	DownloadIcon,
+	ForkIcon,
+	RefreshIcon,
+	SearchIcon,
+	TrashIcon,
+	XIcon,
+} from "../components/icons.tsx";
+import { useApp } from "../store/state.tsx";
 
 export function SessionsPage(): JSX.Element {
 	const { state, dispatch } = useApp();

@@ -1,10 +1,10 @@
 import { useEffect, useState, type JSX } from "react";
 
 import type { WorkspaceEntry, ReadTextFileResult } from "@moros/core/workspace/files.ts";
-import { useDesktopActions } from "../actions.ts";
-import { call, errorMessage } from "../api.ts";
-import { formatBytes } from "../format.ts";
-import { PageHeader } from "../PageHeader.tsx";
+import { useDesktopActions } from "../hooks/actions.ts";
+import { call, errorMessage } from "../api/api.ts";
+import { formatBytes } from "../utils/format.ts";
+import { PageHeader } from "../components/PageHeader.tsx";
 import {
 	ChevronDownIcon,
 	ChevronRightIcon,
@@ -13,8 +13,8 @@ import {
 	FolderOpenIcon,
 	RefreshIcon,
 	XIcon,
-} from "../icons.tsx";
-import { useApp } from "../state.tsx";
+} from "../components/icons.tsx";
+import { useApp } from "../store/state.tsx";
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "webp", "gif", "bmp", "ico", "avif"]);
 

@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 
 import type { SessionView } from "../shared/contract.ts";
-import { call } from "./api.ts";
-import { useApp, type Page } from "./state.tsx";
+import { call } from "../api/api.ts";
+import { useApp, type Page } from "../store/state.tsx";
 
 let navigationEpoch = 0;
 

@@ -3,9 +3,9 @@ import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } f
 import type { SettingsPatch, SettingsSnapshot } from "@moros/core/config/settings.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
 import type { SkillSummary } from "@moros/core/skills.ts";
-import type { ConfigSummary } from "../../shared/contract.ts";
-import { call, errorMessage } from "../api.ts";
-import { Dropdown } from "../Dropdown.tsx";
+import type { ConfigSummary } from "../shared/contract.ts";
+import { call, errorMessage } from "../api/api.ts";
+import { Dropdown } from "../components/Dropdown.tsx";
 import {
 	ArchiveIcon2,
 	BrainIcon,
@@ -28,9 +28,9 @@ import {
 	SunIcon,
 	TerminalIcon,
 	XIcon,
-} from "../icons.tsx";
+} from "../components/icons.tsx";
 import { ProvidersTab, WorkspaceTab } from "./SettingsPage.tsx";
-import { useApp } from "../state.tsx";
+import { useApp } from "../store/state.tsx";
 
 type IconComponent = (props: { size?: number }) => JSX.Element;
 type NavItem = readonly [key: string, label: string, icon: IconComponent];

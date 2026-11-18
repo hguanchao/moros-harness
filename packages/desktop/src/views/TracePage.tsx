@@ -1,11 +1,11 @@
 import { useEffect, useState, type JSX } from "react";
 
-import type { TraceStep, TraceTurn } from "../../shared/contract.ts";
-import { call, errorMessage } from "../api.ts";
-import { firstLine, formatDuration, relativeTime } from "../format.ts";
-import { ListTreeIcon, RefreshIcon } from "../icons.tsx";
-import { PageHeader } from "../PageHeader.tsx";
-import { useApp } from "../state.tsx";
+import type { TraceStep, TraceTurn } from "../shared/contract.ts";
+import { call, errorMessage } from "../api/api.ts";
+import { firstLine, formatDuration, relativeTime } from "../utils/format.ts";
+import { ListTreeIcon, RefreshIcon } from "../components/icons.tsx";
+import { PageHeader } from "../components/PageHeader.tsx";
+import { useApp } from "../store/state.tsx";
 
 interface Selection {
 	readonly turn: TraceTurn;
