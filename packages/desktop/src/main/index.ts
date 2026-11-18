@@ -11,10 +11,15 @@ const TITLEBAR_HEIGHT = 40;
 const DARK_SURFACE = "#202020";
 const LIGHT_SURFACE = "#ebebeb";
 
-/** 应用图标：打包后随 extraResources 落到 resources/icon.png，开发时从项目 build/ 读取。 */
+/** 应用图标：Windows 用多尺寸 .ico（任务栏需要），其余平台用 .png。打包后从 resources 读，开发时从 build/ 读。 */
+function appIconPath(): string {
+	const base = app.isPackaged ? process.resourcesPath : join(app.getAppPath(), "build");
+	const name = process.platform === "win32" ? "icon.ico" : "icon.png";
+	return join(base, name);
+}
+
 function appIcon(): ReturnType<typeof nativeImage.createFromPath> {
-	const path = app.isPackaged ? join(process.resourcesPath, "icon.png") : join(app.getAppPath(), "build", "icon.png");
-	return nativeImage.createFromPath(path);
+	return nativeImage.createFromPath(appIconPath());
 }
 
 let mainWindow: BrowserWindow | undefined;

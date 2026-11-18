@@ -67,12 +67,6 @@
 	color: var(--text-dim);
 }
 
-.welcome-mark {
-	border-radius: 16px;
-	background: var(--surface-chrome);
-	border-color: var(--line-strong);
-}
-
 .trust-card,
 .modal {
 	border-radius: 14px;

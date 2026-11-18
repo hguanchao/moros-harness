@@ -11,7 +11,7 @@ import { TracePage } from "./views/TracePage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useApp } from "./store/state.tsx";
-import { FolderPlusIcon, SparklesIcon, XIcon } from "./components/Icons.tsx";
+import { FolderPlusIcon, MetaIcon, XIcon } from "./components/Icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 
@@ -139,11 +139,13 @@ function Welcome(): JSX.Element {
 	return (
 		<div className="welcome-layer">
 			<div className="welcome">
-				<div className="welcome-mark">
-					<SparklesIcon size={28} />
+				<div className="welcome-brand">
+					<span className="welcome-brand-logo">
+						<MetaIcon size={30} />
+					</span>
+					<h2 className="welcome-brand-name">Moros Harness</h2>
+					<p className="welcome-brand-desc">轻量、本地优先的办公与编程双场景 Agent</p>
 				</div>
-				<h1>moros harness</h1>
-				<p>轻量、本地优先的办公与编程双场景 Agent。打开一个项目开始，会话会与 TUI 共用同一份事件流。</p>
 				<button
 					className="primary-button"
 					onClick={() => {
