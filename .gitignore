@@ -4,6 +4,8 @@
 # Dependencies and build outputs
 node_modules/
 dist/
+out/
+dist-desktop/
 coverage/
 # 历史桌面端打包产物，仅剩一个被占用的 asar，可手动删除
 release/

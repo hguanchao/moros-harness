@@ -1,2 +1,6 @@
 # Static reference captures (external HTML/Markdown kept byte-for-byte)
 docs/reference/
+
+# Electron build outputs
+out/
+dist-desktop/

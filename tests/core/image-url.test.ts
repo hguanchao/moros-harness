@@ -14,7 +14,10 @@ function pngBytes(width = 1, height = 1): Buffer {
 }
 
 function imageResponse(bytes: Buffer, headers: Record<string, string> = {}): Response {
-	return new Response(bytes, { status: 200, headers: { "content-type": "image/png", ...headers } });
+	return new Response(bytes as unknown as BodyInit, {
+		status: 200,
+		headers: { "content-type": "image/png", ...headers },
+	});
 }
 
 /** 永远不应被调用的 fetch，用于断言校验发生在网络之前。 */

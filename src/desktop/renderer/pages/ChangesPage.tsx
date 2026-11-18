@@ -1,0 +1,300 @@
+import { useEffect, useState, type JSX } from "react";
+
+import type { FileChangeDiff } from "#src/core/core.ts";
+import type { DiffHunk, DiffLine } from "#src/core/diff/line-diff.ts";
+import type { CheckpointView, FileChangeSummary } from "#src/desktop/shared/contract.ts";
+import { call, errorMessage } from "#src/desktop/renderer/api.ts";
+import { displayPath, relativeTime } from "#src/desktop/renderer/format.ts";
+import { AlertIcon, CheckIcon, DiffIcon, RefreshIcon, XIcon } from "#src/desktop/renderer/icons.tsx";
+import { useApp } from "#src/desktop/renderer/state.tsx";
+
+export function ChangesPage(): JSX.Element {
+	const { state, dispatch } = useApp();
+	const current = state.current;
+	const [changes, setChanges] = useState<readonly FileChangeSummary[]>([]);
+	const [selected, setSelected] = useState<number | undefined>(undefined);
+	const [diff, setDiff] = useState<FileChangeDiff | undefined>(undefined);
+	const [checkpoint, setCheckpoint] = useState<CheckpointView | null>(null);
+	const [error, setError] = useState<string | undefined>(undefined);
+	const [version, setVersion] = useState(0);
+	const [viewMode, setViewMode] = useState<"unified" | "split">("unified");
+	const eventCount = current === undefined ? 0 : (state.events[current.meta.id]?.length ?? 0);
+
+	useEffect(() => {
+		if (current === undefined) {
+			setChanges([]);
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			try {
+				const items = await call(window.moros.sessionsChanges(current.meta.id));
+				if (cancelled) return;
+				setChanges(items);
+				setError(undefined);
+				setSelected((existing) =>
+					existing !== undefined && items.some((item) => item.seq === existing) ? existing : items.at(-1)?.seq,
+				);
+			} catch (loadError) {
+				if (!cancelled) setError(errorMessage(loadError));
+			}
+			try {
+				const point = await call(window.moros.sessionsCheckpoint());
+				if (!cancelled) setCheckpoint(point);
+			} catch {
+				if (!cancelled) setCheckpoint(null);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [current?.meta.id, eventCount, version]);
+
+	useEffect(() => {
+		if (current === undefined || selected === undefined) {
+			setDiff(undefined);
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			try {
+				const result = await call(window.moros.diffGet(selected));
+				if (!cancelled) {
+					setDiff(result);
+					setError(undefined);
+				}
+			} catch (loadError) {
+				if (!cancelled) setError(errorMessage(loadError));
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [current?.meta.id, selected, version]);
+
+	if (current === undefined) {
+		return (
+			<div className="page-empty">
+				<DiffIcon size={22} />
+				<p>先打开一个会话</p>
+			</div>
+		);
+	}
+
+	return (
+		<div className="changes-page">
+			<header className="page-head">
+				<div>
+					<h2>变更</h2>
+					<p className="page-subtitle">文件工具产生的快照；shell 改动由审批与审计兜底。</p>
+				</div>
+				<div className="page-actions">
+					<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
+						<RefreshIcon size={14} />
+						刷新
+					</button>
+					{checkpoint !== null ? (
+						<button
+							className="ghost-button"
+							onClick={() => {
+								if (!window.confirm("恢复到最近检查点？当前工作区中该检查点涉及的文件会被写回。")) return;
+								void (async () => {
+									try {
+										const result = await call(window.moros.sessionsRestore(checkpoint.id));
+										dispatch({
+											type: "notice",
+											level: "info",
+											message: `已恢复 ${result.restored} 个文件，删除 ${result.removed} 个`,
+										});
+										setVersion((value) => value + 1);
+									} catch (restoreError) {
+										dispatch({ type: "notice", level: "error", message: errorMessage(restoreError) });
+									}
+								})();
+							}}
+						>
+							<CheckIcon size={14} />
+							恢复检查点
+						</button>
+					) : null}
+					<button
+						className="danger-button"
+						onClick={() => {
+							if (!window.confirm("撤销最近一次文件改动？")) return;
+							void (async () => {
+								try {
+									await call(window.moros.sessionsRollback());
+									dispatch({ type: "notice", level: "info", message: "已撤销最近一步改动" });
+									setVersion((value) => value + 1);
+								} catch (rollbackError) {
+									dispatch({ type: "notice", level: "error", message: errorMessage(rollbackError) });
+								}
+							})();
+						}}
+					>
+						<XIcon size={14} />
+						撤销最近一步
+					</button>
+				</div>
+			</header>
+
+			{error !== undefined ? <div className="inline-notice notice-error">{error}</div> : null}
+			<div className="changes-body">
+				<div className="change-list">
+					{changes.length === 0 ? <div className="side-empty">当前会话还没有文件变更</div> : null}
+					{[...changes].reverse().map((change) => (
+						<button
+							key={change.seq}
+							className={`change-row ${selected === change.seq ? "is-selected" : ""}`}
+							onClick={() => setSelected(change.seq)}
+							title={change.path}
+						>
+							<span className={`file-op op-${change.op}`}>{opLabel(change.op)}</span>
+							<span className="change-path">{displayPath(change.path)}</span>
+							<small>{relativeTime(change.ts)}</small>
+						</button>
+					))}
+				</div>
+				<div className="diff-pane">
+					{diff === undefined ? (
+						<div className="page-empty">
+							<DiffIcon size={20} />
+							<p>选择一条变更查看 Diff</p>
+						</div>
+					) : (
+						<>
+							<div className="diff-head">
+								<strong>{displayPath(diff.path)}</strong>
+								<div className="diff-head-right">
+									<div className="view-toggle">
+										<button
+											className={viewMode === "unified" ? "is-active" : ""}
+											onClick={() => setViewMode("unified")}
+										>
+											统一
+										</button>
+										<button className={viewMode === "split" ? "is-active" : ""} onClick={() => setViewMode("split")}>
+											并排
+										</button>
+									</div>
+									<span className="diff-stats">
+										<span className="added">+{diff.added}</span>
+										<span className="removed">−{diff.removed}</span>
+									</span>
+								</div>
+							</div>
+							{diff.binary ? (
+								<div className="inline-notice notice-warn">
+									<AlertIcon size={14} /> 二进制文件，仅记录变更
+								</div>
+							) : null}
+							{diff.degraded ? <div className="inline-notice notice-warn">文件过大，已降级为整段替换展示</div> : null}
+							<div className="diff-content">
+								{diff.hunks.map((hunk, hunkIndex) => (
+									<div className="diff-hunk" key={hunkIndex}>
+										<div className="diff-hunk-head">
+											@@ -{hunk.oldStart},{hunk.oldCount} +{hunk.newStart},{hunk.newCount} @@
+										</div>
+										{viewMode === "unified" ? (
+											hunk.lines.map((line, lineIndex) => (
+												<div className={`diff-line ${line.kind}`} key={lineIndex}>
+													<span className="diff-number">{line.oldLine ?? ""}</span>
+													<span className="diff-number">{line.newLine ?? ""}</span>
+													<span className="diff-marker">
+														{line.kind === "add" ? "+" : line.kind === "remove" ? "−" : " "}
+													</span>
+													<span className="diff-text">{line.text.length > 0 ? line.text : " "}</span>
+												</div>
+											))
+										) : (
+											<SplitHunk hunk={hunk} />
+										)}
+									</div>
+								))}
+							</div>
+						</>
+					)}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+function SplitHunk({ hunk }: { readonly hunk: DiffHunk }): JSX.Element {
+	const rows = splitRows(hunk.lines);
+	return (
+		<div className="diff-split">
+			{rows.map((row, index) => (
+				<div className="split-row" key={index}>
+					<SplitCell line={row.left} side="left" />
+					<SplitCell line={row.right} side="right" />
+				</div>
+			))}
+		</div>
+	);
+}
+
+function SplitCell({
+	line,
+	side,
+}: {
+	readonly line: DiffLine | undefined;
+	readonly side: "left" | "right";
+}): JSX.Element {
+	const number = line === undefined ? "" : side === "left" ? (line.oldLine ?? "") : (line.newLine ?? "");
+	const kind = line?.kind ?? "empty";
+	return (
+		<div className={`split-cell ${kind} ${side}`}>
+			<span className="diff-number">{number}</span>
+			<span className="diff-text">{line === undefined ? "" : line.text.length > 0 ? line.text : " "}</span>
+		</div>
+	);
+}
+
+interface SplitRow {
+	readonly left?: DiffLine;
+	readonly right?: DiffLine;
+}
+
+/** 把 hunk 的删除/新增段按行配对成左右两栏；相等的行两侧同源。 */
+function splitRows(lines: readonly DiffLine[]): readonly SplitRow[] {
+	const rows: SplitRow[] = [];
+	let index = 0;
+	while (index < lines.length) {
+		const line = lines[index];
+		if (line === undefined) break;
+		if (line.kind === "equal") {
+			rows.push({ left: line, right: line });
+			index += 1;
+			continue;
+		}
+		const removes: DiffLine[] = [];
+		const adds: DiffLine[] = [];
+		while (index < lines.length && lines[index]?.kind === "remove") {
+			const remove = lines[index];
+			if (remove !== undefined) removes.push(remove);
+			index += 1;
+		}
+		while (index < lines.length && lines[index]?.kind === "add") {
+			const add = lines[index];
+			if (add !== undefined) adds.push(add);
+			index += 1;
+		}
+		const count = Math.max(removes.length, adds.length);
+		for (let offset = 0; offset < count; offset += 1) {
+			const left = removes[offset];
+			const right = adds[offset];
+			rows.push({
+				...(left === undefined ? {} : { left }),
+				...(right === undefined ? {} : { right }),
+			});
+		}
+	}
+	return rows;
+}
+
+function opLabel(op: FileChangeSummary["op"]): string {
+	if (op === "create") return "新建";
+	if (op === "delete") return "删除";
+	return "修改";
+}
