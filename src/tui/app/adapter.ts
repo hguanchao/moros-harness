@@ -214,6 +214,12 @@ export async function runTui(options: RunTuiOptions): Promise<RunTuiResult> {
 	}
 	await discardStaleEmptySessions(state);
 	await refreshSkills(state);
+	// MCP 只读配置并后台连接，不阻塞界面启动；失败进启动警告区，不影响其它能力
+	try {
+		await state.core.prepareMcp(projectRoot);
+	} catch (error) {
+		launchWarnings.push(`Could not start MCP servers: ${describeError(error)}`);
+	}
 	refreshMetrics(state);
 	const tuiOptions = buildTuiOptions(state, warnings);
 	let exitCode = 0;
@@ -842,14 +848,23 @@ export function buildTuiOptions(state: AdapterState, warnings: WarningSink): Tui
 				};
 			},
 		},
-		// MCP 客户端尚未接入：这里给空数据源，页面与启动握手仍可工作。
-		mcpServers: () => [],
-		mcpStatus: () => [],
+		// MCP 连接是后台的：mcpStatus 每次调用都取实时快照，启动握手与 /mcps 刷新共用。
+		mcpServers: () =>
+			core.mcpStatus(projectRoot).map((server) => {
+				// 失败详情可能带 stderr 多行；页面条目只放一行，换行留给审批/错误记录
+				const detail = server.detail.replace(/\s+/g, " ").trim();
+				return {
+					name: server.name,
+					description: server.status === "connected" ? server.detail : server.status,
+					...(server.status === "connected" || detail.length === 0 ? {} : { note: detail }),
+				};
+			}),
+		mcpStatus: () => core.mcpStatus(projectRoot),
 		startupProblems: [...state.launchWarnings],
 		mcpControl: {
-			reconnect: async () => PAGE.noMcpServers,
-			healthCheck: async () => [],
-			awaitStartup: async () => undefined,
+			reconnect: (name) => core.reconnectMcp(projectRoot, name),
+			healthCheck: () => core.healthCheckMcp(projectRoot),
+			awaitStartup: () => core.awaitMcpStartup(projectRoot),
 		},
 		// 工作区信任：存在需要信任的项目资源且尚无结论时提供信任页；授予后刷新配置与技能。
 		...(state.trust.required && state.trust.decision === null

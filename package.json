@@ -34,6 +34,7 @@
 		"endOfLine": "lf"
 	},
 	"dependencies": {
+		"cross-spawn": "^7.0.6",
 		"get-east-asian-width": "^1.7.0",
 		"highlight.js": "11.11.2",
 		"lowlight": "^3.3.0",
@@ -44,6 +45,7 @@
 		"zod": "^4.1.12"
 	},
 	"devDependencies": {
+		"@types/cross-spawn": "^6.0.6",
 		"@types/micromatch": "^4.0.9",
 		"@types/node": "^22.19.0",
 		"prettier": "^3.6.2",

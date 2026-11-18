@@ -124,12 +124,26 @@ function tryParse(candidate: string): ReviewVerdict | undefined {
 }
 
 function reviewPayload(options: CommandReviewerOptions, request: ReviewRequest): string {
-	return [
+	const lines = [
 		`Workspace: ${options.projectRoot}`,
 		`Tool: ${request.tool}`,
 		`Risk: ${request.risk.level} (${request.risk.rule})`,
 		`Command: ${truncate(request.command)}`,
-	].join("\n\n");
+	];
+	// MCP 工具没有命令文本；把参数送给审查者，否则它只能看到「效果未知」并一律拒绝
+	if (request.args !== undefined) {
+		lines.push(`Arguments: ${truncate(safeJson(request.args))}`);
+	}
+	return lines.join("\n\n");
+}
+
+/** 参数来自外部工具，序列化失败时给出可读的兜底，不让审查本身抛错。 */
+function safeJson(value: unknown): string {
+	try {
+		return JSON.stringify(value) ?? String(value);
+	} catch {
+		return String(value);
+	}
 }
 
 /** 截断必须写明：否则把危险内容放在截断点之后，在审查者眼里只是一段无害前缀。 */

@@ -118,8 +118,8 @@ export class ToolPipeline {
 		const executedArgs = tool.applyResolvedPaths ? tool.applyResolvedPaths(args, resolvedPaths) : args;
 		const command = tool.command?.(args);
 		const policy = createPolicy(this.#mode, this.#options.plan === true);
-		// 风险分级只对带命令文本的工具生效；文件写入由路径沙箱与快照兜底
-		const risk = command === undefined ? FILE_TOOL_RISK : assessCommandRisk(command);
+		// 工具可声明固定风险（MCP 工具无法从命令文本分级）；缺省按命令文本或文件写入推断
+		const risk = tool.risk ?? (command === undefined ? FILE_TOOL_RISK : assessCommandRisk(command));
 		// denylist 三档一律硬拦截：档位只放弃「问」，不放弃「拦」。审批档位不能把已知的
 		// 破坏性命令变成可执行——这与 Claude Code 的 bypass 断路器、Gemini CLI 的 deny 规则一致。
 		if (command !== undefined && isDeniedCommand(command)) {
@@ -318,7 +318,7 @@ export class ToolPipeline {
 		let reviewNote: string | undefined;
 		const reviewCommand = this.#options.reviewCommand;
 		if (this.#approval === "auto" && reviewCommand !== undefined) {
-			const verdict = await this.#review(reviewCommand, tool.name, command, risk, corr, signal);
+			const verdict = await this.#review(reviewCommand, tool.name, command, args, risk, corr, signal);
 			if (verdict.decision === "allow") {
 				await this.#options.events.append({
 					type: "approval.granted",
@@ -376,6 +376,7 @@ export class ToolPipeline {
 		reviewCommand: NonNullable<PipelineOptions["reviewCommand"]>,
 		tool: string,
 		command: string | undefined,
+		args: unknown,
 		risk: RiskAssessment,
 		corr: string,
 		signal?: AbortSignal,
@@ -383,7 +384,7 @@ export class ToolPipeline {
 		const startedAt = this.#now();
 		let verdict: ReviewVerdict;
 		try {
-			verdict = await reviewCommand({ tool, command: command ?? "", risk }, signal);
+			verdict = await reviewCommand({ tool, command: command ?? "", risk, args }, signal);
 		} catch (error) {
 			verdict = { decision: "error", reason: error instanceof Error ? error.message : "Review failed" };
 		}

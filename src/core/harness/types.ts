@@ -22,6 +22,16 @@ export interface ToolDefinition {
 	readonly description: string;
 	readonly schema: ZodType;
 	readonly resource: Resource;
+	/**
+	 * 交给模型的参数 JSON Schema；外部工具（MCP）直接用它，内置工具缺省由 zod schema 推导。
+	 * 声明在工具上而不是在循环里特判来源，避免核心循环知道 MCP 的存在。
+	 */
+	readonly parameters?: Record<string, unknown>;
+	/**
+	 * 固定风险等级；外部工具（MCP）无法从命令文本分级，统一按 high 处理。
+	 * 缺省时由管线按 command/文件写入推断。
+	 */
+	readonly risk?: RiskAssessment;
 	readonly paths?: (args: unknown) => readonly string[];
 	readonly applyResolvedPaths?: (args: unknown, paths: readonly string[]) => unknown;
 	readonly command?: (args: unknown) => string | undefined;
@@ -59,6 +69,8 @@ export interface ReviewRequest {
 	readonly tool: string;
 	readonly command: string;
 	readonly risk: RiskAssessment;
+	/** 无命令文本的外部工具（MCP）送审的参数；不传时审查者只看命令。 */
+	readonly args?: unknown;
 }
 
 /** 审查结论；error 表示审查不可用（超时、模型报错、答复不可解析），调用方必须退回人工。 */

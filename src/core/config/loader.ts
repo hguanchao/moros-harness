@@ -59,13 +59,32 @@ export async function loadConfig(options: ConfigLoaderOptions): Promise<LoadedCo
 		: {};
 	const normalizedGlobal = normalizeConfigKeys(globalConfig) as Record<string, unknown>;
 	const normalizedProject = normalizeConfigKeys(projectConfig) as Record<string, unknown>;
+	// MCP server 只允许用户级配置：项目配置能新增或替换它们，等于让一个目录决定启动哪个
+	// 本地进程。与 Reins 同一条约束；项目里写了就忽略并报告，不静默吞掉。
+	const globalMcpServers = normalizedGlobal["mcpServers"];
+	const projectMcpServers = normalizedProject["mcpServers"];
+	delete normalizedGlobal["mcpServers"];
+	delete normalizedProject["mcpServers"];
 	const merged = deepMerge(normalizedGlobal, normalizedProject);
-	const { config, skipped: configSkips } = parseConfig(merged);
+	const { config, skipped: configSkips } = parseConfig(merged, globalMcpServers);
+	const projectMcpSkip =
+		projectMcpServers === undefined
+			? []
+			: [
+					{
+						path: "mcp_servers",
+						reason: "MCP servers are user-level only; a project config cannot add or replace them",
+					},
+				];
 	// 「当前选择」的有效性不在这里校验（ADR-15 真实测试的恢复陷阱）：provider/model 指向
 	// 不存在的条目时若在此硬抛，providers.json 里其余可用条目会被一起拖死——目录变空，
 	// /model 这个本可自助修复（选择即写回）的入口反而不可用。使用期校验在
 	// resolveActiveProvider（发起请求时）与 assertRegisteredModel（写回选择时）。
-	return { config, providers, skipped: [...providerSkips, ...configSkips] };
+	return {
+		config,
+		providers,
+		skipped: [...providerSkips, ...configSkips, ...projectMcpSkip],
+	};
 }
 
 async function readTomlIfExists(path: string): Promise<Record<string, unknown>> {

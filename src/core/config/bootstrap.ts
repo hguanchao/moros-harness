@@ -48,6 +48,19 @@ const CONFIG_TEMPLATE = `# Moros Harness global configuration
 # Both default to the model above.
 # compact_model = "qwen2.5"  # context summarization
 # review_model = "qwen2.5"   # high-risk review in auto mode
+#
+# MCP servers live here, in the user-level config only. A project config cannot add
+# or replace them: MCP decides which local process starts.
+#
+# [mcp_servers.filesystem]
+# command = "npx"
+# args = ["-y", "@modelcontextprotocol/server-filesystem", "."]
+# timeout = 60
+# disabled = false
+#
+# [mcp_servers.docs]
+# url = "https://example.com/mcp"
+# headers = { Authorization = "Bearer \${DOCS_TOKEN}" }
 `;
 
 /** 初始化结果：`created` 是本次真正新建的文件；`errors` 是 best-effort 失败的原因。 */

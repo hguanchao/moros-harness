@@ -24,7 +24,8 @@ export const PAGE = {
 	noSkills: "No skills yet.",
 	skillsEffectNote: "Changes take effect on the next turn.",
 	noMcpServers: "No MCP servers configured.",
-	mcpConfigNote: "The MCP client isn't wired up in this build yet.",
+	mcpConfigNote:
+		"Configure [mcp_servers.<name>] in ~/.moros/config.toml. MCP tools require approval and run outside the workspace sandbox.",
 	trustIntro: "This workspace ships files that change how Moros Harness behaves.",
 	trustNote: "Trusting applies these files to the prompt; commands still run under the sandbox and approval rules.",
 	trustSkipNote: "Not trusting keeps the default: nothing from this workspace is loaded.",

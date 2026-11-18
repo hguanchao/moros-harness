@@ -62,6 +62,7 @@ export async function runCli(args: readonly string[], deps: CliDependencies = {}
 	}
 	if (cli.command === "doctor") {
 		// 非全屏命令可以直接把诊断写到 stderr；TUI 分支则由 WarningSink 送进界面
+		const owned = deps.core === undefined;
 		const core =
 			deps.core ??
 			new Core({
@@ -69,9 +70,13 @@ export async function runCli(args: readonly string[], deps: CliDependencies = {}
 					warnOutput(`Warning: ${message}\n`);
 				},
 			});
-		const report = await core.doctor(resolve(process.cwd()));
-		output(`${formatDoctorReport(report)}\n`);
-		return report.errors.length > 0 ? 1 : 0;
+		try {
+			const report = await core.doctor(resolve(process.cwd()));
+			output(`${formatDoctorReport(report)}\n`);
+			return report.errors.length > 0 ? 1 : 0;
+		} finally {
+			if (owned) await core.dispose();
+		}
 	}
 
 	const approvals = deps.approvals ?? createApprovalBroker();
@@ -79,32 +84,38 @@ export async function runCli(args: readonly string[], deps: CliDependencies = {}
 	// 诊断通道必须在构造 Core 时注入：压缩、provider 解析等路径不带本次运行的回调，
 	// 缺省会让 Core 走 Node warning 通道，把文本直接写进备用屏。
 	const warnings = createWarningSink();
+	const owned = deps.core === undefined;
 	const core =
 		deps.core ??
 		new Core({
 			requestApproval: (request, signal) => approvals.request(request, signal),
 			onWarning: (message) => warnings.emit(message),
 		});
-	const launch = deps.runTui ?? runTui;
-	// --last / 无参 --resume 由 Core 解析成完整 ID：排序规则属于业务逻辑，不放在 CLI。
-	let sessionId = cli.sessionId;
-	if (cli.lastSession === true) {
-		const latest = await core.latestSessionId(resolve(process.cwd()));
-		if (latest === undefined) throw new Error("No session to resume in this project");
-		sessionId = latest;
+	try {
+		const launch = deps.runTui ?? runTui;
+		// --last / 无参 --resume 由 Core 解析成完整 ID：排序规则属于业务逻辑，不放在 CLI。
+		let sessionId = cli.sessionId;
+		if (cli.lastSession === true) {
+			const latest = await core.latestSessionId(resolve(process.cwd()));
+			if (latest === undefined) throw new Error("No session to resume in this project");
+			sessionId = latest;
+		}
+		const result = await launch({
+			core,
+			...(sessionId !== undefined ? { sessionId } : {}),
+			approvals,
+			warnings,
+		});
+		// 退出备用屏后提示恢复命令；空会话已被清理时 runTui 不返回 sessionId。
+		// 一句定位 + 一条命令足够：前缀恢复与 --last 交给 --help，不在这里堆说明（真实使用反馈）。
+		if (result.sessionId !== undefined) {
+			output(`Resume this session with:\n  moros --session ${result.sessionId}\n`);
+		}
+		return 0;
+	} finally {
+		// MCP 子进程、会话租约与心跳都挂在 Core 上；TUI 退出后必须统一收尾
+		if (owned) await core.dispose();
 	}
-	const result = await launch({
-		core,
-		...(sessionId !== undefined ? { sessionId } : {}),
-		approvals,
-		warnings,
-	});
-	// 退出备用屏后提示恢复命令；空会话已被清理时 runTui 不返回 sessionId。
-	// 一句定位 + 一条命令足够：前缀恢复与 --last 交给 --help，不在这里堆说明（真实使用反馈）。
-	if (result.sessionId !== undefined) {
-		output(`Resume this session with:\n  moros --session ${result.sessionId}\n`);
-	}
-	return 0;
 }
 
 function formatDoctorReport(report: DiagnosticReport): string {
@@ -120,6 +131,14 @@ function formatDoctorReport(report: DiagnosticReport): string {
 		for (const provider of report.providers) {
 			const credential = provider.available ? "credential available" : "credential missing";
 			lines.push(`  ${provider.name}: ${credential}; ${provider.modelCount} model(s)`);
+		}
+	}
+	lines.push("MCP servers:");
+	if (report.mcpServers.length === 0) {
+		lines.push("  None configured · add [mcp_servers.<name>] to ~/.moros/config.toml");
+	} else {
+		for (const server of report.mcpServers) {
+			lines.push(`  ${server.name}: ${server.type}${server.enabled ? "" : " (disabled)"}`);
 		}
 	}
 	lines.push("Environment:");

@@ -12,6 +12,7 @@ const KEY_ALIASES: Readonly<Record<string, string>> = {
 	summary_timeout_sec: "summaryTimeoutSec",
 	compact_model: "compactModel",
 	review_model: "reviewModel",
+	mcp_servers: "mcpServers",
 };
 
 /** 递归归一化配置键；snake_case 与 camelCase 并存视为配置错误。 */
@@ -29,6 +30,11 @@ export function normalizeConfigKeys(value: unknown, path = ""): unknown {
 			throw new Error(`Conflicting config keys at ${location}: ${previous} and ${key}`);
 		}
 		originalByCanonical.set(canonical, key);
+		// server 名与条目字段由 MCP 解析器单独校验；递归归一化会把用户起的名字误当配置键
+		if (canonical === "mcpServers") {
+			result[canonical] = child;
+			continue;
+		}
 		const nextPath = path ? `${path}.${canonical}` : canonical;
 		result[canonical] = normalizeConfigKeys(child, nextPath);
 	}

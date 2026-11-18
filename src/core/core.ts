@@ -10,7 +10,7 @@ import { atomicWriteFile } from "#src/core/atomic-file.ts";
 import type { EventRecord, UserInputImage } from "#src/core/events/schema.ts";
 import { ContextCompactor } from "#src/core/compaction/compactor.ts";
 import { decodeDiffText, diffLines, type DiffResult } from "#src/core/diff/line-diff.ts";
-import { loadConfig, type LoadedConfig } from "#src/core/config/loader.ts";
+import { loadConfig as loadConfigFiles, type LoadedConfig } from "#src/core/config/loader.ts";
 import { parseModelRef } from "#src/core/config/model-ref.ts";
 import { resolveActiveProvider, type ResolvedProvider } from "#src/core/config/resolve-providers.ts";
 import { redactSecrets, runSecretCommand } from "#src/core/config/secrets.ts";
@@ -45,6 +45,9 @@ import type {
 } from "#src/core/harness/types.ts";
 import { LlmClient } from "#src/core/llm/client.ts";
 import { MAX_IMAGE_BYTES_PER_REQUEST, MAX_IMAGES_PER_REQUEST, formatImageBytes } from "#src/core/llm/image-limits.ts";
+import { McpManager } from "#src/core/mcp/manager.ts";
+import type { McpStatus } from "#src/core/mcp/types.ts";
+import { VERSION } from "#src/core/version.ts";
 import { AgentLoop, type LoopResult } from "#src/core/loop/agent-loop.ts";
 import { replayMessages } from "#src/core/loop/message-replay.ts";
 import { Session, SessionManager, type SessionMeta } from "#src/core/session/session-manager.ts";
@@ -106,6 +109,8 @@ export interface DiagnosticReport {
 	readonly nodeVersion: string;
 	readonly configLoaded: boolean;
 	readonly providers: readonly { name: string; available: boolean; modelCount: number }[];
+	/** 已配置的 MCP server；doctor 只报告配置，不实际启动进程。 */
+	readonly mcpServers: readonly { name: string; type: string; enabled: boolean }[];
 	readonly environment: Awaited<ReturnType<typeof detectEnvironment>>;
 	readonly errors: readonly string[];
 }
@@ -302,6 +307,8 @@ export class Core {
 	readonly #sessionPlans = new Map<string, boolean>();
 	/** 当前实例持有的会话租约；存 Promise 让同一实例的并发获取也串行。 */
 	readonly #sessionLeases = new Map<string, Promise<SessionLease>>();
+	/** 每个项目一份 MCP 连接管理；键是归一化项目根。 */
+	readonly #mcpManagers = new Map<string, McpManager>();
 	#disposed = false;
 
 	constructor(options: CoreOptions = {}) {
@@ -323,12 +330,28 @@ export class Core {
 		void this.#pruneSpillLogs();
 	}
 
-	/** 加载并校验用户配置和供应商注册表。 */
+	/** 加载并校验用户配置和供应商注册表；对外返回的供应商凭据一律脱敏。 */
 	async loadConfig(projectRoot?: string): Promise<LoadedConfig> {
-		const project = projectRoot ? resolve(projectRoot) : "";
-		const loaded = await loadConfig({ homeDir: this.#homeDir, ...(project ? { projectRoot: project } : {}) });
-		this.#loadedConfigs.set(project, loaded);
+		const loaded = await this.#loadRawConfig(projectRoot);
 		return { ...loaded, providers: parseProvidersFile(redactSecrets(loaded.providers)).providers };
+	}
+
+	/**
+	 * 内部装载：返回含真实凭据的配置并写入缓存。
+	 *
+	 * 公共 `loadConfig` 必须脱敏，但运行期解析供应商需要原始 apiKey；两者共用同一份缓存，
+	 * 避免出现「第一次调用拿到 `***`、后续调用拿到明文」的隐蔽差异。
+	 */
+	async #loadRawConfig(projectRoot?: string): Promise<LoadedConfig> {
+		const project = projectRoot ? resolve(projectRoot) : "";
+		const cached = this.#loadedConfigs.get(project);
+		if (cached) return cached;
+		const loaded = await loadConfigFiles({
+			homeDir: this.#homeDir,
+			...(project ? { projectRoot: project } : {}),
+		});
+		this.#loadedConfigs.set(project, loaded);
+		return loaded;
 	}
 
 	/** 创建一个项目会话；ADR-14 起会话恒为 creator 档（缺省由 SessionManager 兜底），不再恢复项目模式偏好。 */
@@ -415,6 +438,8 @@ export class Core {
 		for (const sessionId of [...this.#sessionSignals.keys()]) this.abortSession(sessionId, "session");
 		this.#sessionSignals.clear();
 		this.#sessionLoops.clear();
+		await Promise.allSettled([...this.#mcpManagers.values()].map((manager) => manager.close()));
+		this.#mcpManagers.clear();
 		await Promise.allSettled([...this.#sessionLeases.keys()].map((id) => this.releaseSessionLease(id)));
 	}
 
@@ -795,6 +820,11 @@ export class Core {
 			compaction: loaded.config.compaction,
 			ui: loaded.config.ui,
 			providers: Object.keys(loaded.providers.providers),
+			mcpServers: loaded.config.mcpServers.map((server) => ({
+				name: server.name,
+				type: server.type,
+				enabled: !server.disabled,
+			})),
 			skipped: loaded.skipped,
 		};
 	}
@@ -943,6 +973,80 @@ export class Core {
 	}
 
 	/**
+	 * 为项目准备 MCP 连接：装载配置并在后台启动全部启用的 server。
+	 *
+	 * 只做配置读取与启动，不等待握手；TUI 启动时先调用它，`mcpStatus` 立刻就有
+	 * connecting 状态，首条消息前再由 `awaitMcpStartup` 做一次限时收口。
+	 * @param projectRoot 项目根目录；MCP 配置只来自用户级 config.toml。
+	 */
+	async prepareMcp(projectRoot: string): Promise<void> {
+		if (this.#disposed) return;
+		const manager = await this.#ensureMcpManager(projectRoot);
+		manager?.start();
+	}
+
+	/** 限时等待 MCP 启动收口；没有配置 server 时立即返回。 */
+	async awaitMcpStartup(projectRoot: string): Promise<void> {
+		const manager = await this.#ensureMcpManager(projectRoot);
+		if (!manager) return;
+		manager.start();
+		await manager.awaitStartup();
+	}
+
+	/** 当前项目的 MCP 连接状态；尚未准备时返回空数组。 */
+	mcpStatus(projectRoot: string): readonly McpStatus[] {
+		return this.#mcpManagers.get(normalizeProjectRoot(resolve(projectRoot)))?.status() ?? [];
+	}
+
+	/**
+	 * 手动重连一个 MCP server。
+	 * @throws 没有配置任何 MCP server 或名称不存在时抛出。
+	 */
+	async reconnectMcp(projectRoot: string, name: string): Promise<string> {
+		const manager = await this.#ensureMcpManager(projectRoot);
+		if (!manager) throw new Error("No MCP servers are configured");
+		manager.start();
+		return manager.reconnect(name);
+	}
+
+	/** 检查全部 MCP 连接；没有配置时返回空数组。 */
+	async healthCheckMcp(projectRoot: string): Promise<readonly string[]> {
+		const manager = await this.#ensureMcpManager(projectRoot);
+		if (!manager) return [];
+		manager.start();
+		return manager.healthCheck();
+	}
+
+	/**
+	 * 取项目的 MCP 管理器；配置为空时不创建，配置损坏时告警并降级为无 MCP。
+	 * 非致命：MCP 是可选能力，配置问题不应让会话跑不起来。
+	 */
+	async #ensureMcpManager(projectRoot: string): Promise<McpManager | undefined> {
+		if (this.#disposed) return undefined;
+		const root = resolve(projectRoot);
+		const key = normalizeProjectRoot(root);
+		const existing = this.#mcpManagers.get(key);
+		if (existing) return existing;
+		try {
+			const loaded = await this.#getConfig(root);
+			if (loaded.config.mcpServers.length === 0) return undefined;
+			const manager = new McpManager({
+				projectRoot: root,
+				servers: loaded.config.mcpServers,
+				version: VERSION,
+				...(this.#options.env ? { env: this.#options.env } : {}),
+				...(this.#options.fetch ? { fetch: this.#options.fetch } : {}),
+			});
+			this.#mcpManagers.set(key, manager);
+			return manager;
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			this.#options.onWarning?.(`Cannot load MCP configuration: ${message}`);
+			return undefined;
+		}
+	}
+
+	/**
 	 * 建立高危动作的审查回调。
 	 *
 	 * `review_model` 支持 `modelId` 与 `provider/modelId` 两种写法；不填时复用会话模型——
@@ -1071,6 +1175,14 @@ export class Core {
 		}
 		const imageAttachments = await this.#storeImages(session.directory, imageInputs);
 		const plan = this.#sessionPlans.get(sessionId) === true;
+		// MCP 工具只进主会话：子代理的任务是收敛的独立工作，给它一套远端工具会扩大权限面，
+		// 也让「子代理工具面受限」这条约束失效。主代理可以先调 MCP 再把结果写进任务说明。
+		const mcp = options.subagent ? undefined : await this.#ensureMcpManager(projectRoot);
+		if (mcp) {
+			mcp.start();
+			await mcp.awaitStartup();
+		}
+		const mcpTools = mcp?.tools() ?? [];
 		// 递归深度 1：只有主会话（非子代理）才注入 task 执行通道；子代理的工具面没有 task
 		const baseTools = options.subagent
 			? createBuiltinTools(config.shellPath ? { shellPath: config.shellPath } : {})
@@ -1078,7 +1190,7 @@ export class Core {
 					...(config.shellPath ? { shellPath: config.shellPath } : {}),
 					taskRunner: (task, context) => this.#runSubagent(session, projectRoot, task, context, options.onSubagent),
 				});
-		const tools = plan ? [...baseTools, createPresentPlanTool()] : baseTools;
+		const tools = [...baseTools, ...mcpTools, ...(plan ? [createPresentPlanTool()] : [])];
 		const pipeline = await this.createPipeline({
 			session,
 			projectRoot,
@@ -1092,7 +1204,8 @@ export class Core {
 			ToolSchema.parse({
 				name: tool.name,
 				description: tool.description,
-				parameters: z.toJSONSchema(tool.schema) as Record<string, unknown>,
+				// 外部工具（MCP）自带 JSON Schema；内置工具才需要从 zod 推导
+				parameters: tool.parameters ?? (z.toJSONSchema(tool.schema) as Record<string, unknown>),
 			}),
 		);
 		const skills = await this.listSkills(projectRoot);
@@ -1555,6 +1668,7 @@ export class Core {
 		const errors: string[] = [];
 		let configLoaded = false;
 		let providers: DiagnosticReport["providers"] = [];
+		let mcpServers: DiagnosticReport["mcpServers"] = [];
 		try {
 			const loaded = await this.#getConfig(projectRoot ? resolve(projectRoot) : "");
 			configLoaded = true;
@@ -1578,6 +1692,11 @@ export class Core {
 				available: providerHasConfiguredCredential(provider, this.#options.env ?? process.env),
 				modelCount: provider.models.length,
 			}));
+			mcpServers = loaded.config.mcpServers.map((server) => ({
+				name: server.name,
+				type: server.type,
+				enabled: !server.disabled,
+			}));
 		} catch (error) {
 			errors.push(error instanceof Error ? error.message : "Configuration validation failed");
 		}
@@ -1585,6 +1704,7 @@ export class Core {
 			nodeVersion: process.version,
 			configLoaded,
 			providers,
+			mcpServers,
 			environment: await detectEnvironment(this.#options.env ? { env: this.#options.env } : {}),
 			errors,
 		};
@@ -1723,13 +1843,11 @@ export class Core {
 	}
 
 	async #getConfig(projectRoot: string): Promise<LoadedConfig> {
-		const cached = this.#loadedConfigs.get(projectRoot);
-		if (cached) return cached;
 		// 严格门控：未信任且项目存在需要信任的资源时，project.toml 不参与合并
 		if (projectRoot !== "" && (await this.#isTrustGated(projectRoot))) {
-			return this.loadConfig(undefined);
+			return this.#loadRawConfig();
 		}
-		return this.loadConfig(projectRoot || undefined);
+		return this.#loadRawConfig(projectRoot || undefined);
 	}
 
 	/** 运行路径是否被信任门控（doctor 等诊断直读不走这里）。 */

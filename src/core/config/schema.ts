@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+import { parseMcpServers } from "#src/core/mcp/config.ts";
+import type { McpServerConfig } from "#src/core/mcp/types.ts";
+
 const SecretValueSchema = z.string();
 
 export const ModelSchema = z.object({
@@ -81,7 +84,10 @@ const ConfigSchema = z.object({
 
 export type ProviderConfig = z.infer<typeof ProviderSchema>;
 export type ProvidersFile = z.infer<typeof ProvidersFileSchema>;
-export type AppConfig = z.infer<typeof ConfigSchema>;
+/** 应用配置；MCP server 表由 `[mcp_servers]` 单独解析，校验失败的条目只跳过自己。 */
+export type AppConfig = z.infer<typeof ConfigSchema> & {
+	readonly mcpServers: readonly McpServerConfig[];
+};
 
 /** 被逐条容错跳过的坏条目：path 定位到 providers.json / config.toml 里的具体位置。 */
 export interface ConfigSkip {
@@ -177,7 +183,10 @@ export function parseProvidersFile(value: unknown): ParsedProvidersFile {
  * @param value 合并归一后的原始配置值。
  * @returns 校验后的配置与被剥离未知键的清单。
  */
-export function parseConfig(value: unknown): { config: AppConfig; skipped: ConfigSkip[] } {
+export function parseConfig(
+	value: unknown,
+	mcpServers: unknown = isRecord(value) ? value["mcpServers"] : undefined,
+): { config: AppConfig; skipped: ConfigSkip[] } {
 	const config = ConfigSchema.parse(value);
 	const skipped: ConfigSkip[] = [];
 	const knownTop = new Set([
@@ -194,6 +203,7 @@ export function parseConfig(value: unknown): { config: AppConfig; skipped: Confi
 		"compaction",
 		"ui",
 		"trusts",
+		"mcpServers",
 	]);
 	const source = isRecord(value) ? value : {};
 	for (const key of Object.keys(source)) {
@@ -215,7 +225,12 @@ export function parseConfig(value: unknown): { config: AppConfig; skipped: Confi
 		const protocol = new URL(config.httpProxy).protocol;
 		if (protocol !== "http:" && protocol !== "https:") throw new Error("httpProxy must use HTTP or HTTPS");
 	}
-	return { config, skipped };
+	// MCP server 表逐条校验：一个坏条目只跳过自己，其余 server 照常进配置
+	const mcp = parseMcpServers(mcpServers);
+	return {
+		config: { ...config, mcpServers: mcp.servers },
+		skipped: [...skipped, ...mcp.skipped],
+	};
 }
 
 export interface ParsedProvidersFile {
