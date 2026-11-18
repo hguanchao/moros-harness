@@ -41,7 +41,7 @@ export function PanelIcon(props: IconProps): JSX.Element {
 export function FolderIcon(props: IconProps): JSX.Element {
 	return (
 		<Icon {...props}>
-			<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+			<path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.8A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
 		</Icon>
 	);
 }
@@ -49,8 +49,7 @@ export function FolderIcon(props: IconProps): JSX.Element {
 export function FolderOpenIcon(props: IconProps): JSX.Element {
 	return (
 		<Icon {...props}>
-			<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1" />
-			<path d="M4.5 20h13.2a2 2 0 0 0 1.9-1.4l1.7-5.6a1 1 0 0 0-1-1.3H7.3a2 2 0 0 0-1.9 1.4L3 20Z" />
+			<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2" />
 		</Icon>
 	);
 }
