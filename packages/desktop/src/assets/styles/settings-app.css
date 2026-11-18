@@ -86,7 +86,7 @@
 
 /* 左侧导航 */
 .settings-nav {
-	width: 220px;
+	width: var(--sidebar-width);
 	flex: none;
 	display: flex;
 	flex-direction: column;
