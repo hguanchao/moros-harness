@@ -18,6 +18,7 @@ import {
 	MonitorIcon,
 	MoonIcon,
 	PlugIcon,
+	PlusIcon,
 	PuzzleIcon,
 	RestoreIcon,
 	RouteIcon,
@@ -302,6 +303,61 @@ function ChevronLeft({ size }: { readonly size: number }): JSX.Element {
 	);
 }
 
+/** 数值步进器：可点击的 −/+ 按钮 + 可直接输入的文本框，替代原生 number 的难点箭头。 */
+function NumberStepper({
+	value,
+	min,
+	max,
+	suffix,
+	onChange,
+}: {
+	readonly value: number;
+	readonly min: number;
+	readonly max: number;
+	readonly suffix?: string;
+	readonly onChange: (value: number) => void;
+}): JSX.Element {
+	const [text, setText] = useState(String(value));
+	useEffect(() => setText(String(value)), [value]);
+
+	const commit = (): void => {
+		const parsed = Number(text);
+		if (Number.isInteger(parsed) && parsed >= min && parsed <= max) {
+			onChange(parsed);
+		} else {
+			setText(String(value));
+		}
+	};
+
+	const step = (delta: number): void => {
+		const next = Math.min(max, Math.max(min, value + delta));
+		if (next !== value) onChange(next);
+	};
+
+	return (
+		<span className="settings-stepper">
+			<button type="button" aria-label="减小" title="减小" disabled={value <= min} onClick={() => step(-1)}>
+				<MinusIcon size={13} />
+			</button>
+			<input
+				className="settings-stepper-input"
+				type="text"
+				inputMode="numeric"
+				value={text}
+				onChange={(event) => setText(event.target.value)}
+				onBlur={commit}
+				onKeyDown={(event) => {
+					if (event.key === "Enter") commit();
+				}}
+			/>
+			{suffix !== undefined ? <span className="settings-stepper-suffix">{suffix}</span> : null}
+			<button type="button" aria-label="增大" title="增大" disabled={value >= max} onClick={() => step(1)}>
+				<PlusIcon size={13} />
+			</button>
+		</span>
+	);
+}
+
 /** 外观页：界面设置（真实）+ 代码设置与代码预览（占位展示）。 */
 function AppearanceSettings({
 	settings,
@@ -336,21 +392,13 @@ function AppearanceSettings({
 						label="界面字号"
 						description="调整应用界面的文字大小，图标和布局尺寸不受影响。"
 						control={
-							<span className="settings-number">
-								<input
-									type="number"
-									min={12}
-									max={20}
-									value={ui.fontSize}
-									onChange={(event) => {
-										const parsed = Number(event.target.value);
-										if (Number.isInteger(parsed) && parsed >= 12 && parsed <= 20) {
-											void onUpdate({ ui: { fontSize: parsed } });
-										}
-									}}
-								/>
-								<span>px</span>
-							</span>
+							<NumberStepper
+								value={ui.fontSize}
+								min={12}
+								max={20}
+								suffix="px"
+								onChange={(parsed) => void onUpdate({ ui: { fontSize: parsed } })}
+							/>
 						}
 					/>
 				</SettingsCard>

@@ -332,27 +332,66 @@
 	color: var(--text-muted);
 }
 
-.settings-number input {
-	width: 56px;
-	height: 30px;
-	padding: 0 8px;
+/* 数值步进器：与下拉框同高（34px），按钮有足够点击区域 */
+.settings-stepper {
+	display: inline-flex;
+	align-items: center;
+	height: 34px;
 	border: 1px solid var(--line-strong);
-	border-radius: 7px;
+	border-radius: 8px;
 	background: var(--surface-main);
+	overflow: hidden;
+}
+
+.settings-stepper button {
+	width: 30px;
+	height: 100%;
+	display: grid;
+	place-items: center;
+	flex: none;
+	border: none;
+	background: transparent;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.settings-stepper button:hover:not(:disabled) {
+	background: var(--fill-soft);
 	color: var(--text-primary);
-	text-align: right;
+}
+
+.settings-stepper button:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.settings-stepper-input {
+	width: 44px;
+	height: 100%;
+	padding: 0 2px;
+	border: none;
 	outline: none;
+	background: transparent;
+	color: var(--text-primary);
+	text-align: center;
+	font-size: var(--text-body);
+}
+
+.settings-stepper-suffix {
+	padding-right: 8px;
+	color: var(--text-faint);
+	font-size: var(--text-small);
 }
 
 .settings-number.is-disabled > span:first-child {
-	width: 56px;
-	height: 30px;
+	width: 64px;
+	height: 34px;
 	display: inline-flex;
 	align-items: center;
 	justify-content: flex-end;
 	padding: 0 8px;
 	border: 1px solid var(--line);
-	border-radius: 7px;
+	border-radius: 8px;
 	opacity: 0.6;
 }
 
