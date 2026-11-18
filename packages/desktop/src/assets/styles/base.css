@@ -23,8 +23,8 @@
 	--accent-ring: rgba(255, 255, 255, 0.6);
 	--caption-hover: rgba(255, 255, 255, 0.08);
 	--caption-press: rgba(255, 255, 255, 0.13);
-	--close-hover: #4a4a4a;
-	--close-press: #3d3d3d;
+	--close-hover: #e81123;
+	--close-press: #c50e1f;
 	--danger: #ff7b72;
 	--danger-soft: rgba(255, 123, 114, 0.12);
 	--ok: #72d69e;
@@ -81,8 +81,8 @@
 	--accent-ring: rgba(0, 0, 0, 0.5);
 	--caption-hover: rgba(0, 0, 0, 0.06);
 	--caption-press: rgba(0, 0, 0, 0.11);
-	--close-hover: #b5b5b5;
-	--close-press: #a0a0a0;
+	--close-hover: #e81123;
+	--close-press: #c50e1f;
 	--danger: #c93c37;
 	--danger-soft: rgba(201, 60, 55, 0.1);
 	--ok: #1f8a4c;

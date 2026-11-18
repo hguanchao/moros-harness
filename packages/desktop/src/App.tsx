@@ -112,7 +112,11 @@ export function App(): JSX.Element {
 	}
 
 	return (
-		<div className="app" data-platform={state.app?.platform ?? (isMac ? "darwin" : "win32")}>
+		<div
+			className="app"
+			data-platform={state.app?.platform ?? (isMac ? "darwin" : "win32")}
+			data-has-project={state.project === undefined ? "false" : "true"}
+		>
 			<TitleBar
 				sidebarOpen={state.sidebarOpen}
 				onToggleSidebar={() => dispatch({ type: "sidebar", open: !state.sidebarOpen })}

@@ -33,6 +33,11 @@
 	color: var(--text-primary);
 }
 
+/* 无项目欢迎页没有侧栏，隐藏侧栏开关 */
+.app[data-has-project="false"] .titlebar-toggle {
+	display: none;
+}
+
 .caption-group {
 	display: flex;
 	align-items: center;
