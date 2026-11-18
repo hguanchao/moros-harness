@@ -46,7 +46,7 @@
 .prov-workspace {
 	display: grid;
 	grid-template-columns: 240px minmax(0, 1fr);
-	min-height: 480px;
+	min-height: max(480px, calc(100vh - 300px));
 	border: 1px solid var(--line);
 	border-radius: 14px;
 	background: var(--surface-chrome);
