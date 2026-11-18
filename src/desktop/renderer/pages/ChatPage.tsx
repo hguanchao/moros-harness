@@ -1,25 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { ApprovalCard } from "#src/desktop/shared/contract.ts";
-import { useDesktopActions } from "#src/desktop/renderer/actions.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
 import { Composer } from "#src/desktop/renderer/Composer.tsx";
-import { displayPath, formatTokens } from "#src/desktop/renderer/format.ts";
-import {
-	AlertIcon,
-	ChevronDownIcon,
-	CheckIcon,
-	ArchiveIcon,
-	DiffIcon,
-	FileIcon,
-	FolderIcon,
-	ListTreeIcon,
-	MoreIcon,
-	PanelRightIcon,
-	SettingsIcon,
-	SparklesIcon,
-	XIcon,
-} from "#src/desktop/renderer/icons.tsx";
+import { AlertIcon, CheckIcon, ChevronDownIcon, SparklesIcon, XIcon } from "#src/desktop/renderer/icons.tsx";
 import { Markdown } from "#src/desktop/renderer/markdown.tsx";
 import { useApp } from "#src/desktop/renderer/state.tsx";
 import { buildTimeline, Transcript } from "#src/desktop/renderer/transcript.tsx";
@@ -29,15 +13,11 @@ const IMPLEMENTATION_SUFFIX = "\n\nRe-read the files you need before changing th
 
 export function ChatPage(): JSX.Element {
 	const { state, dispatch } = useApp();
-	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const stickToBottom = useRef(true);
-	const [menuOpen, setMenuOpen] = useState(false);
 	const [loadingOlder, setLoadingOlder] = useState(false);
-	const [panelOpen, setPanelOpen] = useState(false);
-	const [artifactsOpen, setArtifactsOpen] = useState(true);
 
 	const events = current === undefined ? [] : (state.events[current.meta.id] ?? []);
 	const live = current === undefined ? undefined : (state.live[current.meta.id] ?? current.live);
@@ -56,18 +36,6 @@ export function ChatPage(): JSX.Element {
 		.flatMap((turn) => turn.blocks)
 		.filter((block): block is Extract<typeof block, { kind: "plan" }> => block.kind === "plan")
 		.at(-1)?.text;
-	const artifacts = events
-		.flatMap((event) =>
-			event.type === "file.changed" ? [{ seq: event.seq, path: event.payload.path, op: event.payload.op }] : [],
-		)
-		.slice(-5)
-		.reverse();
-	const contextWindow =
-		current?.model === undefined
-			? undefined
-			: state.models.providers
-					.find((provider) => provider.name === current.model?.provider)
-					?.models.find((model) => model.id === current.model?.model)?.contextWindow;
 
 	useEffect(() => {
 		stickToBottom.current = true;
@@ -117,189 +85,56 @@ export function ChatPage(): JSX.Element {
 		})();
 	};
 
-	const runCommand = (command: "compact" | "review" | "rollback"): void => {
-		setMenuOpen(false);
-		void (async () => {
-			try {
-				if (command === "compact") {
-					if (!window.confirm("立即压缩当前会话的上下文？")) return;
-					const result = await call(window.moros.sessionsCompact());
-					dispatch({
-						type: "notice",
-						level: "info",
-						message: result.compacted ? `已压缩：${result.covered} 条消息` : "当前上下文不足以压缩",
-					});
-				} else if (command === "review") {
-					await call(window.moros.sessionsReview(""));
-				} else {
-					if (!window.confirm("撤销最近一次通过文件工具产生的改动？")) return;
-					await call(window.moros.sessionsRollback());
-					dispatch({ type: "notice", level: "info", message: "已撤销最近一步改动" });
-				}
-			} catch (error) {
-				report(error);
-			}
-		})();
-	};
-
 	return (
-		<div className={`chat-page ${panelOpen ? "panel-open" : ""}`}>
-			<div className="main-stage">
-				<header className="main-bar">
-					<div className="main-bar-left">
-						<span className="conversation-title">{current?.meta.title ?? project?.name ?? "Moros Harness"}</span>
-						{current?.plan === true ? <span className="pill">计划模式</span> : null}
-						{current?.readOnly === true ? <span className="pill warn">只读</span> : null}
-					</div>
-					<div className="page-actions">
-						{current !== undefined ? (
-							<span className="main-metrics">
-								上下文 {formatTokens(current.metrics.contextUsed)}
-								{contextWindow === undefined ? "" : ` / ${formatTokens(contextWindow)}`}
-								<span>缓存 {(current.metrics.cacheHitRate * 100).toFixed(0)}%</span>
-							</span>
-						) : null}
-						<button className="icon-button" title="文件" aria-label="文件" onClick={() => actions.setPage("files")}>
-							<FolderIcon size={16} />
-						</button>
-						<button className="icon-button" title="变更" aria-label="变更" onClick={() => actions.setPage("changes")}>
-							<DiffIcon size={16} />
-						</button>
-						<button className="icon-button" title="轨迹" aria-label="轨迹" onClick={() => actions.setPage("trace")}>
-							<ListTreeIcon size={16} />
-						</button>
-						<button
-							className="icon-button"
-							title={panelOpen ? "关闭快速操作" : "快速操作"}
-							aria-label="快速操作"
-							onClick={() => setPanelOpen(!panelOpen)}
-						>
-							<PanelRightIcon size={16} />
-						</button>
-						<div className="menu-wrap">
-							<button className="icon-button" title="更多操作" onClick={() => setMenuOpen(!menuOpen)}>
-								<MoreIcon size={16} />
-							</button>
-							{menuOpen ? (
-								<>
-									<div className="menu-backdrop" onClick={() => setMenuOpen(false)} />
-									<div className="dropdown">
-										<button onClick={() => runCommand("compact")}>压缩上下文</button>
-										<button onClick={() => runCommand("review")}>只读审查</button>
-										<button onClick={() => runCommand("rollback")}>撤销最近一步</button>
-									</div>
-								</>
-							) : null}
-						</div>
-					</div>
-				</header>
-
-				<div
-					className="conversation"
-					ref={scrollRef}
-					onScroll={(event) => {
-						const element = event.currentTarget;
-						stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-					}}
-				>
-					<div className="transcript">
-						{current !== undefined && events.length > 0 && (events[0]?.seq ?? 1) > 1 ? (
-							<button className="load-older" disabled={loadingOlder} onClick={() => void loadOlder()}>
-								{loadingOlder ? "加载中…" : "加载更早消息"}
-							</button>
-						) : null}
-						{state.loadError !== undefined ? (
-							<div className="load-error">
-								<AlertIcon size={16} />
-								<span>{state.loadError}</span>
-							</div>
-						) : null}
-						<Transcript
-							turns={turns}
-							planning={current?.plan === true}
-							running={current?.running === true}
-							onApprovePlan={approvePlan}
-							onRevisePlan={() => {
-								if (activePlan === undefined) return;
-								document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
-							}}
-							onOpenChange={() => actions.setPage("changes")}
-						/>
-					</div>
+		<div className="chat-page">
+			<header className="main-bar">
+				<div className="main-bar-left">
+					<span className="conversation-title">{current?.meta.title ?? project?.name ?? "Moros Harness"}</span>
+					{current?.plan === true ? <span className="pill">计划模式</span> : null}
+					{current?.readOnly === true ? <span className="pill warn">只读</span> : null}
 				</div>
+			</header>
 
-				<div className="composer-dock">
-					{approvals.map((card) => (
-						<ApprovalPanel key={card.id} card={card} currentSessionId={current?.meta.id} />
-					))}
-					<Composer />
-					{state.review !== undefined ? <ReviewModal /> : null}
+			<div
+				className="conversation"
+				ref={scrollRef}
+				onScroll={(event) => {
+					const element = event.currentTarget;
+					stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+				}}
+			>
+				<div className="transcript">
+					{current !== undefined && events.length > 0 && (events[0]?.seq ?? 1) > 1 ? (
+						<button className="load-older" disabled={loadingOlder} onClick={() => void loadOlder()}>
+							{loadingOlder ? "加载中…" : "加载更早消息"}
+						</button>
+					) : null}
+					{state.loadError !== undefined ? (
+						<div className="load-error">
+							<AlertIcon size={16} />
+							<span>{state.loadError}</span>
+						</div>
+					) : null}
+					<Transcript
+						turns={turns}
+						planning={current?.plan === true}
+						running={current?.running === true}
+						onApprovePlan={approvePlan}
+						onRevisePlan={() => {
+							if (activePlan === undefined) return;
+							document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+						}}
+					/>
 				</div>
 			</div>
 
-			{current !== undefined ? (
-				<aside className={`side-panel ${panelOpen ? "is-open" : ""}`} aria-label="快速操作">
-					<div className="panel-tabs">
-						<div className="panel-tab is-active">
-							<PanelRightIcon size={12} />
-							<span>快速操作</span>
-							<button className="tab-close" aria-label="关闭面板" onClick={() => setPanelOpen(false)}>
-								<XIcon size={12} />
-							</button>
-						</div>
-					</div>
-					<div className="panel-body">
-						<div className="candidate-list">
-							<button className="candidate" onClick={() => actions.setPage("files")}>
-								<FolderIcon size={18} />
-								<span>文件树</span>
-							</button>
-							<button className="candidate" onClick={() => actions.setPage("changes")}>
-								<DiffIcon size={18} />
-								<span>查看变更</span>
-							</button>
-							<button className="candidate" onClick={() => actions.setPage("trace")}>
-								<ListTreeIcon size={18} />
-								<span>执行轨迹</span>
-							</button>
-							<button className="candidate" onClick={() => actions.setPage("sessions")}>
-								<ArchiveIcon size={18} />
-								<span>会话管理</span>
-							</button>
-							<button className="candidate" onClick={() => actions.setPage("settings")}>
-								<SettingsIcon size={18} />
-								<span>设置</span>
-							</button>
-						</div>
-						<div className={`panel-artifacts ${artifactsOpen ? "" : "is-collapsed"}`}>
-							<button
-								className="artifacts-head"
-								aria-expanded={artifactsOpen}
-								onClick={() => setArtifactsOpen(!artifactsOpen)}
-							>
-								<span className="chev">
-									<ChevronDownIcon size={14} />
-								</span>
-								<span>最近变更 ({artifacts.length})</span>
-							</button>
-							<div className="artifacts-body">
-								{artifacts.length === 0 ? <div className="side-empty">还没有文件变更</div> : null}
-								{artifacts.map((artifact) => (
-									<button className="artifact-item" key={artifact.seq} onClick={() => actions.setPage("changes")}>
-										<span className="artifact-file-icon">
-											<FileIcon size={11} />
-										</span>
-										<span className={`file-op op-${artifact.op}`}>
-											{artifact.op === "create" ? "新" : artifact.op === "delete" ? "删" : "改"}
-										</span>
-										<span className="artifact-path">{displayPath(artifact.path)}</span>
-									</button>
-								))}
-							</div>
-						</div>
-					</div>
-				</aside>
-			) : null}
+			<div className="composer-dock">
+				{approvals.map((card) => (
+					<ApprovalPanel key={card.id} card={card} currentSessionId={current?.meta.id} />
+				))}
+				<Composer />
+				{state.review !== undefined ? <ReviewModal /> : null}
+			</div>
 
 			{trustBlocked && project !== undefined ? <TrustGate /> : null}
 			{current === undefined && project !== undefined ? (

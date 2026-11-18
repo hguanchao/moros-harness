@@ -393,12 +393,3 @@ export function MessagePlusIcon(props: IconProps): JSX.Element {
 		</Icon>
 	);
 }
-
-export function PanelRightIcon(props: IconProps): JSX.Element {
-	return (
-		<Icon {...props}>
-			<rect x="3" y="3" width="18" height="18" rx="2" />
-			<path d="M15 3v18" />
-		</Icon>
-	);
-}

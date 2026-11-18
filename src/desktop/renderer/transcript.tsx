@@ -314,17 +314,9 @@ export interface TranscriptProps {
 	readonly running: boolean;
 	readonly onApprovePlan: (plan: string) => void;
 	readonly onRevisePlan: () => void;
-	readonly onOpenChange: () => void;
 }
 
-export function Transcript({
-	turns,
-	planning,
-	running,
-	onApprovePlan,
-	onRevisePlan,
-	onOpenChange,
-}: TranscriptProps): JSX.Element {
+export function Transcript({ turns, planning, running, onApprovePlan, onRevisePlan }: TranscriptProps): JSX.Element {
 	if (turns.length === 0) {
 		return (
 			<div className="chat-empty">
@@ -352,7 +344,6 @@ export function Transcript({
 							running={running}
 							onApprovePlan={onApprovePlan}
 							onRevisePlan={onRevisePlan}
-							onOpenChange={onOpenChange}
 						/>
 					</div>
 				</div>
@@ -367,14 +358,12 @@ function BlockList({
 	running,
 	onApprovePlan,
 	onRevisePlan,
-	onOpenChange,
 }: {
 	readonly blocks: readonly Block[];
 	readonly planning: boolean;
 	readonly running: boolean;
 	readonly onApprovePlan: (plan: string) => void;
 	readonly onRevisePlan: () => void;
-	readonly onOpenChange: () => void;
 }): JSX.Element {
 	const rendered: JSX.Element[] = [];
 	let toolBuffer: ToolBlock[] = [];
@@ -435,12 +424,11 @@ function BlockList({
 				break;
 			case "file":
 				rendered.push(
-					<button className="file-row" key={`file-${key++}`} onClick={onOpenChange}>
+					<div className="file-row" key={`file-${key++}`}>
 						<FileIcon size={14} />
 						<span className={`file-op op-${block.op}`}>{opLabel(block.op)}</span>
 						<span className="file-path">{displayPath(block.path)}</span>
-						<ChevronRightIcon size={13} />
-					</button>,
+					</div>,
 				);
 				break;
 		}
