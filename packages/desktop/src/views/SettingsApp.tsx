@@ -212,10 +212,6 @@ export function SettingsApp(): JSX.Element {
 						))}
 						{filteredGroups.length === 0 ? <div className="settings-nav-empty">没有匹配的设置项</div> : null}
 					</div>
-					<div className="settings-nav-footer">
-						<SettingsIcon size={14} />
-						<span>连接使用</span>
-					</div>
 				</nav>
 				<main className="settings-content">
 					<div className={`settings-content-inner ${active === "providers" ? "is-wide" : ""}`}>

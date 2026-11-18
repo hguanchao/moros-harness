@@ -196,18 +196,6 @@
 	font-size: var(--text-small);
 }
 
-.settings-nav-footer {
-	flex: none;
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	height: 42px;
-	padding: 0 18px;
-	border-top: 1px solid var(--line);
-	color: var(--text-faint);
-	font-size: var(--text-small);
-}
-
 /* 内容区：居中固定宽度列 */
 .settings-content {
 	flex: 1;
