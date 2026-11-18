@@ -1,0 +1,225 @@
+/* ---------- 提示 ---------- */
+
+.toasts {
+	position: fixed;
+	right: 20px;
+	bottom: 20px;
+	z-index: 80;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-width: 420px;
+}
+
+.toast {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 10px 12px;
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+	color: var(--text-secondary);
+	font-size: var(--text-small);
+	animation: toast-in 0.18s ease-out;
+}
+
+.toast > span {
+	flex: 1;
+	overflow-wrap: anywhere;
+}
+
+.toast-error {
+	border-color: var(--danger);
+	color: var(--danger);
+}
+
+.toast-warn {
+	border-color: var(--warn);
+	color: var(--warn);
+}
+
+/* ---------- 动画 / 滚动条 ---------- */
+
+.spinner {
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--line-strong);
+	border-top-color: var(--text-primary);
+	border-radius: 50%;
+	animation: spin 0.8s linear infinite;
+	flex: none;
+}
+
+.spinner.small {
+	width: 11px;
+	height: 11px;
+	border-width: 1.5px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.4;
+	}
+}
+
+@keyframes toast-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+	}
+}
+
+@media (max-width: 1080px) {
+	:root {
+		--sidebar-width: 232px;
+	}
+
+	.file-tree-pane,
+	.change-list {
+		width: 260px;
+	}
+
+	.session-table-head,
+	.session-table-row {
+		grid-template-columns: minmax(0, 1fr) 100px 120px 230px;
+	}
+}
+
+/* ---------- Diff 并排视图 ---------- */
+
+.diff-head-right {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.view-toggle {
+	display: flex;
+	align-items: center;
+	padding: 2px;
+	border-radius: 7px;
+	background: var(--fill-soft);
+}
+
+.view-toggle button {
+	height: 23px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 5px;
+	background: transparent;
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+}
+
+.view-toggle button.is-active {
+	background: var(--surface-raised);
+	color: var(--text-primary);
+}
+
+.diff-split {
+	display: flex;
+	flex-direction: column;
+}
+
+.split-row {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	min-height: 19px;
+}
+
+.split-cell {
+	display: grid;
+	grid-template-columns: 44px 1fr;
+	min-width: 0;
+	font-size: var(--text-caption);
+	line-height: 1.55;
+	border-right: 1px solid var(--line);
+}
+
+.split-cell.right {
+	border-right: none;
+}
+
+.split-cell.add {
+	background: var(--diff-add);
+}
+
+.split-cell.remove {
+	background: var(--diff-remove);
+}
+
+.split-cell.add .diff-text {
+	color: var(--diff-add-text);
+}
+
+.split-cell.remove .diff-text {
+	color: var(--diff-remove-text);
+}
+
+.split-cell .diff-text {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: pre;
+}
+
+.approval-actions .ghost-button {
+	max-width: 340px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.url-attach {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 5px 8px;
+	border: 1px solid var(--line);
+	color: var(--text-faint);
+}
+
+.url-attach input {
+	flex: 1;
+	min-width: 0;
+	height: 26px;
+	border: none;
+	outline: none;
+	background: transparent;
+	font-size: var(--text-small);
+	color: var(--text-primary);
+}

@@ -76,8 +76,10 @@ const ConfigSchema = z.object({
 		.object({
 			theme: z.enum(["auto", "light", "dark"]).default("auto"),
 			notify: z.enum(["auto", "bell", "desktop", "off"]).default("auto"),
+			/** 界面文字基准字号（px）；图标与布局尺寸不受影响。 */
+			fontSize: z.number().int().min(12).max(20).default(14),
 		})
-		.default({ theme: "auto", notify: "auto" }),
+		.default({ theme: "auto", notify: "auto", fontSize: 14 }),
 	/** 按项目路径记录的工作区信任决定；键为归一化路径（win32 小写）。 */
 	trusts: z.record(z.string(), z.boolean()).optional(),
 });
@@ -213,7 +215,7 @@ export function parseConfig(
 		["limits", ["maxTurns", "spillThreshold", "streamIdleTimeoutSec"]],
 		["retry", ["maxRetries", "maxDelayMs"]],
 		["compaction", ["compactAt", "keepRecent", "summaryTimeoutSec"]],
-		["ui", ["theme", "notify"]],
+		["ui", ["theme", "notify", "fontSize"]],
 	];
 	for (const [group, keys] of groups) {
 		const raw = isRecord(source[group]) ? source[group] : {};

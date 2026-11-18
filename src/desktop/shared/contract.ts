@@ -54,6 +54,7 @@ export const IPC = {
 	settingsUpdate: "moros:settings-update",
 	settingsUpsertProvider: "moros:settings-upsert-provider",
 	settingsDeleteProvider: "moros:settings-delete-provider",
+	settingsRenameProvider: "moros:settings-rename-provider",
 	settingsRevealSecret: "moros:settings-reveal-secret",
 	modelsList: "moros:models-list",
 	configSummary: "moros:config-summary",
@@ -369,6 +370,7 @@ export interface DesktopBridge {
 	settingsUpdate(patch: SettingsPatch): Promise<RpcResult<SettingsSnapshot>>;
 	settingsUpsertProvider(name: string, draft: ProviderDraft): Promise<RpcResult<SettingsSnapshot>>;
 	settingsDeleteProvider(name: string): Promise<RpcResult<SettingsSnapshot>>;
+	settingsRenameProvider(from: string, to: string): Promise<RpcResult<SettingsSnapshot>>;
 	settingsRevealSecret(name: string): Promise<RpcResult<string>>;
 	modelsList(): Promise<RpcResult<ModelCatalog>>;
 	configSummary(): Promise<RpcResult<ConfigSummary>>;

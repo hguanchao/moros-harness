@@ -59,6 +59,7 @@ const bridge: DesktopBridge = {
 	settingsUpdate: (patch) => invoke(IPC.settingsUpdate, patch),
 	settingsUpsertProvider: (name, draft) => invoke(IPC.settingsUpsertProvider, name, draft),
 	settingsDeleteProvider: (name) => invoke(IPC.settingsDeleteProvider, name),
+	settingsRenameProvider: (from, to) => invoke(IPC.settingsRenameProvider, from, to),
 	settingsRevealSecret: (name) => invoke(IPC.settingsRevealSecret, name),
 	modelsList: () => invoke(IPC.modelsList),
 	configSummary: () => invoke(IPC.configSummary),

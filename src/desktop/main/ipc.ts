@@ -166,6 +166,12 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.settingsDeleteProvider, getWindow, z.tuple([z.string().min(1).max(100)]), ([name]) =>
 		host.deleteProvider(name),
 	);
+	handle(
+		IPC.settingsRenameProvider,
+		getWindow,
+		z.tuple([z.string().min(1).max(100), z.string().min(1).max(100)]),
+		([from, to]) => host.renameProvider(from, to),
+	);
 	handle(IPC.settingsRevealSecret, getWindow, z.tuple([z.string().min(1).max(100)]), ([name]) =>
 		host.revealSecret(name),
 	);

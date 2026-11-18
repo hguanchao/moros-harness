@@ -7,7 +7,7 @@ import { MessagePlusIcon, SettingsIcon } from "#src/desktop/renderer/icons.tsx";
 import { useApp } from "#src/desktop/renderer/state.tsx";
 
 /** 侧栏：品牌、新建任务、项目树与会话列表；设置固定在底部图标按钮。 */
-export function Sidebar(): JSX.Element {
+export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 	const { state, dispatch } = useApp();
 	const actions = useDesktopActions();
 	const [expanded, setExpanded] = useState(true);
@@ -18,7 +18,7 @@ export function Sidebar(): JSX.Element {
 	};
 
 	return (
-		<aside className="sidebar">
+		<aside className={`sidebar ${open ? "" : "is-collapsed"}`} inert={!open} aria-hidden={!open}>
 			<div className="brand">
 				<span className="brand-name">Moros</span>
 				<span className="brand-tag">Harness</span>

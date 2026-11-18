@@ -1,0 +1,47 @@
+/* ---------- 窄窗 ---------- */
+
+@media (max-width: 960px) {
+	:root {
+		--sidebar-width: 224px;
+	}
+
+	.model-picker .dropdown-trigger > span {
+		max-width: 120px;
+	}
+}
+
+/* 标题栏按钮不显示浏览器默认的按钮底与焦点框；窗口控件由自绘 hover 表达状态 */
+.titlebar button {
+	background: transparent;
+	border: none;
+	outline: none;
+}
+
+.titlebar button:focus,
+.titlebar button:focus-visible {
+	outline: none;
+}
+
+.titlebar-toggle.is-active {
+	background: transparent;
+}
+
+.sidebar-footer {
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	padding: 8px 12px;
+	border-top: 0.5px solid var(--line);
+}
+
+.sidebar-footer .icon-button {
+	width: 28px;
+	height: 28px;
+	color: var(--text-dim);
+}
+
+.sidebar-footer .icon-button:hover:not(:disabled) {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}

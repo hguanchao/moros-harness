@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type 
 
 import type { PreparedImage, SessionView } from "#src/desktop/shared/contract.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
+import { Dropdown, type DropdownOption } from "#src/desktop/renderer/Dropdown.tsx";
 import {
 	ArrowUpIcon,
-	ChevronDownIcon,
 	ImageIcon,
 	LinkIcon,
 	PlusIcon,
@@ -352,75 +352,85 @@ function ModelPicker({
 			: (providers
 					.find((provider) => provider.name === selected.provider)
 					?.models.find((model) => model.id === selected.model)?.name ?? selected.model);
+	const options: DropdownOption[] = [{ value: "", label: "选择模型", disabled: true }];
+	for (const provider of providers) {
+		options.push(
+			...provider.models.map((model) => ({
+				value: JSON.stringify([provider.name, model.id]),
+				label: model.name ?? model.id,
+				group: provider.name,
+			})),
+		);
+	}
 	return (
-		<label className="composer-control model-picker" title="切换模型（同时写入全局默认）">
-			<span>{label}</span>
-			<ChevronDownIcon size={12} />
-			<select className="control-overlay" value={selectedValue} onChange={(event) => void onChange(event.target.value)}>
-				<option value="" disabled>
-					选择模型
-				</option>
-				{providers.map((provider) => (
-					<optgroup key={provider.name} label={provider.name}>
-						{provider.models.map((model) => (
-							<option key={`${provider.name}/${model.id}`} value={JSON.stringify([provider.name, model.id])}>
-								{model.name ?? model.id}
-							</option>
-						))}
-					</optgroup>
-				))}
-			</select>
-		</label>
+		<Dropdown
+			className="model-picker"
+			variant="inline"
+			title="切换模型（同时写入全局默认）"
+			value={selectedValue}
+			options={options}
+			placeholder="选择模型"
+			trigger={
+				<>
+					<span>{label}</span>
+				</>
+			}
+			onChange={(value) => void onChange(value)}
+		/>
 	);
 }
 
 function EffortPicker({ current }: { readonly current: SessionView }): JSX.Element {
 	const { dispatch } = useApp();
 	return (
-		<label className="composer-control effort-picker" title="推理强度（同时写入全局默认）">
-			<span>{effortLabel(current.effort)}</span>
-			<ChevronDownIcon size={12} />
-			<select
-				className="control-overlay"
-				value={current.effort}
-				onChange={(event) => {
-					void call(window.moros.sessionSelectEffort(event.target.value as SessionView["effort"])).catch(
-						(error: unknown) => dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
-					);
-				}}
-			>
-				<option value="off">Off</option>
-				<option value="minimal">Minimal</option>
-				<option value="low">Low</option>
-				<option value="medium">Medium</option>
-				<option value="high">High</option>
-				<option value="max">Max</option>
-			</select>
-		</label>
+		<Dropdown
+			className="effort-picker"
+			variant="inline"
+			title="推理强度（同时写入全局默认）"
+			value={current.effort}
+			options={[
+				{ value: "off", label: "Off" },
+				{ value: "minimal", label: "Minimal" },
+				{ value: "low", label: "Low" },
+				{ value: "medium", label: "Medium" },
+				{ value: "high", label: "High" },
+				{ value: "max", label: "Max" },
+			]}
+			trigger={<span>{effortLabel(current.effort)}</span>}
+			onChange={(effort) => {
+				void call(window.moros.sessionSelectEffort(effort as SessionView["effort"])).catch((error: unknown) =>
+					dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
+				);
+			}}
+		/>
 	);
 }
 
 function ApprovalPicker({ current }: { readonly current: SessionView }): JSX.Element {
 	const { dispatch } = useApp();
 	return (
-		<label className="composer-control permission" title="审批档位（仅本会话，不回写配置）">
-			<ShieldIcon size={16} />
-			<span>{approvalLabel(current.approval)}</span>
-			<ChevronDownIcon size={12} />
-			<select
-				className="control-overlay"
-				value={current.approval}
-				onChange={(event) => {
-					void call(window.moros.sessionSelectApproval(event.target.value as SessionView["approval"])).catch(
-						(error: unknown) => dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
-					);
-				}}
-			>
-				<option value="ask">每次确认</option>
-				<option value="auto">自动审批</option>
-				<option value="yolo">全部放行</option>
-			</select>
-		</label>
+		<Dropdown
+			className="permission"
+			variant="inline"
+			title="审批档位（仅本会话，不回写配置）"
+			value={current.approval}
+			options={[
+				{ value: "ask", label: "每次确认" },
+				{ value: "auto", label: "自动审批" },
+				{ value: "yolo", label: "全部放行" },
+			]}
+			trigger={
+				<>
+					<ShieldIcon size={16} />
+					<span>{approvalLabel(current.approval)}</span>
+				</>
+			}
+			onChange={(approval) => {
+				void call(window.moros.sessionSelectApproval(approval as SessionView["approval"])).catch((error: unknown) =>
+					dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
+				);
+			}}
+		/>
 	);
 }
 

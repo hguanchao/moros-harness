@@ -1,26 +1,34 @@
-import { useCallback, useEffect, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft, ProviderView } from "#src/core/config/settings.ts";
 import type { McpStatus } from "#src/core/mcp/types.ts";
 import type { SkillSummary } from "#src/core/skills.ts";
-import type { ModelCatalog } from "#src/core/core.ts";
 import type { ConfigSummary } from "#src/desktop/shared/contract.ts";
 import { call, errorMessage } from "#src/desktop/renderer/api.ts";
-import { PageHeader } from "#src/desktop/renderer/PageHeader.tsx";
+import { Dropdown } from "#src/desktop/renderer/Dropdown.tsx";
 import {
 	AlertIcon,
 	CheckIcon,
 	EyeIcon,
 	EyeOffIcon,
+	InfoIcon,
+	MoreIcon,
+	PencilIcon,
 	PlusIcon,
 	RefreshIcon,
-	SettingsIcon,
+	ServerIcon,
 	TrashIcon,
 	XIcon,
 } from "#src/desktop/renderer/icons.tsx";
 import { useApp } from "#src/desktop/renderer/state.tsx";
 
-type Tab = "models" | "providers" | "workspace" | "appearance";
+const NEW_PROVIDER = "__new__";
+
+const API_OPTIONS: ReadonlyArray<readonly [ProviderView["api"], string]> = [
+	["anthropic-messages", "Anthropic Messages (/v1/messages)"],
+	["chat-completions", "OpenAI Chat Completions (/v1/chat/completions)"],
+	["responses", "OpenAI Responses (/v1/responses)"],
+];
 
 interface ModelForm {
 	id: string;
@@ -31,7 +39,7 @@ interface ModelForm {
 	image: boolean;
 }
 
-interface ProviderForm {
+export interface ProviderForm {
 	originalName?: string;
 	name: string;
 	api: ProviderView["api"];
@@ -41,588 +49,577 @@ interface ProviderForm {
 	models: ModelForm[];
 }
 
-export function SettingsPage(): JSX.Element {
-	const { state, dispatch } = useApp();
-	const [settings, setSettings] = useState<SettingsSnapshot | undefined>(undefined);
-	const [models, setModels] = useState<ModelCatalog | undefined>(undefined);
-	const [summary, setSummary] = useState<ConfigSummary | undefined>(undefined);
-	const [skills, setSkills] = useState<readonly SkillSummary[]>([]);
-	const [mcp, setMcp] = useState<readonly McpStatus[]>([]);
-	const [mcpHealth, setMcpHealth] = useState<readonly string[]>([]);
-	const [tab, setTab] = useState<Tab>("models");
-	const [editing, setEditing] = useState<ProviderForm | undefined>(undefined);
-	const [revealed, setRevealed] = useState<Record<string, string>>({});
-	const [loadError, setLoadError] = useState<string | undefined>(undefined);
-	const project = state.project;
-
-	const refresh = useCallback(async (): Promise<void> => {
-		try {
-			const next = await call(window.moros.settingsGet());
-			setSettings(next);
-			dispatch({ type: "settings", settings: next });
-			const catalog = await call(window.moros.modelsList()).catch(() => undefined);
-			if (catalog !== undefined) {
-				setModels(catalog);
-				dispatch({ type: "models", models: catalog });
-			}
-			const config = await call(window.moros.configSummary()).catch(() => undefined);
-			if (config !== undefined) setSummary(config);
-			const skillList = await call(window.moros.skillsList()).catch(() => []);
-			setSkills(skillList);
-			const statuses = await call(window.moros.mcpStatus()).catch(() => []);
-			setMcp(statuses);
-			setLoadError(undefined);
-		} catch (error) {
-			setLoadError(errorMessage(error));
-		}
-	}, [dispatch]);
-
-	useEffect(() => {
-		void refresh();
-	}, [refresh, project?.root]);
-
-	const update = async (patch: SettingsPatch, message?: string): Promise<SettingsSnapshot | undefined> => {
-		try {
-			const next = await call(window.moros.settingsUpdate(patch));
-			setSettings(next);
-			dispatch({ type: "settings", settings: next });
-			await refresh();
-			if (message !== undefined) dispatch({ type: "notice", level: "info", message });
-			return next;
-		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-			return undefined;
-		}
-	};
-
-	if (project === undefined) {
-		return (
-			<div className="page-empty">
-				<SettingsIcon size={22} />
-				<p>设置需要先打开一个项目</p>
-			</div>
-		);
-	}
-
-	return (
-		<div className="settings-page">
-			<PageHeader
-				title="设置"
-				subtitle="全局配置写入 ~/.moros；当前会话的模型/强度选择会立即生效。"
-				actions={
-					<button className="ghost-button" onClick={() => void refresh()}>
-						<RefreshIcon size={14} />
-						刷新
-					</button>
-				}
-			/>
-
-			{loadError !== undefined ? <div className="inline-notice notice-error">{loadError}</div> : null}
-			<div className="settings-tabs">
-				{(
-					[
-						["models", "模型"],
-						["providers", "供应商"],
-						["workspace", "工作区"],
-						["appearance", "外观"],
-					] as const
-				).map(([value, label]) => (
-					<button
-						key={value}
-						className={`settings-tab ${tab === value ? "is-active" : ""}`}
-						onClick={() => setTab(value)}
-					>
-						{label}
-					</button>
-				))}
-			</div>
-
-			<div className="settings-body">
-				{tab === "models" && settings !== undefined ? (
-					<ModelsTab settings={settings} models={models} onUpdate={update} onRefresh={refresh} />
-				) : null}
-				{tab === "providers" && settings !== undefined ? (
-					<ProvidersTab
-						settings={settings}
-						editing={editing}
-						revealed={revealed}
-						onEdit={setEditing}
-						onRevealed={(name, value) =>
-							setRevealed((existing) => {
-								if (value === undefined) {
-									const next = { ...existing };
-									delete next[name];
-									return next;
-								}
-								return { ...existing, [name]: value };
-							})
-						}
-						onRefresh={refresh}
-						onNotice={(level, message) => dispatch({ type: "notice", level, message })}
-					/>
-				) : null}
-				{tab === "workspace" ? (
-					<WorkspaceTab
-						settings={settings}
-						summary={summary}
-						skills={skills}
-						mcp={mcp}
-						mcpHealth={mcpHealth}
-						onUpdate={update}
-						onHealth={async () => {
-							try {
-								setMcpHealth(await call(window.moros.mcpHealth()));
-							} catch (error) {
-								dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-							}
-						}}
-						onReconnect={async (name) => {
-							try {
-								const message = await call(window.moros.mcpReconnect(name));
-								dispatch({ type: "notice", level: "info", message });
-								setMcp(await call(window.moros.mcpStatus()));
-							} catch (error) {
-								dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-							}
-						}}
-						onTrust={async (remember) => {
-							try {
-								const trust = await call(window.moros.trustAccept(remember));
-								dispatch({ type: "trust", trust });
-								await refresh();
-							} catch (error) {
-								dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-							}
-						}}
-						onDeny={async () => {
-							try {
-								const trust = await call(window.moros.trustDeny());
-								dispatch({ type: "trust", trust });
-								await refresh();
-							} catch (error) {
-								dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-							}
-						}}
-					/>
-				) : null}
-				{tab === "appearance" && settings !== undefined ? (
-					<AppearanceTab settings={settings} onUpdate={update} />
-				) : null}
-			</div>
-		</div>
-	);
+interface ModelEditorState {
+	readonly index?: number;
+	readonly model: ModelForm;
 }
 
-function ModelsTab({
-	settings,
-	models,
-	onUpdate,
-	onRefresh,
-}: {
-	readonly settings: SettingsSnapshot;
-	readonly models: ModelCatalog | undefined;
-	readonly onUpdate: (patch: SettingsPatch, message?: string) => Promise<SettingsSnapshot | undefined>;
-	readonly onRefresh: () => Promise<void>;
-}): JSX.Element {
-	const { state, dispatch } = useApp();
-	const provider = settings.config.provider ?? "";
-	const model = settings.config.model ?? "";
-	const providerEntry = models?.providers.find((entry) => entry.name === provider);
-	const selected = JSON.stringify([provider, model]);
-
-	const changeModel = async (value: string): Promise<void> => {
-		try {
-			const [nextProvider, nextModel] = JSON.parse(value) as [string, string];
-			if (state.current !== undefined) {
-				await call(window.moros.sessionSelectModel(nextProvider, nextModel));
-				await onRefresh();
-			} else {
-				await onUpdate({ provider: nextProvider, model: nextModel }, "默认模型已更新");
-			}
-		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-		}
-	};
-
-	return (
-		<div className="settings-section">
-			<h3>默认模型</h3>
-			<p className="settings-note">新会话从这里的默认值开始；在对话框里切换会同时写回默认。</p>
-			<label className="field">
-				<span>模型</span>
-				<select value={selected} onChange={(event) => void changeModel(event.target.value)}>
-					<option value={JSON.stringify(["", ""])} disabled>
-						选择模型
-					</option>
-					{(models?.providers ?? []).map((entry) => (
-						<optgroup key={entry.name} label={entry.name}>
-							{entry.models.map((item) => (
-								<option key={`${entry.name}/${item.id}`} value={JSON.stringify([entry.name, item.id])}>
-									{item.name ?? item.id}
-								</option>
-							))}
-						</optgroup>
-					))}
-				</select>
-			</label>
-			{providerEntry !== undefined ? (
-				<div className="model-facts">
-					{providerEntry.models
-						.filter((entry) => entry.id === model)
-						.map((entry) => (
-							<div className="fact-row" key={entry.id}>
-								<span>上下文窗口</span>
-								<strong>{entry.contextWindow === undefined ? "未声明" : entry.contextWindow.toLocaleString()}</strong>
-								<span>最大输出</span>
-								<strong>{entry.maxTokens.toLocaleString()}</strong>
-								<span>能力</span>
-								<strong>
-									{entry.reasoning ? "reasoning " : ""}
-									{entry.input.join(" / ")}
-								</strong>
-							</div>
-						))}
-				</div>
-			) : null}
-
-			<h3>默认放权</h3>
-			<div className="field-grid">
-				<label className="field">
-					<span>推理强度</span>
-					<select
-						value={settings.config.reasoningEffort}
-						onChange={(event) => {
-							const effort = event.target.value;
-							if (state.current !== undefined) {
-								void call(window.moros.sessionSelectEffort(effort as typeof settings.config.reasoningEffort)).catch(
-									(error: unknown) => dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
-								);
-							} else {
-								void onUpdate({ reasoningEffort: effort as SettingsPatch["reasoningEffort"] }, "默认推理强度已更新");
-							}
-						}}
-					>
-						<option value="off">Off</option>
-						<option value="minimal">Minimal</option>
-						<option value="low">Low</option>
-						<option value="medium">Medium</option>
-						<option value="high">High</option>
-						<option value="max">Max</option>
-					</select>
-				</label>
-				<label className="field">
-					<span>审批档位</span>
-					<select
-						value={settings.config.approval}
-						onChange={(event) => {
-							const approval = event.target.value as SettingsPatch["approval"];
-							void onUpdate({ approval }, "默认审批档位已更新").then(() => {
-								if (state.current !== undefined && approval !== undefined) {
-									void call(window.moros.sessionSelectApproval(approval)).catch(() => undefined);
-								}
-							});
-						}}
-					>
-						<option value="ask">Ask</option>
-						<option value="auto">Auto</option>
-						<option value="yolo">Yolo</option>
-					</select>
-				</label>
-			</div>
-		</div>
-	);
+function emptyModel(): ModelForm {
+	return { id: "", name: "", maxTokens: "8192", contextWindow: "", reasoning: false, image: false };
 }
 
-function ProvidersTab({
+function emptyForm(): ProviderForm {
+	return {
+		name: "",
+		api: "anthropic-messages",
+		baseUrl: "",
+		apiKey: "",
+		timeoutMs: "120000",
+		models: [],
+	};
+}
+
+function formFromProvider(provider: ProviderView): ProviderForm {
+	return {
+		originalName: provider.name,
+		name: provider.name,
+		api: provider.api,
+		baseUrl: provider.baseUrl,
+		apiKey: "",
+		timeoutMs: String(provider.timeoutMs),
+		models: provider.models.map((model) => ({
+			id: model.id,
+			name: model.name ?? "",
+			maxTokens: String(model.maxTokens),
+			contextWindow: model.contextWindow === undefined ? "" : String(model.contextWindow),
+			reasoning: model.reasoning,
+			image: model.input.includes("image"),
+		})),
+	};
+}
+
+export function ProvidersTab({
 	settings,
-	editing,
-	revealed,
-	onEdit,
-	onRevealed,
 	onRefresh,
 	onNotice,
 }: {
 	readonly settings: SettingsSnapshot;
-	readonly editing: ProviderForm | undefined;
-	readonly revealed: Record<string, string>;
-	readonly onEdit: (form: ProviderForm | undefined) => void;
-	readonly onRevealed: (name: string, value: string | undefined) => void;
 	readonly onRefresh: () => Promise<void>;
 	readonly onNotice: (level: "info" | "warn" | "error", message: string) => void;
 }): JSX.Element {
-	const save = async (form: ProviderForm): Promise<void> => {
+	const firstProvider = settings.providers[0];
+	const [selected, setSelected] = useState<string>(() => firstProvider?.name ?? NEW_PROVIDER);
+	const [draft, setDraft] = useState<ProviderForm>(() =>
+		firstProvider === undefined ? emptyForm() : formFromProvider(firstProvider),
+	);
+	const [revealed, setRevealed] = useState<Record<string, string>>({});
+	const [modelEditor, setModelEditor] = useState<ModelEditorState | undefined>(undefined);
+	const [showKey, setShowKey] = useState(false);
+	const [moreOpen, setMoreOpen] = useState(false);
+	const [editingName, setEditingName] = useState(false);
+	const [renameValue, setRenameValue] = useState("");
+	const moreRef = useRef<HTMLDivElement>(null);
+
+	const isNew = selected === NEW_PROVIDER;
+	const current = settings.providers.find((provider) => provider.name === selected);
+	const keyDisplay = revealed[selected] ?? current?.apiKey.display ?? "";
+	const set = (patch: Partial<ProviderForm>): void => setDraft((previous) => ({ ...previous, ...patch }));
+
+	useEffect(() => {
+		if (!moreOpen) return;
+		const onPointerDown = (event: PointerEvent): void => {
+			if (moreRef.current !== null && !moreRef.current.contains(event.target as Node)) setMoreOpen(false);
+		};
+		document.addEventListener("pointerdown", onPointerDown);
+		return () => document.removeEventListener("pointerdown", onPointerDown);
+	}, [moreOpen]);
+
+	const selectProvider = (provider: ProviderView): void => {
+		setSelected(provider.name);
+		setDraft(formFromProvider(provider));
+		setRevealed({});
+		setShowKey(false);
+		setModelEditor(undefined);
+		setMoreOpen(false);
+		setEditingName(false);
+	};
+
+	const startNew = (): void => {
+		setSelected(NEW_PROVIDER);
+		setDraft(emptyForm());
+		setRevealed({});
+		setShowKey(false);
+		setModelEditor(undefined);
+		setMoreOpen(false);
+		setEditingName(false);
+	};
+
+	/** 组装写回后端的草稿；密钥留空时省略以保留原值。 */
+	const buildPayload = (form: ProviderForm): ProviderDraft => {
+		const timeout = Number(form.timeoutMs);
+		return {
+			api: form.api,
+			baseUrl: form.baseUrl.trim(),
+			timeoutMs: Number.isInteger(timeout) && timeout > 0 ? timeout : 120_000,
+			models: form.models.map((model) => ({
+				id: model.id.trim(),
+				...(model.name.trim().length === 0 ? {} : { name: model.name.trim() }),
+				maxTokens: Number(model.maxTokens),
+				...(model.contextWindow.trim().length === 0 ? {} : { contextWindow: Number(model.contextWindow) }),
+				reasoning: model.reasoning,
+				input: model.image ? (["text", "image"] as const) : (["text"] as const),
+			})),
+			...(form.apiKey.trim().length === 0 ? {} : { apiKey: form.apiKey.trim() }),
+		};
+	};
+
+	/** 自动保存前置校验：未完成编辑时静默跳过，避免每个按键都弹提示。 */
+	const readyToSave = (form: ProviderForm, name: string): boolean => {
+		if (name.length === 0) return false;
 		try {
-			const draft: ProviderDraft = {
-				api: form.api,
-				baseUrl: form.baseUrl,
-				timeoutMs: Number(form.timeoutMs),
-				models: form.models.map((model) => ({
-					id: model.id,
-					...(model.name.trim().length === 0 ? {} : { name: model.name.trim() }),
-					maxTokens: Number(model.maxTokens),
-					...(model.contextWindow.trim().length === 0 ? {} : { contextWindow: Number(model.contextWindow) }),
-					reasoning: model.reasoning,
-					input: model.image ? (["text", "image"] as const) : (["text"] as const),
-				})),
-				...(form.apiKey.trim().length === 0 ? {} : { apiKey: form.apiKey.trim() }),
-			};
-			await call(window.moros.settingsUpsertProvider(form.name.trim(), draft));
+			const url = new URL(form.baseUrl.trim());
+			if (!["http:", "https:"].includes(url.protocol)) return false;
+		} catch {
+			return false;
+		}
+		if (form.models.length === 0) return false;
+		for (const model of form.models) {
+			if (model.id.trim().length === 0) return false;
+			if (!Number.isInteger(Number(model.maxTokens)) || Number(model.maxTokens) <= 0) return false;
+			const context = model.contextWindow.trim();
+			if (context.length > 0 && (!Number.isInteger(Number(context)) || Number(context) <= 0)) return false;
+		}
+		return true;
+	};
+
+	/** 字段变更后自动保存；可传入覆盖值以绕过 setState 的异步性。 */
+	const autoSave = async (overrides?: Partial<ProviderForm>): Promise<void> => {
+		const form = { ...draft, ...overrides };
+		const name = (isNew ? form.name : selected).trim();
+		if (!readyToSave(form, name)) return;
+		try {
+			await call(window.moros.settingsUpsertProvider(name, buildPayload(form)));
 			await onRefresh();
-			onEdit(undefined);
-			onNotice("info", `供应商 ${form.name} 已保存`);
+			if (isNew) {
+				setSelected(name);
+				setDraft((previous) => ({ ...previous, name }));
+				setRevealed({});
+				setShowKey(false);
+			}
 		} catch (error) {
 			onNotice("error", errorMessage(error));
 		}
 	};
 
+	const toggleReveal = async (): Promise<void> => {
+		if (isNew || current === undefined) {
+			setShowKey((previous) => !previous);
+			return;
+		}
+		if (revealed[selected] !== undefined) {
+			const next = { ...revealed };
+			delete next[selected];
+			setRevealed(next);
+			set({ apiKey: "" });
+			setShowKey(false);
+			return;
+		}
+		try {
+			const value = await call(window.moros.settingsRevealSecret(selected));
+			setRevealed((previous) => ({ ...previous, [selected]: value }));
+			set({ apiKey: value });
+			setShowKey(true);
+		} catch (error) {
+			onNotice("error", errorMessage(error));
+		}
+	};
+
+	const remove = async (): Promise<void> => {
+		if (isNew || current === undefined) return;
+		setMoreOpen(false);
+		if (!window.confirm(`删除供应商 ${selected}？`)) return;
+		try {
+			await call(window.moros.settingsDeleteProvider(selected));
+			await onRefresh();
+			const provider = settings.providers.find((item) => item.name !== selected);
+			if (provider === undefined) {
+				startNew();
+			} else {
+				selectProvider(provider);
+			}
+			onNotice("info", `已删除 ${selected}`);
+		} catch (error) {
+			onNotice("error", errorMessage(error));
+		}
+	};
+
+	const startEditName = (): void => {
+		setMoreOpen(false);
+		if (isNew) return;
+		setRenameValue(selected);
+		setEditingName(true);
+	};
+
+	/** 行内重命名：名称输入框失焦或回车时提交，空值与未变化直接取消。 */
+	const commitRename = async (): Promise<void> => {
+		const next = renameValue.trim();
+		setEditingName(false);
+		if (next.length === 0 || next === selected) return;
+		try {
+			await call(window.moros.settingsRenameProvider(selected, next));
+			await onRefresh();
+			setSelected(next);
+			setDraft((previous) => ({ ...previous, originalName: next, name: next }));
+			setRevealed({});
+			onNotice("info", `已重命名为 ${next}`);
+		} catch (error) {
+			onNotice("error", errorMessage(error));
+		}
+	};
+
+	const commitModel = (model: ModelForm): void => {
+		const id = model.id.trim();
+		if (id.length === 0) {
+			onNotice("warn", "请填写模型 ID");
+			return;
+		}
+		const index = modelEditor?.index;
+		if (draft.models.some((item, position) => position !== index && item.id.trim() === id)) {
+			onNotice("warn", `模型 ID ${id} 已存在`);
+			return;
+		}
+		const maxTokens = Number(model.maxTokens);
+		if (!Number.isInteger(maxTokens) || maxTokens <= 0) {
+			onNotice("warn", "maxTokens 必须为正整数");
+			return;
+		}
+		const contextWindow = model.contextWindow.trim();
+		if (contextWindow.length > 0 && (!Number.isInteger(Number(contextWindow)) || Number(contextWindow) <= 0)) {
+			onNotice("warn", "contextWindow 必须为正整数");
+			return;
+		}
+		const normalized: ModelForm = {
+			...model,
+			id,
+			name: model.name.trim(),
+			maxTokens: String(maxTokens),
+			contextWindow,
+		};
+		const nextModels =
+			index === undefined
+				? [...draft.models, normalized]
+				: draft.models.map((item, position) => (position === index ? normalized : item));
+		setDraft((previous) => ({ ...previous, models: nextModels }));
+		setModelEditor(undefined);
+		void autoSave({ models: nextModels });
+	};
+
+	const deleteModel = (index: number): void => {
+		const nextModels = draft.models.filter((_, position) => position !== index);
+		setDraft((previous) => ({ ...previous, models: nextModels }));
+		void autoSave({ models: nextModels });
+	};
+
 	return (
-		<div className="settings-section">
-			<div className="section-head">
+		<div className="prov-page">
+			<div className="prov-page-head">
 				<div>
-					<h3>供应商与模型</h3>
-					<p className="settings-note">
-						密钥支持 <code>${"{ENV}"}</code>、<code>!command</code> 或明文；界面只显示掩码，显示原文需显式操作。
-					</p>
+					<h1 className="prov-page-title">模型设置</h1>
+					<p className="prov-page-desc">管理自定义模型供应商，配置后可在聊天时选择使用。</p>
 				</div>
-				<button
-					className="primary-button"
-					onClick={() =>
-						onEdit({
-							name: "",
-							api: "chat-completions",
-							baseUrl: "https://api.openai.com/v1",
-							apiKey: "",
-							timeoutMs: "60000",
-							models: [
-								{ id: "", name: "", maxTokens: "8192", contextWindow: "128000", reasoning: false, image: false },
-							],
-						})
-					}
-				>
-					<PlusIcon size={15} />
-					添加供应商
-				</button>
+				<div className="prov-page-actions">
+					<button className="icon-button" title="刷新" onClick={() => void onRefresh()}>
+						<RefreshIcon size={16} />
+					</button>
+					<button className="primary-button" onClick={startNew}>
+						<PlusIcon size={15} />
+						添加供应商
+					</button>
+				</div>
 			</div>
 
-			<div className="provider-list">
-				{settings.providers.map((provider) => (
-					<div className="provider-card" key={provider.name}>
-						<div className="provider-main">
-							<div className="provider-title">
-								<strong>{provider.name}</strong>
-								<span className="pill">{provider.api}</span>
-								<span className="pill">{provider.models.length} 模型</span>
-							</div>
-							<div className="provider-url">{provider.baseUrl}</div>
-							<div className="provider-secret">
-								<span>密钥</span>
-								<code>{revealed[provider.name] ?? provider.apiKey.display}</code>
-								<button
-									className="icon-button"
-									title={revealed[provider.name] === undefined ? "显示原始表达式" : "隐藏"}
-									onClick={() => {
-										if (revealed[provider.name] !== undefined) {
-											onRevealed(provider.name, undefined);
-											return;
-										}
-										void call(window.moros.settingsRevealSecret(provider.name))
-											.then((value) => onRevealed(provider.name, value))
-											.catch((error: unknown) => onNotice("error", errorMessage(error)));
-									}}
-								>
-									{revealed[provider.name] === undefined ? <EyeIcon size={14} /> : <EyeOffIcon size={14} />}
-								</button>
-							</div>
-						</div>
-						<div className="provider-actions">
+			<div className="prov-workspace">
+				<aside className="prov-sidebar">
+					<div className="prov-sidebar-label">自定义供应商</div>
+					<div className="prov-sidebar-list">
+						{settings.providers.map((provider) => (
 							<button
-								className="ghost-button"
-								onClick={() =>
-									onEdit({
-										originalName: provider.name,
-										name: provider.name,
-										api: provider.api,
-										baseUrl: provider.baseUrl,
-										apiKey: "",
-										timeoutMs: String(provider.timeoutMs),
-										models: provider.models.map((model) => ({
-											id: model.id,
-											name: model.name ?? "",
-											maxTokens: String(model.maxTokens),
-											contextWindow: model.contextWindow === undefined ? "" : String(model.contextWindow),
-											reasoning: model.reasoning,
-											image: model.input.includes("image"),
-										})),
-									})
-								}
+								key={provider.name}
+								className={`provider-card prov-item ${selected === provider.name ? "is-active" : ""}`}
+								onClick={() => selectProvider(provider)}
 							>
-								编辑
+								<ServerIcon size={15} />
+								<span className="prov-item-name">{provider.name}</span>
+								<span className={`prov-item-status ${provider.apiKey.source === "empty" ? "is-warn" : "is-ok"}`} />
 							</button>
-							<button
-								className="icon-button danger"
-								title="删除供应商"
-								onClick={() => {
-									if (!window.confirm(`删除供应商 ${provider.name}？`)) return;
-									void call(window.moros.settingsDeleteProvider(provider.name))
-										.then(() => onRefresh())
-										.then(() => onNotice("info", `已删除 ${provider.name}`))
-										.catch((error: unknown) => onNotice("error", errorMessage(error)));
+						))}
+						{settings.providers.length === 0 ? <div className="prov-sidebar-empty">还没有自定义供应商</div> : null}
+					</div>
+				</aside>
+
+				<section className="prov-detail">
+					<div className="prov-detail-head">
+						<div className="prov-detail-identity">
+							<span className="prov-detail-icon">
+								<ServerIcon size={18} />
+							</span>
+							{isNew ? (
+								<input
+									className="prov-name-input is-inline"
+									value={draft.name}
+									placeholder="新供应商"
+									onChange={(event) => set({ name: event.target.value })}
+									onBlur={() => void autoSave()}
+								/>
+							) : editingName ? (
+								<input
+									className="prov-name-input is-inline"
+									value={renameValue}
+									autoFocus
+									onChange={(event) => setRenameValue(event.target.value)}
+									onBlur={() => void commitRename()}
+									onKeyDown={(event) => {
+										if (event.key === "Enter") commitRename();
+										if (event.key === "Escape") {
+											setEditingName(false);
+											setRenameValue(selected);
+										}
+									}}
+								/>
+							) : (
+								<h2 className="prov-detail-name" title="双击重命名" onDoubleClick={startEditName}>
+									{selected}
+								</h2>
+							)}
+						</div>
+						{!isNew ? (
+							<div className="prov-more" ref={moreRef}>
+								<button className="icon-button" title="更多" onClick={() => setMoreOpen((previous) => !previous)}>
+									<MoreIcon size={16} />
+								</button>
+								{moreOpen ? (
+									<div className="prov-more-menu" role="menu">
+										<button type="button" role="menuitem" onClick={startEditName}>
+											<PencilIcon size={14} />
+											重命名
+										</button>
+										<button type="button" role="menuitem" className="danger" onClick={() => void remove()}>
+											<TrashIcon size={14} />
+											删除
+										</button>
+									</div>
+								) : null}
+							</div>
+						) : null}
+					</div>
+
+					<div className="prov-fields">
+						<label className="prov-field">
+							<span>Base URL</span>
+							<input
+								className="prov-input"
+								value={draft.baseUrl}
+								placeholder="https://api.example.com/v1"
+								onChange={(event) => set({ baseUrl: event.target.value })}
+								onBlur={() => void autoSave()}
+							/>
+						</label>
+						<label className="prov-field">
+							<span>API 格式</span>
+							<Dropdown
+								value={draft.api}
+								options={API_OPTIONS.map(([value, label]) => ({ value, label }))}
+								onChange={(api) => {
+									const next = api as ProviderView["api"];
+									set({ api: next });
+									void autoSave({ api: next });
 								}}
-							>
-								<TrashIcon size={14} />
+							/>
+						</label>
+						<label className="prov-field">
+							<span>API Key</span>
+							<span className="prov-key-wrap">
+								<input
+									className="prov-input"
+									type={showKey ? "text" : "password"}
+									value={draft.apiKey}
+									placeholder={
+										isNew ? "输入 API Key" : `留空保持不变${keyDisplay.length > 0 ? `（当前 ${keyDisplay}）` : ""}`
+									}
+									onChange={(event) => set({ apiKey: event.target.value })}
+									onBlur={() => void autoSave()}
+								/>
+								<button
+									type="button"
+									className="prov-key-eye"
+									title={showKey ? "隐藏" : "显示原始表达式"}
+									onClick={() => void toggleReveal()}
+								>
+									{showKey ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+								</button>
+							</span>
+						</label>
+					</div>
+
+					<div className="prov-models">
+						<div className="prov-models-head">
+							<h3>模型列表</h3>
+							<button className="ghost-button small" onClick={() => setModelEditor({ model: emptyModel() })}>
+								<PlusIcon size={13} />
+								添加模型
+							</button>
+						</div>
+						{draft.models.length === 0 ? (
+							<div className="prov-empty">
+								<InfoIcon size={16} />
+								<span>当前没有配置模型，添加模型后可在聊天中使用。</span>
+							</div>
+						) : (
+							<div className="prov-model-list">
+								{draft.models.map((model, index) => (
+									<div className="prov-model-card" key={`${index}-${model.id}`}>
+										<div className="prov-model-main">
+											<div className="prov-model-title">
+												<strong>{model.id}</strong>
+												{model.name.trim().length > 0 ? <span>{model.name}</span> : null}
+											</div>
+											<div className="prov-model-meta">
+												<span>maxTokens {model.maxTokens}</span>
+												{model.contextWindow.trim().length > 0 ? <span>context {model.contextWindow}</span> : null}
+												{model.reasoning ? <span className="pill">reasoning</span> : null}
+												{model.image ? <span className="pill">image</span> : null}
+											</div>
+										</div>
+										<div className="prov-model-actions">
+											<button
+												className="icon-button"
+												title="编辑模型"
+												onClick={() => setModelEditor({ index, model: { ...model } })}
+											>
+												<PencilIcon size={14} />
+											</button>
+											<button className="icon-button danger" title="删除模型" onClick={() => deleteModel(index)}>
+												<TrashIcon size={14} />
+											</button>
+										</div>
+									</div>
+								))}
+							</div>
+						)}
+					</div>
+				</section>
+			</div>
+
+			{modelEditor !== undefined ? (
+				<div
+					className="modal-backdrop"
+					onMouseDown={(event) => {
+						if (event.target === event.currentTarget) setModelEditor(undefined);
+					}}
+				>
+					<div className="modal model-modal" role="dialog" aria-modal="true">
+						<div className="modal-head">
+							<h3>{modelEditor.index === undefined ? "添加模型" : "编辑模型"}</h3>
+							<button className="icon-button" aria-label="关闭" onClick={() => setModelEditor(undefined)}>
+								<XIcon size={16} />
+							</button>
+						</div>
+						<div className="field-grid">
+							<label className="field">
+								<span>模型 ID</span>
+								<input
+									value={modelEditor.model.id}
+									placeholder="例如 claude-sonnet-4"
+									onChange={(event) =>
+										setModelEditor((previous) =>
+											previous === undefined
+												? undefined
+												: { ...previous, model: { ...previous.model, id: event.target.value } },
+										)
+									}
+								/>
+							</label>
+							<label className="field">
+								<span>显示名称（可选）</span>
+								<input
+									value={modelEditor.model.name}
+									onChange={(event) =>
+										setModelEditor((previous) =>
+											previous === undefined
+												? undefined
+												: { ...previous, model: { ...previous.model, name: event.target.value } },
+										)
+									}
+								/>
+							</label>
+							<label className="field">
+								<span>maxTokens</span>
+								<input
+									value={modelEditor.model.maxTokens}
+									onChange={(event) =>
+										setModelEditor((previous) =>
+											previous === undefined
+												? undefined
+												: {
+														...previous,
+														model: { ...previous.model, maxTokens: event.target.value },
+													},
+										)
+									}
+								/>
+							</label>
+							<label className="field">
+								<span>contextWindow（可选）</span>
+								<input
+									value={modelEditor.model.contextWindow}
+									onChange={(event) =>
+										setModelEditor((previous) =>
+											previous === undefined
+												? undefined
+												: {
+														...previous,
+														model: { ...previous.model, contextWindow: event.target.value },
+													},
+										)
+									}
+								/>
+							</label>
+							<label className="check">
+								<input
+									type="checkbox"
+									checked={modelEditor.model.reasoning}
+									onChange={(event) =>
+										setModelEditor((previous) =>
+											previous === undefined
+												? undefined
+												: { ...previous, model: { ...previous.model, reasoning: event.target.checked } },
+										)
+									}
+								/>
+								reasoning
+							</label>
+							<label className="check">
+								<input
+									type="checkbox"
+									checked={modelEditor.model.image}
+									onChange={(event) =>
+										setModelEditor((previous) =>
+											previous === undefined
+												? undefined
+												: { ...previous, model: { ...previous.model, image: event.target.checked } },
+										)
+									}
+								/>
+								image
+							</label>
+						</div>
+						<div className="modal-actions">
+							<button className="ghost-button" onClick={() => setModelEditor(undefined)}>
+								取消
+							</button>
+							<button className="primary-button" onClick={() => commitModel(modelEditor.model)}>
+								<CheckIcon size={14} />
+								保存模型
 							</button>
 						</div>
 					</div>
-				))}
-			</div>
-
-			{editing !== undefined ? (
-				<ProviderEditor form={editing} onChange={onEdit} onSave={save} onCancel={() => onEdit(undefined)} />
+				</div>
 			) : null}
 		</div>
 	);
 }
 
-function ProviderEditor({
-	form,
-	onChange,
-	onSave,
-	onCancel,
-}: {
-	readonly form: ProviderForm;
-	readonly onChange: (form: ProviderForm | undefined) => void;
-	readonly onSave: (form: ProviderForm) => Promise<void>;
-	readonly onCancel: () => void;
-}): JSX.Element {
-	const set = (patch: Partial<ProviderForm>): void => onChange({ ...form, ...patch });
-	const setModel = (index: number, patch: Partial<ModelForm>): void => {
-		const models = form.models.map((model, current) => (current === index ? { ...model, ...patch } : model));
-		onChange({ ...form, models });
-	};
-	return (
-		<div className="provider-editor">
-			<div className="modal-head">
-				<h3>{form.originalName === undefined ? "添加供应商" : `编辑 ${form.originalName}`}</h3>
-				<button className="icon-button" aria-label="关闭" onClick={onCancel}>
-					<XIcon size={16} />
-				</button>
-			</div>
-			<div className="field-grid">
-				<label className="field">
-					<span>名称</span>
-					<input
-						value={form.name}
-						disabled={form.originalName !== undefined}
-						onChange={(event) => set({ name: event.target.value })}
-					/>
-				</label>
-				<label className="field">
-					<span>协议</span>
-					<select value={form.api} onChange={(event) => set({ api: event.target.value as ProviderView["api"] })}>
-						<option value="chat-completions">chat-completions</option>
-						<option value="anthropic-messages">anthropic-messages</option>
-						<option value="responses">responses</option>
-					</select>
-				</label>
-				<label className="field wide">
-					<span>Base URL</span>
-					<input value={form.baseUrl} onChange={(event) => set({ baseUrl: event.target.value })} />
-				</label>
-				<label className="field">
-					<span>API Key</span>
-					<input
-						type="password"
-						value={form.apiKey}
-						placeholder="留空保持不变"
-						onChange={(event) => set({ apiKey: event.target.value })}
-					/>
-				</label>
-				<label className="field">
-					<span>超时（毫秒）</span>
-					<input value={form.timeoutMs} onChange={(event) => set({ timeoutMs: event.target.value })} />
-				</label>
-			</div>
-
-			<div className="model-editor">
-				<div className="section-head">
-					<h4>模型</h4>
-					<button
-						className="ghost-button"
-						onClick={() =>
-							set({
-								models: [
-									...form.models,
-									{ id: "", name: "", maxTokens: "8192", contextWindow: "", reasoning: false, image: false },
-								],
-							})
-						}
-					>
-						<PlusIcon size={13} />
-						添加模型
-					</button>
-				</div>
-				{form.models.map((model, index) => (
-					<div className="model-row" key={index}>
-						<input
-							placeholder="id"
-							value={model.id}
-							onChange={(event) => setModel(index, { id: event.target.value })}
-						/>
-						<input
-							placeholder="显示名（可选）"
-							value={model.name}
-							onChange={(event) => setModel(index, { name: event.target.value })}
-						/>
-						<input
-							placeholder="maxTokens"
-							value={model.maxTokens}
-							onChange={(event) => setModel(index, { maxTokens: event.target.value })}
-						/>
-						<input
-							placeholder="contextWindow"
-							value={model.contextWindow}
-							onChange={(event) => setModel(index, { contextWindow: event.target.value })}
-						/>
-						<label className="check">
-							<input
-								type="checkbox"
-								checked={model.reasoning}
-								onChange={(event) => setModel(index, { reasoning: event.target.checked })}
-							/>
-							reasoning
-						</label>
-						<label className="check">
-							<input
-								type="checkbox"
-								checked={model.image}
-								onChange={(event) => setModel(index, { image: event.target.checked })}
-							/>
-							image
-						</label>
-						<button
-							className="icon-button danger"
-							title="删除模型"
-							onClick={() => set({ models: form.models.filter((_, current) => current !== index) })}
-						>
-							<TrashIcon size={14} />
-						</button>
-					</div>
-				))}
-			</div>
-			<div className="modal-actions">
-				<button className="ghost-button" onClick={onCancel}>
-					取消
-				</button>
-				<button className="primary-button" onClick={() => void onSave(form)}>
-					<CheckIcon size={14} />
-					保存供应商
-				</button>
-			</div>
-		</div>
-	);
-}
-
-function WorkspaceTab({
+export function WorkspaceTab({
 	settings,
 	summary,
 	skills,
@@ -794,52 +791,6 @@ function WorkspaceTab({
 					) : null}
 				</div>
 			) : null}
-		</div>
-	);
-}
-
-function AppearanceTab({
-	settings,
-	onUpdate,
-}: {
-	readonly settings: SettingsSnapshot;
-	readonly onUpdate: (patch: SettingsPatch, message?: string) => Promise<SettingsSnapshot | undefined>;
-}): JSX.Element {
-	return (
-		<div className="settings-section">
-			<h3>主题</h3>
-			<p className="settings-note">跟随系统会监听系统深浅色变化；选择后立即写入全局配置。</p>
-			<label className="field">
-				<span>外观</span>
-				<select
-					value={settings.config.ui.theme}
-					onChange={(event) => {
-						void onUpdate({ ui: { theme: event.target.value as "auto" | "light" | "dark" } }, "主题已更新");
-					}}
-				>
-					<option value="auto">跟随系统</option>
-					<option value="light">浅色</option>
-					<option value="dark">深色</option>
-				</select>
-			</label>
-			<h3>通知</h3>
-			<label className="field">
-				<span>完成提醒</span>
-				<select
-					value={settings.config.ui.notify}
-					onChange={(event) => {
-						void onUpdate(
-							{ ui: { notify: event.target.value as "auto" | "bell" | "desktop" | "off" } },
-							"通知设置已更新",
-						);
-					}}
-				>
-					<option value="auto">窗口失焦时通知</option>
-					<option value="desktop">总是系统通知</option>
-					<option value="bell">响铃</option>
-					<option value="off">关闭</option>
-				</select>
-			</label>
 		</div>
 	);
 }

@@ -14,7 +14,7 @@ import {
 	type ConfigSkip,
 	type ProviderConfig,
 } from "#src/core/config/schema.ts";
-import { updateGlobalSettings } from "#src/core/config/writer.ts";
+import { updateGlobalConfig, updateGlobalSettings } from "#src/core/config/writer.ts";
 
 /** 密钥来源：空、环境变量、`!command` 或明文。 */
 export type SecretSource = "empty" | "env" | "command" | "literal";
@@ -83,6 +83,7 @@ export const SettingsPatchSchema = z
 			.object({
 				theme: z.enum(["auto", "light", "dark"]).optional(),
 				notify: z.enum(["auto", "bell", "desktop", "off"]).optional(),
+				fontSize: z.number().int().min(12).max(20).optional(),
 			})
 			.optional(),
 	})
@@ -170,6 +171,36 @@ export async function upsertProvider(homeDir: string, name: string, draft: Provi
 		throw new Error(`Invalid provider ${name}: ${reason}`);
 	}
 	await writeProvidersJson(homeDir, candidate);
+	return readSettings(homeDir);
+}
+
+/**
+ * 重命名供应商；保留原配置的全部字段（含密钥与 headers）。
+ * 新名须非空且不与已有供应商冲突；未找到旧名时抛错。
+ */
+export async function renameProvider(homeDir: string, from: string, to: string): Promise<SettingsSnapshot> {
+	const nextName = to.trim();
+	if (nextName.length === 0) throw new Error("Provider name must not be empty");
+	const raw = await readProvidersJson(homeDir);
+	const provider = raw.providers[from];
+	if (!provider) throw new Error(`Unknown provider: ${from}`);
+	if (from !== nextName && raw.providers[nextName]) throw new Error(`Provider ${nextName} already exists`);
+	const providers = { ...raw.providers };
+	delete providers[from];
+	providers[nextName] = provider;
+	const candidate = { providers };
+	const validated = parseProvidersFile(candidate);
+	if (!validated.providers.providers[nextName]) {
+		const reason =
+			validated.skipped.find((skip) => skip.path === `providers.${nextName}`)?.reason ?? "invalid provider";
+		throw new Error(`Invalid provider ${nextName}: ${reason}`);
+	}
+	await writeProvidersJson(homeDir, candidate);
+	// 若该供应商是当前激活项，同步更新 config.toml 的 provider 引用，避免指向旧名。
+	if (from !== nextName) {
+		const active = (await loadConfig({ homeDir })).config.provider;
+		if (active === from) await updateGlobalConfig({ provider: nextName }, { homeDir });
+	}
 	return readSettings(homeDir);
 }
 

@@ -203,6 +203,7 @@ const SECTION_KEYS = {
 	ui: {
 		theme: ["theme"],
 		notify: ["notify"],
+		fontSize: ["fontSize", "font_size"],
 	},
 } as const;
 
@@ -376,7 +377,7 @@ const SECTION_CANONICAL: Readonly<Record<SectionName, Readonly<Record<string, st
 	limits: { maxTurns: "max_turns", spillThreshold: "spill_threshold", streamIdleTimeoutSec: "stream_idle_timeout_sec" },
 	retry: { maxRetries: "max_retries", maxDelayMs: "max_delay_ms" },
 	compaction: { compactAt: "compact_at", keepRecent: "keep_recent", summaryTimeoutSec: "summary_timeout_sec" },
-	ui: { theme: "theme", notify: "notify" },
+	ui: { theme: "theme", notify: "notify", fontSize: "font_size" },
 };
 
 /** 借助 smol-toml 序列化生成带正确转义的右侧值。 */

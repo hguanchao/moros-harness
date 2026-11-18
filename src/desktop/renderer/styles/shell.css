@@ -1,0 +1,180 @@
+/* ---------- 标题栏 ---------- */
+
+.titlebar {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	-webkit-app-region: drag;
+	user-select: none;
+}
+
+.app[data-platform="darwin"] .titlebar {
+	padding-left: 82px;
+}
+
+.titlebar button {
+	-webkit-app-region: no-drag;
+}
+
+.titlebar-toggle.is-active {
+	color: var(--text-primary);
+}
+
+.brand {
+	display: flex;
+	align-items: baseline;
+	gap: 6px;
+	font-size: var(--text-body);
+	font-weight: 600;
+	letter-spacing: -0.01em;
+}
+
+/* ---------- 通用按钮 ---------- */
+
+.icon-button {
+	width: 28px;
+	height: 28px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border: none;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--text-secondary);
+	flex: none;
+}
+
+.icon-button:hover:not(:disabled) {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.icon-button.danger:hover:not(:disabled) {
+	background: var(--danger-soft);
+	color: var(--danger);
+}
+
+.primary-button,
+.ghost-button,
+.danger-button {
+	height: 32px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 0 12px;
+	border-radius: 8px;
+	border: 1px solid transparent;
+	font-size: var(--text-ui);
+	white-space: nowrap;
+}
+
+.primary-button {
+	background: var(--accent);
+	color: var(--accent-contrast);
+	font-weight: 500;
+}
+
+.primary-button:hover:not(:disabled) {
+	opacity: 0.88;
+}
+
+.ghost-button {
+	background: transparent;
+	border-color: var(--line);
+	color: var(--text-secondary);
+}
+
+.ghost-button:hover:not(:disabled) {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.danger-button {
+	background: transparent;
+	border-color: var(--line);
+	color: var(--danger);
+}
+
+.danger-button:hover:not(:disabled) {
+	background: var(--danger-soft);
+	border-color: var(--danger);
+}
+
+.ghost-button.small {
+	height: 26px;
+	padding: 0 8px;
+	font-size: var(--text-small);
+}
+
+.pill {
+	display: inline-flex;
+	align-items: center;
+	height: 20px;
+	padding: 0 7px;
+	border-radius: 999px;
+	background: var(--fill-soft);
+	color: var(--text-secondary);
+	font-size: var(--text-caption);
+	white-space: nowrap;
+}
+
+.pill.accent {
+	background: var(--accent);
+	color: var(--accent-contrast);
+}
+
+.pill.warn {
+	color: var(--warn);
+}
+
+.app-body {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+}
+
+.main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* ---------- 侧栏 ---------- */
+
+.session-row:hover {
+	background: var(--fill-hover);
+}
+
+.session-row.is-selected {
+	background: var(--row-selected);
+	color: var(--text-primary);
+}
+
+.session-dot.is-running {
+	background: var(--ok);
+	animation: pulse 1.6s ease-in-out infinite;
+}
+
+.session-title {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.sidebar-footer {
+	gap: 4px;
+}
+
+.project-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}

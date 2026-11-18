@@ -6,7 +6,7 @@ import { ChangesPage } from "#src/desktop/renderer/pages/ChangesPage.tsx";
 import { ChatPage } from "#src/desktop/renderer/pages/ChatPage.tsx";
 import { FilesPage } from "#src/desktop/renderer/pages/FilesPage.tsx";
 import { SessionsPage } from "#src/desktop/renderer/pages/SessionsPage.tsx";
-import { SettingsPage } from "#src/desktop/renderer/pages/SettingsPage.tsx";
+import { SettingsApp } from "#src/desktop/renderer/pages/SettingsApp.tsx";
 import { TracePage } from "#src/desktop/renderer/pages/TracePage.tsx";
 import { Sidebar } from "#src/desktop/renderer/Sidebar.tsx";
 import { TitleBar } from "#src/desktop/renderer/TitleBar.tsx";
@@ -63,6 +63,11 @@ export function App(): JSX.Element {
 		return () => query.removeEventListener("change", apply);
 	}, [state.theme, dispatch]);
 
+	// 界面字号：只缩放文字，图标与布局尺寸保持不变
+	useEffect(() => {
+		document.documentElement.style.setProperty("--ui-scale", String(state.uiFontSize / 14));
+	}, [state.uiFontSize]);
+
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent): void => {
 			const modifier = isMac ? event.metaKey : event.ctrlKey;
@@ -96,6 +101,16 @@ export function App(): JSX.Element {
 		return () => window.removeEventListener("keydown", onKeyDown);
 	}, [state.sidebarOpen, state.project, actions, dispatch]);
 
+	// 设置是独立全屏视图，整窗替代主工作区
+	if (state.page === "settings") {
+		return (
+			<>
+				<SettingsApp />
+				<Toasts />
+			</>
+		);
+	}
+
 	return (
 		<div className="app" data-platform={state.app?.platform ?? (isMac ? "darwin" : "win32")}>
 			<TitleBar
@@ -103,14 +118,13 @@ export function App(): JSX.Element {
 				onToggleSidebar={() => dispatch({ type: "sidebar", open: !state.sidebarOpen })}
 			/>
 			<div className="app-body">
-				{state.sidebarOpen ? <Sidebar /> : null}
+				<Sidebar open={state.sidebarOpen} />
 				<main className="main">
 					{state.page === "chat" ? <ChatPage /> : null}
 					{state.page === "files" ? <FilesPage /> : null}
 					{state.page === "changes" ? <ChangesPage /> : null}
 					{state.page === "trace" ? <TracePage /> : null}
 					{state.page === "sessions" ? <SessionsPage /> : null}
-					{state.page === "settings" ? <SettingsPage /> : null}
 				</main>
 			</div>
 			{state.ready && state.page === "chat" && state.project === undefined ? <Welcome /> : null}

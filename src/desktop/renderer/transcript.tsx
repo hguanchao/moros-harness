@@ -11,6 +11,7 @@ import {
 	ClockIcon,
 	FileIcon,
 	FolderOpenIcon,
+	MetaIcon,
 	SparklesIcon,
 	TerminalIcon,
 } from "#src/desktop/renderer/icons.tsx";
@@ -320,8 +321,13 @@ export function Transcript({ turns, planning, running, onApprovePlan, onRevisePl
 	if (turns.length === 0) {
 		return (
 			<div className="chat-empty">
-				<SparklesIcon size={24} />
-				<p>描述你想构建或整理的内容。会话保留完整事件流，可随时回看工具调用与文件变更。</p>
+				<div className="welcome-brand">
+					<span className="welcome-brand-logo">
+						<MetaIcon size={30} />
+					</span>
+					<h2 className="welcome-brand-name">Moros Harness</h2>
+					<p className="welcome-brand-desc">轻量、本地优先的办公与编程双场景 Agent</p>
+				</div>
 			</div>
 		);
 	}

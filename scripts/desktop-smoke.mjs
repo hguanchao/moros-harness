@@ -230,13 +230,14 @@ try {
 	const typography = await page.evaluate(() => {
 		const host = document.createElement("div");
 		host.style.cssText = "position:fixed;left:-9999px;top:0;visibility:hidden";
-		host.innerHTML = "<h1>x</h1><h2>x</h2><h3>x</h3><h4>x</h4><h5>x</h5><h6>x</h6><p>x</p><small>x</small>";
+		host.innerHTML =
+			"<h1>x</h1><h2>x</h2><h3>x</h3><h4>x</h4><h5>x</h5><h6>x</h6><p>x</p><small>x</small><code>x</code><pre>x</pre>";
 		document.body.append(host);
 		const read = (element) => {
 			const style = getComputedStyle(element);
 			return { size: Number.parseFloat(style.fontSize), family: style.fontFamily, weight: style.fontWeight };
 		};
-		const entries = [...host.querySelectorAll("h1,h2,h3,h4,h5,h6,p,small")].map((element) => [
+		const entries = [...host.querySelectorAll("h1,h2,h3,h4,h5,h6,p,small,code,pre")].map((element) => [
 			element.tagName.toLowerCase(),
 			read(element),
 		]);
@@ -244,18 +245,82 @@ try {
 		return { entries, body: read(document.body) };
 	});
 	const fonts = Object.fromEntries(typography.entries);
-	const expected = { h1: 28, h2: 22, h3: 20, h4: 18, h5: 17, h6: 16, p: 15, small: 13 };
+	const expected = { h1: 24, h2: 20, h3: 18, h4: 17, h5: 16, h6: 15, p: 14, small: 13 };
 	for (const [tag, size] of Object.entries(expected)) {
 		if (fonts[tag]?.size !== size) throw new Error(`typography ${tag}: expected ${size}px, got ${fonts[tag]?.size}`);
 	}
+	const levels = ["h1", "h2", "h3", "h4", "h5", "h6", "p", "small"];
+	for (let index = 0; index < levels.length - 1; index += 1) {
+		const current = fonts[levels[index]];
+		const next = fonts[levels[index + 1]];
+		if (current.size <= next.size) {
+			throw new Error(`typography order: ${levels[index]}=${current.size}px <= ${levels[index + 1]}=${next.size}px`);
+		}
+	}
+	const rootSize = await page.evaluate(() => Number.parseFloat(getComputedStyle(document.documentElement).fontSize));
+	if (rootSize !== 16) throw new Error(`root font-size: expected 16px, got ${rootSize}px`);
 	const families = new Set([typography.body.family, ...Object.values(fonts).map((entry) => entry.family)]);
 	if (families.size !== 1) throw new Error(`typography has ${families.size} font families`);
+	const sidebarType = await page.evaluate(() => {
+		const project = document.querySelector(".project-name");
+		const session = document.querySelector(".session-title");
+		const read = (element) => {
+			if (element === null) return undefined;
+			const style = getComputedStyle(element);
+			return { size: Number.parseFloat(style.fontSize), weight: style.fontWeight, family: style.fontFamily };
+		};
+		return { project: read(project), session: read(session) };
+	});
+	if (
+		sidebarType.project === undefined ||
+		sidebarType.session === undefined ||
+		sidebarType.project.size <= sidebarType.session.size
+	) {
+		throw new Error(`sidebar hierarchy: ${JSON.stringify(sidebarType)}`);
+	}
 	process.stdout.write(
 		`typography: ${Object.entries(fonts)
 			.map(([tag, entry]) => `${tag}=${entry.size}px/${entry.weight}`)
-			.join(", ")}; body=${typography.body.size}px; family unified
+			.join(
+				", ",
+			)}; body=${typography.body.size}px; sidebar project=${sidebarType.project.size}px/${sidebarType.project.weight} > session=${sidebarType.session.size}px/${sidebarType.session.weight}; family unified
 `,
 	);
+
+	// 侧栏收起/展开：切换按钮应驱动 is-collapsed 类与宽度过渡动画，且最终回到原位
+	const readSidebar = () =>
+		page.evaluate(() => {
+			const sidebar = document.querySelector(".sidebar");
+			if (sidebar === null) throw new Error("sidebar is missing");
+			const style = getComputedStyle(sidebar);
+			return {
+				width: sidebar.getBoundingClientRect().width,
+				collapsed: sidebar.classList.contains("is-collapsed"),
+				transition: style.transitionProperty,
+				duration: style.transitionDuration,
+			};
+		});
+	const sidebarOpen = await readSidebar();
+	if (sidebarOpen.collapsed || sidebarOpen.width <= 0) {
+		throw new Error(`sidebar should start open: ${JSON.stringify(sidebarOpen)}`);
+	}
+	if (!sidebarOpen.transition.includes("width") || sidebarOpen.duration === "0s") {
+		throw new Error(`sidebar width transition missing: ${JSON.stringify(sidebarOpen)}`);
+	}
+	await page.getByRole("button", { name: "收起侧栏" }).click();
+	await page.waitForFunction(() => document.querySelector(".sidebar")?.classList.contains("is-collapsed") === true);
+	await page.waitForFunction(() => document.querySelector(".sidebar")?.getBoundingClientRect().width === 0);
+	const sidebarCollapsed = await readSidebar();
+	if (!sidebarCollapsed.collapsed || sidebarCollapsed.width !== 0) {
+		throw new Error(`sidebar did not collapse: ${JSON.stringify(sidebarCollapsed)}`);
+	}
+	await page.getByRole("button", { name: "展开侧栏" }).click();
+	await page.waitForFunction(() => document.querySelector(".sidebar")?.classList.contains("is-collapsed") === false);
+	await page.waitForFunction(
+		(openWidth) => (document.querySelector(".sidebar")?.getBoundingClientRect().width ?? 0) >= openWidth - 1,
+		sidebarOpen.width,
+	);
+	process.stdout.write(`sidebar toggle: ${sidebarOpen.width}px -> 0 -> back, width animated\n`);
 
 	await page.fill(".composer textarea", "写一个说明文件");
 	await page.click(".send-button");
@@ -285,14 +350,56 @@ try {
 	await page.screenshot({ path: join(shots, "06-plan-approved.png") });
 
 	await page.locator('.sidebar-footer button[aria-label="设置"]').click();
+	await page.waitForSelector(".settings-app", { timeout: 10_000 });
+	await page.screenshot({ path: join(shots, "07-settings.png") });
+	const settingsType = await page.evaluate(() => {
+		const read = (selector) => {
+			const element = document.querySelector(selector);
+			if (element === null) return undefined;
+			const style = getComputedStyle(element);
+			return { size: Number.parseFloat(style.fontSize), weight: style.fontWeight };
+		};
+		return { pageTitle: read(".settings-page-title"), sectionTitle: read(".settings-section-heading") };
+	});
+	if (
+		settingsType.pageTitle === undefined ||
+		settingsType.sectionTitle === undefined ||
+		settingsType.pageTitle.size <= settingsType.sectionTitle.size
+	) {
+		throw new Error(`settings heading hierarchy: ${JSON.stringify(settingsType)}`);
+	}
+	process.stdout.write(
+		`settings headings: h1=${settingsType.pageTitle.size}px > h2=${settingsType.sectionTitle.size}px\n`,
+	);
+
+	// 左侧导航：切到供应商分组应渲染真实内容，外观分组的主题/界面字号应真实生效
 	await page.getByRole("button", { name: "供应商", exact: true }).click();
 	await page.waitForSelector(".provider-card", { timeout: 10_000 });
-	await page.screenshot({ path: join(shots, "07-settings.png") });
-
 	await page.getByRole("button", { name: "外观", exact: true }).click();
-	await page.locator(".settings-section select").first().selectOption("dark");
+	await page.waitForSelector(".settings-number input", { timeout: 10_000 });
+	const fontSizeInput = page.locator(".settings-number input");
+	const readFontSize = () => page.evaluate(() => Number.parseFloat(getComputedStyle(document.body).fontSize));
+	if ((await fontSizeInput.inputValue()) !== "14") throw new Error("default ui font size should be 14px");
+	await fontSizeInput.fill("16");
+	await page.waitForTimeout(300);
+	const scaled = await readFontSize();
+	if (scaled < 15.5) throw new Error(`ui font size did not scale to 16px, got ${scaled}px`);
+	await fontSizeInput.fill("14");
+	await page.waitForTimeout(300);
+	const restored = await readFontSize();
+	if (restored > 14.5) throw new Error(`ui font size did not reset to 14px, got ${restored}px`);
+	process.stdout.write(`ui font size: 14px -> ${scaled}px -> ${restored}px\n`);
+
+	// 主题下拉为自绘组件：点击触发按钮后从弹层选择「深色」
+	await page.locator(".settings-app .settings-row .dropdown-box .dropdown-trigger").first().click();
+	await page.locator('.settings-app .dropdown-option[data-value="dark"]').first().click();
 	await page.waitForTimeout(500);
 	await page.screenshot({ path: join(shots, "08-theme.png") });
+
+	// 返回工作区：独立视图应能回到聊天页
+	await page.getByRole("button", { name: "返回工作区" }).click();
+	await page.waitForSelector(".composer textarea", { timeout: 10_000 });
+	process.stdout.write("settings: back to workspace ok\n");
 
 	const { Core } = await import("#src/core/index.ts");
 	const core = new Core({ homeDir: home });

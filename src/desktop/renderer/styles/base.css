@@ -1,0 +1,279 @@
+:root {
+	color-scheme: dark;
+	--surface-sidebar: #202020;
+	--surface-main: #131313;
+	--surface-chrome: #262626;
+	--surface-raised: #333333;
+	--surface-sunken: #0f0f0f;
+	--text-primary: #ffffff;
+	--text-secondary: #ededed;
+	--text-muted: #c4c4c4;
+	--text-dim: #9a9a9a;
+	--text-faint: #6e6e6e;
+	--line: rgba(255, 255, 255, 0.09);
+	--line-strong: rgba(255, 255, 255, 0.14);
+	--fill-soft: rgba(255, 255, 255, 0.06);
+	--fill-hover: rgba(255, 255, 255, 0.05);
+	--fill-strong: rgba(255, 255, 255, 0.12);
+	--row-selected: rgba(255, 255, 255, 0.14);
+	--accent: #ffffff;
+	--accent-soft: rgba(255, 255, 255, 0.16);
+	--accent-contrast: #101010;
+	--on-accent: #101010;
+	--accent-ring: rgba(255, 255, 255, 0.6);
+	--caption-hover: rgba(255, 255, 255, 0.08);
+	--caption-press: rgba(255, 255, 255, 0.13);
+	--close-hover: #4a4a4a;
+	--close-press: #3d3d3d;
+	--danger: #ff7b72;
+	--danger-soft: rgba(255, 123, 114, 0.12);
+	--ok: #72d69e;
+	--warn: #e6c07b;
+	--bubble: #262626;
+	--send-idle-fg: rgba(255, 255, 255, 0.5);
+	--shadow: 0 24px 72px rgba(0, 0, 0, 0.32);
+	--shadow-soft: rgba(0, 0, 0, 0.1);
+	--code-bg: #0f0f0f;
+	--diff-add: rgba(63, 185, 80, 0.14);
+	--diff-remove: rgba(248, 81, 73, 0.13);
+	--diff-add-text: #7ee787;
+	--diff-remove-text: #ffa198;
+	--scrollbar: rgba(255, 255, 255, 0.14);
+	--lane-model: #8fb8ff;
+	--lane-tools: #e0a96d;
+	--lane-input: #7fd1a7;
+	--syn-keyword: #c678dd;
+	--syn-string: #98c379;
+	--syn-number: #d19a66;
+	--syn-comment: #7f848e;
+	--syn-function: #61afef;
+	--syn-variable: #e06c75;
+	--r-surface: 22px;
+
+	/* 侧栏收起/展开动画 */
+	--sidebar-width: 260px;
+	--duration-sidebar: 220ms;
+	--ease-sidebar: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:root[data-theme="light"] {
+	color-scheme: light;
+	--surface-sidebar: #ebebeb;
+	--surface-main: #f5f5f5;
+	--surface-chrome: #ececec;
+	--surface-raised: #ffffff;
+	--surface-sunken: #f7f7f7;
+	--text-primary: #0a0a0a;
+	--text-secondary: #262626;
+	--text-muted: #4a4a4a;
+	--text-dim: #707070;
+	--text-faint: #9e9e9e;
+	--line: rgba(0, 0, 0, 0.08);
+	--line-strong: rgba(0, 0, 0, 0.14);
+	--fill-soft: rgba(0, 0, 0, 0.05);
+	--fill-hover: rgba(0, 0, 0, 0.04);
+	--fill-strong: rgba(0, 0, 0, 0.09);
+	--row-selected: rgba(0, 0, 0, 0.1);
+	--accent: #0a0a0a;
+	--accent-soft: rgba(10, 10, 10, 0.14);
+	--accent-contrast: #ffffff;
+	--on-accent: #ffffff;
+	--accent-ring: rgba(0, 0, 0, 0.5);
+	--caption-hover: rgba(0, 0, 0, 0.06);
+	--caption-press: rgba(0, 0, 0, 0.11);
+	--close-hover: #b5b5b5;
+	--close-press: #a0a0a0;
+	--danger: #c93c37;
+	--danger-soft: rgba(201, 60, 55, 0.1);
+	--ok: #1f8a4c;
+	--warn: #9a6b00;
+	--bubble: #ececec;
+	--send-idle-fg: rgba(10, 10, 10, 0.42);
+	--shadow: 0 24px 72px rgba(0, 0, 0, 0.14);
+	--shadow-soft: rgba(0, 0, 0, 0.08);
+	--code-bg: #f7f7f7;
+	--diff-add: rgba(31, 138, 76, 0.12);
+	--diff-remove: rgba(201, 60, 55, 0.1);
+	--diff-add-text: #176b3b;
+	--diff-remove-text: #a02a25;
+	--scrollbar: rgba(0, 0, 0, 0.15);
+	--lane-model: #2f6fd0;
+	--lane-tools: #a15c16;
+	--lane-input: #1f7a4c;
+	--syn-keyword: #a626a4;
+	--syn-string: #407a2c;
+	--syn-number: #986801;
+	--syn-comment: #8b8f98;
+	--syn-function: #2f6fd0;
+	--syn-variable: #b23b3b;
+}
+
+/* ============================================================
+   排版系统：字体栈、字号、行高、字重
+   与配色方案一样集中在此定义；组件只通过 var() 引用，不散落硬编码字号。
+   基准 16px，字号统一用 rem；正文默认 14px。
+   --ui-scale 由「界面字号」设置驱动（ui.fontSize / 14），默认 1 时各档位等于注释中的 px。
+   仅缩放文字，图标与布局尺寸不变。
+   ============================================================ */
+
+:root {
+	--font-ui:
+		-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+		"Helvetica Neue", Helvetica, Arial, sans-serif;
+
+	--ui-scale: 1;
+
+	/* 标题层级 h1 > h2 > h3 > h4 > h5 > h6；h2 用于页面头，h3 用于分区标题 */
+	--text-h1: calc(1.5rem * var(--ui-scale)); /* 24px */
+	--text-h2: calc(1.25rem * var(--ui-scale)); /* 20px，页面头 / 模态框标题 */
+	--text-h3: calc(1.125rem * var(--ui-scale)); /* 18px，分区标题 */
+	--text-h4: calc(1.0625rem * var(--ui-scale)); /* 17px */
+	--text-h5: calc(1rem * var(--ui-scale)); /* 16px */
+	--text-h6: calc(0.9375rem * var(--ui-scale)); /* 15px */
+
+	/* 正文与辅助字号：正文默认 14px */
+	--text-body: calc(0.875rem * var(--ui-scale)); /* 14px，对话 / Markdown / 输入框 */
+	--text-ui: calc(0.875rem * var(--ui-scale)); /* 14px，侧栏 / 列表项 / 控件 */
+	--text-title: calc(1rem * var(--ui-scale)); /* 16px，界面标题（非 h 标签，如会话标题 / 侧栏项目名） */
+	--text-brand: calc(1.125rem * var(--ui-scale)); /* 18px，品牌字 */
+	--text-small: calc(0.8125rem * var(--ui-scale)); /* 13px */
+	--text-caption: calc(0.75rem * var(--ui-scale)); /* 12px */
+	--text-micro: calc(0.6875rem * var(--ui-scale)); /* 11px */
+
+	--leading-h1: 1.25;
+	--leading-h2: 1.3;
+	--leading-heading: 1.35;
+	--leading-body: 1.6;
+	--leading-small: 1.5;
+
+	--weight-regular: 400;
+	--weight-medium: 500;
+	--weight-semibold: 600;
+	--weight-bold: 700;
+}
+
+html {
+	font-size: 16px;
+}
+
+/* 全站唯一字体栈；表单控件与代码块也继承，避免回退到浏览器默认字体 */
+html,
+body,
+button,
+input,
+select,
+textarea,
+option,
+optgroup,
+code,
+kbd,
+samp,
+pre,
+tt {
+	font-family: var(--font-ui);
+}
+
+body {
+	font-size: var(--text-body);
+	font-weight: var(--weight-regular);
+	line-height: var(--leading-body);
+}
+
+small {
+	font-size: var(--text-small);
+	font-weight: var(--weight-regular);
+	line-height: var(--leading-small);
+}
+
+/* 严格标题层级 */
+h1 {
+	font-size: var(--text-h1);
+	font-weight: var(--weight-bold);
+	line-height: var(--leading-h1);
+}
+
+h2 {
+	font-size: var(--text-h2);
+	font-weight: var(--weight-semibold);
+	line-height: var(--leading-h2);
+}
+
+h3 {
+	font-size: var(--text-h3);
+	font-weight: var(--weight-semibold);
+	line-height: var(--leading-heading);
+}
+
+h4 {
+	font-size: var(--text-h4);
+	font-weight: var(--weight-semibold);
+	line-height: var(--leading-heading);
+}
+
+h5 {
+	font-size: var(--text-h5);
+	font-weight: var(--weight-semibold);
+	line-height: var(--leading-heading);
+}
+
+h6 {
+	font-size: var(--text-h6);
+	font-weight: var(--weight-semibold);
+	line-height: var(--leading-heading);
+}
+
+/* 侧栏层级：项目名 > 任务名 */
+.project-row .project-name {
+	font-size: var(--text-title);
+	font-weight: var(--weight-semibold);
+}
+
+.session-title {
+	font-size: var(--text-ui);
+	font-weight: var(--weight-regular);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: var(--surface-main);
+	color: var(--text-primary);
+	overflow: hidden;
+	-webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+button {
+	cursor: pointer;
+	border: 0;
+	padding: 0;
+	background: none;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.45;
+}
+
+.app {
+	height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-sidebar);
+}

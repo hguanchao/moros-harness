@@ -26,6 +26,7 @@ import {
 	readSettings,
 	revealProviderSecret,
 	upsertProvider,
+	renameProvider,
 	writeSettings,
 	type ProviderDraft,
 	type SettingsPatch,
@@ -859,6 +860,13 @@ export class Core {
 	/** 删除供应商。 */
 	async deleteProvider(name: string): Promise<SettingsSnapshot> {
 		const snapshot = await deleteProvider(this.#homeDir, name);
+		this.#loadedConfigs.clear();
+		return snapshot;
+	}
+
+	/** 重命名供应商，保留原配置（含密钥与 headers）。 */
+	async renameProvider(from: string, to: string): Promise<SettingsSnapshot> {
+		const snapshot = await renameProvider(this.#homeDir, from, to);
 		this.#loadedConfigs.clear();
 		return snapshot;
 	}

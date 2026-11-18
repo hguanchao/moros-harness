@@ -1,0 +1,109 @@
+/* ---------- 页面头 ---------- */
+
+.page-head {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+	height: 50px;
+	min-height: 50px;
+	padding: 0 20px;
+	border-bottom: none;
+	box-shadow: inset 0 -0.5px var(--line);
+}
+
+.page-back {
+	width: 26px;
+	height: 26px;
+	margin-left: -6px;
+	color: var(--text-dim);
+}
+
+.page-back:hover {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.page-head-title {
+	flex: 1;
+	min-width: 0;
+}
+
+.page-head h2 {
+	margin: 0;
+	color: var(--text-muted);
+}
+
+.page-subtitle {
+	margin: 1px 0 0;
+	font-size: var(--text-caption);
+	color: var(--text-faint);
+	max-width: 680px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.page-actions .ghost-button,
+.page-actions .danger-button {
+	height: 28px;
+	padding: 0 9px;
+	font-size: var(--text-small);
+	border-radius: 7px;
+}
+
+/* ---------- 欢迎层 / 弹层 ---------- */
+
+.welcome-layer {
+	inset: 40px 0 0 0;
+	background: radial-gradient(circle at 50% 32%, var(--fill-soft), transparent 55%), var(--surface-main);
+}
+
+.welcome h1 {
+	color: var(--text-primary);
+}
+
+.welcome p {
+	color: var(--text-dim);
+}
+
+.welcome-mark {
+	border-radius: 16px;
+	background: var(--surface-chrome);
+	border-color: var(--line-strong);
+}
+
+.trust-card,
+.modal {
+	border-radius: 14px;
+	border-color: var(--line-strong);
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+}
+
+.modal-backdrop,
+.trust-overlay {
+	background: rgba(0, 0, 0, 0.42);
+}
+
+/* ---------- 滚动条 ---------- */
+
+::-webkit-scrollbar {
+	width: 6px;
+	height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--scrollbar);
+	border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-faint);
+}
+
+::-webkit-scrollbar-button {
+	display: none;
+	width: 0;
+	height: 0;
+}

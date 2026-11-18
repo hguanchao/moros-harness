@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 
-import { BrowserWindow, Menu, app, dialog, nativeTheme, screen, session } from "electron";
+import { BrowserWindow, Menu, app, dialog, nativeImage, nativeTheme, screen, session } from "electron";
 
 import { DesktopHost } from "#src/desktop/main/core-host.ts";
 import { registerIpc } from "#src/desktop/main/ipc.ts";
@@ -10,6 +10,12 @@ import { PUSH_CHANNEL } from "#src/desktop/shared/contract.ts";
 const TITLEBAR_HEIGHT = 40;
 const DARK_SURFACE = "#202020";
 const LIGHT_SURFACE = "#ebebeb";
+
+/** 应用图标：打包后随 extraResources 落到 resources/icon.png，开发时从项目 build/ 读取。 */
+function appIcon(): ReturnType<typeof nativeImage.createFromPath> {
+	const path = app.isPackaged ? join(process.resourcesPath, "icon.png") : join(app.getAppPath(), "build", "icon.png");
+	return nativeImage.createFromPath(path);
+}
 
 let mainWindow: BrowserWindow | undefined;
 let host: DesktopHost | undefined;
@@ -93,6 +99,7 @@ function createWindow(
 		maximizable: true,
 		show: false,
 		title: "Moros Harness",
+		icon: appIcon(),
 		backgroundColor: initialSurface,
 		titleBarStyle: process.platform === "darwin" ? "hiddenInset" : "hidden",
 		...(process.platform === "darwin" ? { trafficLightPosition: { x: 16, y: 14 } } : {}),

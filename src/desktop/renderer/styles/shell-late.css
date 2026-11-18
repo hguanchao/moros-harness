@@ -1,0 +1,390 @@
+/* ---------- 已合并的界面外壳与页面布局 ---------- */
+
+/* ---------- 窗口壳 ---------- */
+
+.titlebar {
+	height: 40px;
+	padding: 0 0 0 10px;
+	background: var(--surface-sidebar);
+	justify-content: space-between;
+}
+
+.app[data-platform="win32"] .titlebar,
+.app[data-platform="linux"] .titlebar {
+	padding-right: 0;
+}
+
+.titlebar-left {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+}
+
+.titlebar-toggle {
+	width: 26px;
+	height: 26px;
+	border-radius: 6px;
+	color: var(--text-muted);
+}
+
+.titlebar-toggle:hover {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.caption-group {
+	display: flex;
+	align-items: center;
+	flex: none;
+	align-self: stretch;
+}
+
+.caption {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 46px;
+	height: 100%;
+	border: none;
+	border-radius: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	-webkit-app-region: no-drag;
+	transition:
+		background 0.12s ease,
+		color 0.12s ease;
+}
+
+.caption:hover {
+	background: var(--caption-hover);
+	color: var(--text-primary);
+}
+
+.caption:active {
+	background: var(--caption-press);
+}
+
+.caption-close:hover {
+	background: var(--close-hover);
+	color: #ffffff;
+}
+
+.caption-close:active {
+	background: var(--close-press);
+	color: #ffffff;
+}
+
+/* ---------- 侧栏 ---------- */
+
+.sidebar {
+	width: var(--sidebar-width);
+	flex: none;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	background: var(--surface-sidebar);
+	font-size: var(--text-ui);
+	overflow: hidden;
+	transition: width var(--duration-sidebar) var(--ease-sidebar);
+}
+
+/* 收起时宽度归零；内容保持定宽被裁剪，并随容器淡出，避免文字被挤压换行 */
+.sidebar.is-collapsed {
+	width: 0;
+}
+
+.sidebar > * {
+	width: var(--sidebar-width);
+	flex-shrink: 0;
+	transition: opacity var(--duration-sidebar) var(--ease-sidebar);
+}
+
+.sidebar.is-collapsed > * {
+	opacity: 0;
+}
+
+.sidebar .brand {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 38px;
+	padding: 0 12px;
+	margin: 10px 0 12px;
+	flex: none;
+}
+
+.brand-name {
+	font-size: var(--text-brand);
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	line-height: 1;
+	color: var(--text-primary);
+}
+
+.brand-tag {
+	padding: 2px 5px;
+	border: 1px solid var(--line-strong);
+	border-radius: 4px;
+	font-size: var(--text-small);
+	font-weight: 600;
+	letter-spacing: 0.08em;
+	color: var(--text-dim);
+	line-height: 1.2;
+}
+
+.sidebar-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	scrollbar-gutter: stable;
+	padding: 0 12px 16px;
+}
+
+.side-menu {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-bottom: 10px;
+}
+
+.menu-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	width: 100%;
+	min-height: 36px;
+	padding: 0 10px;
+	border: none;
+	border-radius: 9px;
+	background: transparent;
+	color: var(--text-secondary);
+	text-align: left;
+	font-size: var(--text-ui);
+}
+
+.menu-row:hover:not(:disabled) {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.menu-row > svg {
+	color: var(--text-dim);
+}
+
+.menu-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.workspace-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: 24px;
+	margin: 8px 0 0;
+	padding: 0 8px;
+	color: var(--text-dim);
+	font-size: var(--text-ui);
+}
+
+.project-group {
+	display: flex;
+	flex-direction: column;
+}
+
+.project-group + .project-group {
+	margin-top: 6px;
+}
+
+.project-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	height: 38px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-secondary);
+	text-align: left;
+}
+
+.project-row:hover {
+	background: var(--fill-hover);
+}
+
+.project-row > svg {
+	color: var(--text-dim);
+}
+
+.project-tasks {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 4px;
+}
+
+.project-group:not(.is-expanded) .project-tasks {
+	display: none;
+}
+
+.session-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	width: 100%;
+	height: 38px;
+	padding: 0 8px 0 28px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-secondary);
+	text-align: left;
+}
+
+.session-row.is-selected .session-dot {
+	background: var(--accent);
+}
+
+.session-dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--text-faint);
+	flex: none;
+}
+
+.side-empty {
+	padding: 10px 8px 10px 28px;
+	font-size: var(--text-small);
+	color: var(--text-faint);
+}
+
+/* ---------- 主区 ---------- */
+
+.main {
+	margin: 0;
+	border: none;
+	border-radius: 0;
+	border-top-left-radius: var(--r-surface);
+	background: var(--surface-main);
+}
+
+.main-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 16px;
+	flex: none;
+	height: 50px;
+	padding: 0 20px;
+	box-shadow: inset 0 -0.5px var(--line);
+	color: var(--text-muted);
+}
+
+.main-bar-left {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	min-width: 0;
+}
+
+.conversation-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-size: var(--text-title);
+	font-weight: 500;
+	color: var(--text-muted);
+}
+
+.conversation {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	scrollbar-gutter: stable;
+	display: flex;
+	flex-direction: column;
+}
+
+.transcript {
+	width: calc(100% - 48px);
+	max-width: 760px;
+	margin: 0 auto;
+	padding: 20px 0;
+	font-size: var(--text-body);
+	user-select: text;
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+
+.turns {
+	display: flex;
+	flex-direction: column;
+	gap: 26px;
+}
+
+.turn {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.bubble {
+	max-width: 76%;
+	padding: 10px 15px;
+	border-radius: 16px;
+	background: var(--surface-chrome);
+	color: var(--text-primary);
+	font-size: var(--text-body);
+	line-height: 1.6;
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+.prose p {
+	margin: 0 0 15px;
+}
+
+.prose p:last-child {
+	margin-bottom: 0;
+}
+
+.prose ol,
+.prose ul {
+	margin: 0 0 15px;
+	padding-left: 20px;
+}
+
+.prose li + li {
+	margin-top: 7px;
+}
+
+.prose li::marker {
+	color: var(--text-faint);
+}
+
+.prose a {
+	color: inherit;
+	text-decoration-color: var(--line-strong);
+	text-underline-offset: 3px;
+}
+
+.prose a:hover {
+	text-decoration-color: var(--accent);
+}
+
+.prose pre {
+	border-radius: 10px;
+}
+
+.chat-empty {
+	flex: 1;
+	color: var(--text-dim);
+}

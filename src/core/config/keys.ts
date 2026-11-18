@@ -12,6 +12,7 @@ const KEY_ALIASES: Readonly<Record<string, string>> = {
 	summary_timeout_sec: "summaryTimeoutSec",
 	compact_model: "compactModel",
 	review_model: "reviewModel",
+	font_size: "fontSize",
 	mcp_servers: "mcpServers",
 };
 

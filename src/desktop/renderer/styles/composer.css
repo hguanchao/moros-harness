@@ -1,0 +1,272 @@
+/* ---------- 复刻输入框 ---------- */
+
+.composer-dock {
+	flex: none;
+	width: calc(100% - 32px);
+	max-width: 762px;
+	margin: 0 auto;
+	padding: 16px 0 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.composer {
+	padding: 8px;
+	border: none;
+	border-radius: var(--r-surface);
+	background: var(--surface-chrome);
+	box-shadow:
+		0 0 0 0.5px var(--line-strong),
+		0 4px 16px var(--shadow-soft);
+	transition: box-shadow 0.2s ease;
+}
+
+.composer:focus-within {
+	border: none;
+	box-shadow:
+		0 0 0 1px var(--accent-ring),
+		0 4px 16px var(--shadow-soft);
+}
+
+.composer .composer-input {
+	display: block;
+	width: 100%;
+	min-height: 36px;
+	max-height: 140px;
+	padding: 4px 6px 0;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: var(--text-primary);
+	font-size: var(--text-body);
+	line-height: 1.5;
+	resize: none;
+	user-select: text;
+}
+
+.composer-input::placeholder {
+	color: var(--text-faint);
+}
+
+.composer-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-top: 12px;
+	font-size: var(--text-ui);
+	color: var(--text-muted);
+}
+
+.composer-left {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	flex: none;
+	transform: translateY(2px);
+}
+
+.composer-right {
+	display: flex;
+	align-items: center;
+	gap: 16px;
+	min-width: 0;
+	transform: translateY(2px);
+}
+
+.add-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	flex: none;
+	border: none;
+	border-radius: 50%;
+	background: var(--fill-soft);
+	color: var(--text-secondary);
+}
+
+.add-button:hover:not(:disabled) {
+	background: var(--fill-strong);
+	color: var(--text-primary);
+}
+
+.attach-wrap {
+	position: relative;
+	display: flex;
+	flex: none;
+}
+
+.attach-menu {
+	position: absolute;
+	left: 0;
+	bottom: 36px;
+	z-index: 32;
+	min-width: 150px;
+	padding: 5px;
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.attach-menu button {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	height: 32px;
+	padding: 0 9px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-secondary);
+	font-size: var(--text-small);
+	text-align: left;
+}
+
+.attach-menu button:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.composer-control {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	white-space: nowrap;
+	color: var(--text-muted);
+	font-size: var(--text-ui);
+	cursor: pointer;
+}
+
+.composer-control:hover {
+	color: var(--text-primary);
+}
+
+.composer-control > svg {
+	color: var(--text-dim);
+	flex: none;
+}
+
+.model-picker {
+	max-width: 260px;
+}
+
+.model-picker .dropdown-trigger > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 190px;
+}
+
+.effort-picker {
+	color: var(--text-faint);
+}
+
+.permission {
+	color: var(--text-muted);
+}
+
+.plan-control {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	height: 28px;
+	padding: 0 8px;
+	border: none;
+	border-radius: 7px;
+	background: transparent;
+	color: var(--text-faint);
+	font-size: var(--text-ui);
+	white-space: nowrap;
+}
+
+.plan-control:hover:not(:disabled) {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.plan-control.is-active {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.send-button {
+	width: 34px;
+	height: 34px;
+	border: none;
+	border-radius: 50%;
+	background: var(--accent-soft);
+	color: var(--send-idle-fg);
+	display: grid;
+	place-items: center;
+	flex: none;
+	transition:
+		background 0.18s ease,
+		color 0.18s ease;
+}
+
+.send-button:hover:not(:disabled) {
+	background: var(--fill-strong);
+}
+
+.send-button.is-ready {
+	background: var(--accent);
+	color: var(--on-accent);
+}
+
+.send-button.is-ready:hover:not(:disabled) {
+	background: var(--accent);
+	opacity: 0.88;
+}
+
+.stop-button {
+	width: 28px;
+	height: 28px;
+	border: none;
+	border-radius: 50%;
+	background: var(--fill-soft);
+	color: var(--danger);
+	display: grid;
+	place-items: center;
+	flex: none;
+}
+
+/* 旧的条形控件不再使用；保留类名避免页面回归时丢失样式 */
+
+.attachments {
+	padding: 2px 6px 8px;
+}
+
+.attachment {
+	border-color: var(--line);
+	border-radius: 10px;
+}
+
+.url-attach {
+	margin: 2px 6px 8px;
+	border-color: var(--line);
+	background: var(--surface-main);
+	border-radius: 10px;
+}
+
+.queue-bar {
+	padding: 4px 6px 6px;
+	color: var(--text-faint);
+}
+
+.composer-wrap.is-dragging .composer {
+	box-shadow:
+		0 0 0 1px var(--accent-ring),
+		0 4px 16px var(--shadow-soft);
+}

@@ -1,0 +1,107 @@
+/* ---------- 欢迎层 ---------- */
+
+.welcome-layer {
+	position: fixed;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 20;
+}
+
+.welcome {
+	width: min(560px, calc(100vw - 80px));
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	text-align: center;
+	gap: 12px;
+	padding: 34px;
+}
+
+.welcome-mark {
+	width: 58px;
+	height: 58px;
+	display: grid;
+	place-items: center;
+	border: 1px solid var(--line);
+	color: var(--text-primary);
+}
+
+.welcome h1 {
+	margin: 0;
+	letter-spacing: -0.03em;
+}
+
+.welcome p {
+	margin: 0 0 8px;
+	max-width: 460px;
+	font-size: var(--text-ui);
+}
+
+.recent-projects {
+	width: 100%;
+	margin-top: 10px;
+	text-align: left;
+}
+
+.recent-project {
+	width: 100%;
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	padding: 9px 10px;
+	border: none;
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-secondary);
+	text-align: left;
+}
+
+.recent-project:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.recent-project small {
+	margin-left: auto;
+	max-width: 260px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+}
+
+/* 空会话欢迎区：居中展示应用标识、名称与定位 */
+.welcome-brand {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	text-align: center;
+}
+
+.welcome-brand-logo {
+	width: 60px;
+	height: 60px;
+	display: grid;
+	place-items: center;
+	border-radius: 16px;
+	background: #086fe3;
+	color: #ffffff;
+	box-shadow: 0 8px 24px rgba(8, 111, 227, 0.24);
+}
+
+.welcome-brand-name {
+	margin: 2px 0 0;
+	font-size: var(--text-h2);
+	font-weight: var(--weight-semibold);
+	color: var(--text-primary);
+	letter-spacing: -0.01em;
+}
+
+.welcome-brand-desc {
+	margin: 0;
+	font-size: var(--text-small);
+	color: var(--text-dim);
+}

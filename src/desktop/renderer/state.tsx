@@ -58,6 +58,7 @@ export interface AppState {
 	readonly settings: SettingsSnapshot | undefined;
 	readonly models: ModelCatalog;
 	readonly theme: ThemeChoice;
+	readonly uiFontSize: number;
 	readonly resolvedTheme: ResolvedTheme;
 	readonly workspaceVersion: number;
 	readonly review: ReviewState | undefined;
@@ -125,6 +126,7 @@ export const initialState: AppState = {
 	runStates: {},
 	models: { providers: [] },
 	theme: "auto",
+	uiFontSize: 14,
 	resolvedTheme: "dark",
 	workspaceVersion: 0,
 	windowMaximized: false,
@@ -145,6 +147,7 @@ export function reducer(state: AppState, action: Action): AppState {
 				...(project === undefined ? {} : { project }),
 				settings,
 				theme: themeFromSettings(settings) ?? state.theme,
+				uiFontSize: settings?.config.ui.fontSize ?? state.uiFontSize,
 				models: project?.models ?? state.models,
 				current: project?.session ?? state.current,
 				...(project?.session === undefined
@@ -222,6 +225,7 @@ export function reducer(state: AppState, action: Action): AppState {
 				...state,
 				settings: action.settings,
 				theme: action.settings.config.ui.theme,
+				uiFontSize: action.settings.config.ui.fontSize,
 			};
 		case "models":
 			return {

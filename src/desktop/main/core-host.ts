@@ -633,6 +633,13 @@ export class DesktopHost {
 		return snapshot;
 	}
 
+	async renameProvider(from: string, to: string): Promise<SettingsSnapshot> {
+		const snapshot = await this.#requiredCore().renameProvider(from, to);
+		await this.#refreshCatalog();
+		await this.#pushViewIfCurrent(this.#current?.meta.id);
+		return snapshot;
+	}
+
 	async revealSecret(name: string): Promise<string> {
 		return this.#requiredCore().revealProviderSecret(name);
 	}

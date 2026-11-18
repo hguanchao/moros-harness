@@ -393,3 +393,148 @@ export function MessagePlusIcon(props: IconProps): JSX.Element {
 		</Icon>
 	);
 }
+
+/* 设置导航图标：按纵向列表语义补充，沿用统一 Icon 包装 */
+
+export function KeyboardIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="2" y="5" width="20" height="14" rx="2" />
+			<path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16h8" />
+		</Icon>
+	);
+}
+
+export function BrainIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M12 5a3 3 0 0 0-6 0 3 3 0 0 0-1 5.8A3 3 0 0 0 6 17a3 3 0 0 0 6 1zM12 5a3 3 0 0 1 6 0 3 3 0 0 1 1 5.8A3 3 0 0 1 18 17a3 3 0 0 1-6 1z" />
+		</Icon>
+	);
+}
+
+export function PuzzleIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M10 4a2 2 0 1 1 4 0v1h3a1 1 0 0 1 1 1v3h1a2 2 0 1 1 0 4h-1v3a1 1 0 0 1-1 1h-3v-1a2 2 0 1 0-4 0v1H6a1 1 0 0 1-1-1v-3H4a2 2 0 1 1 0-4h1V6a1 1 0 0 1 1-1h4z" />
+		</Icon>
+	);
+}
+
+export function PlugIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M9 3v6M15 3v6M7 9h10v3a5 5 0 0 1-10 0zM12 17v4" />
+		</Icon>
+	);
+}
+
+export function MonitorIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="2" y="4" width="20" height="13" rx="2" />
+			<path d="M8 21h8M12 17v4" />
+		</Icon>
+	);
+}
+
+export function DatabaseIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<ellipse cx="12" cy="5" rx="8" ry="3" />
+			<path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3" />
+		</Icon>
+	);
+}
+
+export function BookIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M4 5a2 2 0 0 1 2-2h12v18H6a2 2 0 0 1-2-2z" />
+			<path d="M8 7h6M8 11h6" />
+		</Icon>
+	);
+}
+
+export function RouteIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<circle cx="6" cy="19" r="3" />
+			<circle cx="18" cy="5" r="3" />
+			<path d="M6 16V9a3 3 0 0 1 3-3h3a3 3 0 0 0 3-3" />
+		</Icon>
+	);
+}
+
+export function ShareIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<circle cx="18" cy="5" r="3" />
+			<circle cx="6" cy="12" r="3" />
+			<circle cx="18" cy="19" r="3" />
+			<path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4" />
+		</Icon>
+	);
+}
+
+export function CubeIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M12 2.5 21 7v10l-9 4.5L3 17V7Z" />
+			<path d="m3 7 9 4.5L21 7M12 11.5V21.5" />
+		</Icon>
+	);
+}
+
+export function ServerIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="3" y="4" width="18" height="7" rx="2" />
+			<rect x="3" y="13" width="18" height="7" rx="2" />
+			<path d="M7 7.5h.01M7 16.5h.01M11 7.5h6M11 16.5h6" />
+		</Icon>
+	);
+}
+
+/** Meta 品牌 ∞ 标志（来自 @lobehub/icons，用作应用标识）。 */
+export function MetaIcon(props: IconProps): JSX.Element {
+	return (
+		<svg
+			width={props.size ?? 24}
+			height={props.size ?? 24}
+			viewBox="0 0 24 24"
+			fill="currentColor"
+			aria-hidden="true"
+			{...props}
+		>
+			<title>Meta</title>
+			<path d="M6.897 4c1.915 0 3.516.932 5.43 3.376l.282-.373c.19-.246.383-.484.58-.71l.313-.35C14.588 4.788 15.792 4 17.225 4c1.273 0 2.469.557 3.491 1.516l.218.213c1.73 1.765 2.917 4.71 3.053 8.026l.011.392.002.25c0 1.501-.28 2.759-.818 3.7l-.14.23-.108.153c-.301.42-.664.758-1.086 1.009l-.265.142-.087.04a3.493 3.493 0 01-.302.118 4.117 4.117 0 01-1.33.208c-.524 0-.996-.067-1.438-.215-.614-.204-1.163-.56-1.726-1.116l-.227-.235c-.753-.812-1.534-1.976-2.493-3.586l-1.43-2.41-.544-.895-1.766 3.13-.343.592C7.597 19.156 6.227 20 4.356 20c-1.21 0-2.205-.42-2.936-1.182l-.168-.184c-.484-.573-.837-1.311-1.043-2.189l-.067-.32a8.69 8.69 0 01-.136-1.288L0 14.468c.002-.745.06-1.49.174-2.23l.1-.573c.298-1.53.828-2.958 1.536-4.157l.209-.34c1.177-1.83 2.789-3.053 4.615-3.16L6.897 4zm-.033 2.615l-.201.01c-.83.083-1.606.673-2.252 1.577l-.138.199-.01.018c-.67 1.017-1.185 2.378-1.456 3.845l-.004.022a12.591 12.591 0 00-.207 2.254l.002.188c.004.18.017.36.04.54l.043.291c.092.503.257.908.486 1.208l.117.137c.303.323.698.492 1.17.492 1.1 0 1.796-.676 3.696-3.641l2.175-3.4.454-.701-.139-.198C9.11 7.3 8.084 6.616 6.864 6.616zm10.196-.552l-.176.007c-.635.048-1.223.359-1.82.933l-.196.198c-.439.462-.887 1.064-1.367 1.807l.266.398c.18.274.362.56.55.858l.293.475 1.396 2.335.695 1.114c.583.926 1.03 1.6 1.408 2.082l.213.262c.282.326.529.54.777.673l.102.05c.227.1.457.138.718.138.176.002.35-.023.518-.073.338-.104.61-.32.813-.637l.095-.163.077-.162c.194-.459.29-1.06.29-1.785l-.006-.449c-.08-2.871-.938-5.372-2.2-6.798l-.176-.189c-.67-.683-1.444-1.074-2.27-1.074z" />
+		</svg>
+	);
+}
+
+export function InfoIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<circle cx="12" cy="12" r="9" />
+			<path d="M12 11v5M12 8h.01" />
+		</Icon>
+	);
+}
+
+export function PencilIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="m15 5 4 4M4 20l4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10Z" />
+		</Icon>
+	);
+}
+
+export function ArchiveIcon2(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<rect x="3" y="4" width="18" height="4" rx="1" />
+			<path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" />
+		</Icon>
+	);
+}

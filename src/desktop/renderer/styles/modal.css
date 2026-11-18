@@ -1,0 +1,117 @@
+/* ---------- 信任 / 模态框 ---------- */
+
+.trust-overlay,
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 28px;
+	backdrop-filter: blur(3px);
+}
+
+.trust-card {
+	width: min(600px, 100%);
+	padding: 26px;
+	border: 1px solid var(--line-strong);
+	border-radius: 16px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+}
+
+.trust-icon {
+	width: 44px;
+	height: 44px;
+	display: grid;
+	place-items: center;
+	border-radius: 12px;
+	background: var(--fill-soft);
+	margin-bottom: 12px;
+}
+
+.trust-card h2 {
+	margin: 0 0 6px;
+}
+
+.trust-card p {
+	margin: 0 0 12px;
+	color: var(--text-secondary);
+	font-size: var(--text-ui);
+}
+
+.trust-files {
+	max-height: 180px;
+	overflow: auto;
+	margin: 0 0 16px;
+	padding: 10px 12px 10px 28px;
+	border-radius: 9px;
+	background: var(--code-bg);
+	color: var(--text-secondary);
+	font-size: var(--text-caption);
+	line-height: 1.7;
+}
+
+.trust-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.modal {
+	width: min(760px, 100%);
+	max-height: min(78vh, 760px);
+	overflow: auto;
+	padding: 20px;
+	border: 1px solid var(--line-strong);
+	border-radius: 15px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+}
+
+.modal.review-modal {
+	width: min(820px, 100%);
+}
+
+.modal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 14px;
+}
+
+.modal-head h2,
+.modal-head h3 {
+	margin: 0;
+}
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 16px;
+}
+
+.review-running {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 22px 0;
+	color: var(--text-secondary);
+}
+
+.text-input {
+	width: 100%;
+	height: 36px;
+	border: 1px solid var(--line-strong);
+	border-radius: 8px;
+	background: var(--surface-main);
+	padding: 0 10px;
+	outline: none;
+}
+
+.text-input:focus {
+	border-color: var(--text-faint);
+}
