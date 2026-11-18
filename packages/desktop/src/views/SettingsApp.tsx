@@ -8,25 +8,17 @@ import { call, errorMessage } from "../api/api.ts";
 import { Dropdown } from "../components/Dropdown.tsx";
 import {
 	ArchiveIcon2,
-	BrainIcon,
-	DatabaseIcon,
 	FolderIcon,
 	MaximizeIcon,
 	MinusIcon,
 	MonitorIcon,
 	MoonIcon,
-	PlugIcon,
 	PlusIcon,
-	PuzzleIcon,
 	RestoreIcon,
-	RouteIcon,
 	SearchIcon,
 	SettingsIcon,
-	ShareIcon,
 	SlidersIcon,
-	SparklesIcon,
 	SunIcon,
-	TerminalIcon,
 	XIcon,
 } from "../components/Icons.tsx";
 import { ProvidersTab, WorkspaceTab } from "./SettingsPage.tsx";
@@ -50,27 +42,13 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	},
 	{
 		title: "Agent 能力",
-		items: [
-			["personalize", "个性化", SettingsIcon],
-			["behavior", "行为与工具", SlidersIcon],
-			["memory", "记忆", BrainIcon],
-			["subagents", "子智能体", RouteIcon],
-			["plugins", "插件", PuzzleIcon],
-			["mcp", "MCP 服务器", PlugIcon],
-			["skills", "技能", SparklesIcon],
-			["commands", "命令", TerminalIcon],
-			["hooks", "钩子", RouteIcon],
-		],
+		items: [["personalize", "个性化", SettingsIcon]],
 	},
 	{
 		title: "数据与统计",
 		items: [
 			["workspace", "工作区", FolderIcon],
-			["sync", "数据同步", DatabaseIcon],
-			["usage", "使用统计", ArchiveIcon2],
-			["projects", "项目管理", FolderIcon],
 			["archive", "归档管理", ArchiveIcon2],
-			["share", "分享管理", ShareIcon],
 		],
 	},
 ];
