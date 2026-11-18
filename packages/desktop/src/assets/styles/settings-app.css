@@ -254,7 +254,7 @@
 	border: 1px solid var(--line);
 	border-radius: 10px;
 	background: var(--surface-chrome);
-	overflow: hidden;
+	/* 不用 overflow:hidden，否则内部下拉弹层会被裁切 */
 }
 
 .settings-row {
