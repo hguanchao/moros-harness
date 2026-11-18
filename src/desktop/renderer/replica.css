@@ -313,7 +313,6 @@
 	border-radius: 0;
 	border-top-left-radius: var(--r-surface);
 	background: var(--surface-main);
-	box-shadow: var(--recess-shadow);
 }
 
 .main-bar {
