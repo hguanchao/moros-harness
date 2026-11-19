@@ -12,6 +12,8 @@ export interface DropdownOption {
 	readonly description?: string;
 	/** 分组名；同一分组的连续选项共用一个小标题。 */
 	readonly group?: string;
+	/** 强制显示为选中态；用于一个菜单内同时展示多个维度的当前值。 */
+	readonly selected?: boolean;
 	readonly disabled?: boolean;
 }
 
@@ -45,6 +47,10 @@ export function Dropdown({
 	title,
 	disabled = false,
 	actions = [],
+	keepOpenOnSelect = false,
+	onOpenChange,
+	menuHeader,
+	emptyState,
 }: {
 	readonly value: string;
 	readonly options: readonly DropdownOption[];
@@ -59,6 +65,14 @@ export function Dropdown({
 	readonly disabled?: boolean;
 	/** 选项之后、分割线下方展示的操作项。 */
 	readonly actions?: readonly DropdownAction[];
+	/** 选择选项后保持菜单开启，供两级菜单的第一级切换内容使用。 */
+	readonly keepOpenOnSelect?: boolean;
+	/** 菜单开关状态变化通知；关闭后可用于重置内部层级。 */
+	readonly onOpenChange?: (open: boolean) => void;
+	/** 菜单顶部自定义内容，例如返回上一级的按钮。 */
+	readonly menuHeader?: ReactNode;
+	/** 没有可选项时菜单内的空态内容；不渲染为可聚焦或可勾选的选项。 */
+	readonly emptyState?: ReactNode;
 }): JSX.Element {
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -69,13 +83,18 @@ export function Dropdown({
 		if (!open) return;
 		if (disabled) {
 			setOpen(false);
+			onOpenChange?.(false);
 			return;
 		}
+		const close = (): void => {
+			setOpen(false);
+			onOpenChange?.(false);
+		};
 		const onPointerDown = (event: PointerEvent): void => {
-			if (rootRef.current !== null && !rootRef.current.contains(event.target as Node)) setOpen(false);
+			if (rootRef.current !== null && !rootRef.current.contains(event.target as Node)) close();
 		};
 		const onKeyDown = (event: KeyboardEvent): void => {
-			if (event.key === "Escape") setOpen(false);
+			if (event.key === "Escape") close();
 		};
 		document.addEventListener("pointerdown", onPointerDown);
 		document.addEventListener("keydown", onKeyDown);
@@ -83,7 +102,7 @@ export function Dropdown({
 			document.removeEventListener("pointerdown", onPointerDown);
 			document.removeEventListener("keydown", onKeyDown);
 		};
-	}, [open, disabled]);
+	}, [open, disabled, onOpenChange]);
 
 	const groups = groupOptions(options);
 
@@ -95,7 +114,11 @@ export function Dropdown({
 				aria-haspopup="listbox"
 				aria-expanded={open && !disabled}
 				disabled={disabled}
-				onClick={() => setOpen((previous) => !previous)}
+				onClick={() => {
+					const next = !open;
+					setOpen(next);
+					onOpenChange?.(next);
+				}}
 			>
 				{trigger ?? (
 					<span className="dropdown-label">
@@ -107,27 +130,35 @@ export function Dropdown({
 			</button>
 			{open && !disabled ? (
 				<div className="dropdown-menu" role="listbox">
+					{menuHeader === undefined ? null : <div className="dropdown-menu-header">{menuHeader}</div>}
+					{options.length === 0 && emptyState !== undefined ? emptyState : null}
 					{groups.map((group, groupIndex) => (
 						<div className="dropdown-group" key={group.name ?? groupIndex}>
 							{group.name !== undefined ? <div className="dropdown-group-label">{group.name}</div> : null}
-							{group.items.map((option) => (
-								<button
-									key={option.value}
-									type="button"
-									role="option"
-									data-value={option.value}
-									aria-selected={option.value === value}
-									className={`dropdown-option ${option.value === value ? "is-selected" : ""} ${option.description === undefined ? "" : "has-description"}`}
-									disabled={option.disabled === true}
-									onClick={() => {
-										onChange(option.value);
-										setOpen(false);
-									}}
-								>
-									<DropdownItem icon={option.icon} label={option.label} description={option.description} />
-									{option.value === value ? <CheckIcon size={14} /> : null}
-								</button>
-							))}
+							{group.items.map((option) => {
+								const isSelected = option.value === value || option.selected === true;
+								return (
+									<button
+										key={option.value}
+										type="button"
+										role="option"
+										data-value={option.value}
+										aria-selected={isSelected}
+										className={`dropdown-option ${isSelected ? "is-selected" : ""} ${option.description === undefined ? "" : "has-description"}`}
+										disabled={option.disabled === true}
+										onClick={() => {
+											onChange(option.value);
+											if (!keepOpenOnSelect) {
+												setOpen(false);
+												onOpenChange?.(false);
+											}
+										}}
+									>
+										<DropdownItem icon={option.icon} label={option.label} description={option.description} />
+										{isSelected ? <CheckIcon size={14} /> : null}
+									</button>
+								);
+							})}
 						</div>
 					))}
 					{actions.length > 0 ? (
@@ -140,6 +171,7 @@ export function Dropdown({
 									disabled={action.disabled === true}
 									onClick={() => {
 										setOpen(false);
+										onOpenChange?.(false);
 										action.onSelect();
 									}}
 								>

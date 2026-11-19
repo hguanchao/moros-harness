@@ -9,9 +9,11 @@ import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
 import { ProjectPicker } from "./ProjectPicker.tsx";
 import {
 	ArrowUpIcon,
+	ChevronLeftIcon,
 	ImageIcon,
 	LightbulbIcon,
 	LinkIcon,
+	PlugIcon,
 	PlusIcon,
 	PointerIcon,
 	ShieldAlertIcon,
@@ -384,17 +386,13 @@ export function Composer(): JSX.Element {
 						/>
 					</div>
 					<div className="composer-right">
-						<ModelPicker
+						<ModelEffortPicker
 							model={model}
-							isDraft={current === undefined}
-							disabled={disabled || isSending}
-							onChange={changeModel}
-						/>
-						<EffortPicker
 							effort={effort}
 							isDraft={current === undefined}
 							disabled={disabled || isSending}
-							onChange={(value) => void changeEffort(value)}
+							onModelChange={changeModel}
+							onEffortChange={(value) => void changeEffort(value)}
 						/>
 						{running ? (
 							<button
@@ -423,79 +421,132 @@ export function Composer(): JSX.Element {
 	);
 }
 
-function ModelPicker({
+const EFFORT_OPTIONS: readonly { readonly value: SessionView["effort"]; readonly label: string }[] = [
+	{ value: "off", label: "Off" },
+	{ value: "minimal", label: "Minimal" },
+	{ value: "low", label: "Low" },
+	{ value: "medium", label: "Medium" },
+	{ value: "high", label: "High" },
+	{ value: "max", label: "Max" },
+];
+
+/**
+ * 模型与思考强度合并菜单：第一级选供应商，第二级选模型与思考强度。
+ * 第二级分两组，选择模型或强度后关闭菜单；重新打开总是从供应商列表开始。
+ */
+function ModelEffortPicker({
 	model,
+	effort,
 	isDraft,
 	disabled,
-	onChange,
+	onModelChange,
+	onEffortChange,
 }: {
 	readonly model: SessionView["model"];
+	readonly effort: SessionView["effort"];
 	readonly isDraft: boolean;
 	readonly disabled: boolean;
-	readonly onChange: (value: string) => Promise<void>;
+	readonly onModelChange: (value: string) => Promise<void>;
+	readonly onEffortChange: (value: SessionView["effort"]) => void;
 }): JSX.Element {
 	const { state } = useApp();
+	const [providerName, setProviderName] = useState<string | undefined>();
 	const providers = state.models.providers;
+	const provider = providerName === undefined ? undefined : providers.find((item) => item.name === providerName);
 	const selectedValue = model === undefined ? "" : JSON.stringify([model.provider, model.model]);
-	const label =
+	const modelLabel =
 		model === undefined
 			? "选择模型"
-			: (providers
-					.find((provider) => provider.name === model.provider)
-					?.models.find((entry) => entry.id === model.model)?.name ?? model.model);
-	const options: DropdownOption[] = [{ value: "", label: "选择模型", disabled: true }];
-	for (const provider of providers) {
-		options.push(
-			...provider.models.map((entry) => ({
-				value: JSON.stringify([provider.name, entry.id]),
-				label: entry.name ?? entry.id,
-				group: provider.name,
-			})),
-		);
-	}
+			: (providers.find((item) => item.name === model.provider)?.models.find((entry) => entry.id === model.model)
+					?.name ?? model.model);
+	const label = model === undefined ? "选择模型 · 思考" : `${modelLabel} · ${effortLabel(effort)}`;
+	const title =
+		providers.length === 0
+			? "暂无可用供应商，请先在设置中添加"
+			: isDraft
+				? "模型与思考强度（未选择时使用工作区默认）"
+				: "切换模型与思考强度（同时写入全局默认）";
+
+	useEffect(() => {
+		if (providerName === undefined) return;
+		if (!providers.some((item) => item.name === providerName)) setProviderName(undefined);
+	}, [providers, providerName]);
+
+	const providerOptions: DropdownOption[] = providers.map((item) => ({
+		value: item.name,
+		label: item.name,
+		group: "供应商",
+		selected: item.name === model?.provider,
+	}));
+
+	const modelOptions: DropdownOption[] =
+		provider === undefined
+			? []
+			: provider.models.length === 0
+				? [{ value: "__no_models__", label: "该供应商暂无模型", group: "模型", disabled: true }]
+				: provider.models.map((entry) => {
+						const value = JSON.stringify([provider.name, entry.id]);
+						return {
+							value,
+							label: entry.name ?? entry.id,
+							group: "模型",
+							selected: value === selectedValue,
+						};
+					});
+
+	const effortOptions: DropdownOption[] = EFFORT_OPTIONS.map((option) => ({
+		value: option.value,
+		label: option.label,
+		group: "思考强度",
+		selected: option.value === effort,
+	}));
+
 	return (
 		<Dropdown
 			className="model-picker"
 			variant="inline"
 			disabled={disabled}
-			title={isDraft ? "新任务模型（未选择时使用工作区默认）" : "切换模型（同时写入全局默认）"}
-			value={selectedValue}
-			options={options}
-			placeholder="选择模型"
+			title={title}
+			value={provider === undefined ? (model?.provider ?? "") : selectedValue}
+			options={provider === undefined ? providerOptions : [...modelOptions, ...effortOptions]}
+			emptyState={
+				providers.length === 0 ? (
+					<div className="dropdown-empty">
+						<PlugIcon size={18} />
+						<span className="dropdown-empty-title">暂无可用供应商</span>
+						<span>请先在设置中添加供应商与模型</span>
+					</div>
+				) : undefined
+			}
+			keepOpenOnSelect={provider === undefined}
+			onOpenChange={(open) => {
+				if (!open) setProviderName(undefined);
+			}}
+			menuHeader={
+				provider === undefined ? undefined : (
+					<button
+						type="button"
+						className="dropdown-menu-back"
+						title="返回供应商列表"
+						onClick={() => setProviderName(undefined)}
+					>
+						<ChevronLeftIcon size={13} />
+						<span>{provider.name}</span>
+					</button>
+				)
+			}
 			trigger={<span>{label}</span>}
-			onChange={(value) => void onChange(value)}
-		/>
-	);
-}
-
-function EffortPicker({
-	effort,
-	isDraft,
-	disabled,
-	onChange,
-}: {
-	readonly effort: SessionView["effort"];
-	readonly isDraft: boolean;
-	readonly disabled: boolean;
-	readonly onChange: (value: SessionView["effort"]) => void;
-}): JSX.Element {
-	return (
-		<Dropdown
-			className="effort-picker"
-			variant="inline"
-			disabled={disabled}
-			title={isDraft ? "新任务推理强度（未选择时使用工作区默认）" : "推理强度（同时写入全局默认）"}
-			value={effort}
-			options={[
-				{ value: "off", label: "Off" },
-				{ value: "minimal", label: "Minimal" },
-				{ value: "low", label: "Low" },
-				{ value: "medium", label: "Medium" },
-				{ value: "high", label: "High" },
-				{ value: "max", label: "Max" },
-			]}
-			trigger={<span>{effortLabel(effort)}</span>}
-			onChange={(value) => onChange(value as SessionView["effort"])}
+			onChange={(value) => {
+				if (provider === undefined) {
+					setProviderName(value);
+					return;
+				}
+				if (EFFORT_OPTIONS.some((option) => option.value === value)) {
+					onEffortChange(value as SessionView["effort"]);
+					return;
+				}
+				void onModelChange(value);
+			}}
 		/>
 	);
 }
