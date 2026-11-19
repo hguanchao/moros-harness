@@ -11,7 +11,7 @@ import { TracePage } from "./views/TracePage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useApp } from "./store/state.tsx";
-import { XIcon } from "./components/Icons.tsx";
+import { AlertIcon, InfoIcon, XIcon } from "./components/Icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 
@@ -167,10 +167,11 @@ function Toast({
 	}, [id, level, onDismiss]);
 
 	return (
-		<div className={`toast toast-${level}`}>
-			<span>{message}</span>
-			<button className="icon-button" aria-label="关闭" onClick={onDismiss}>
-				<XIcon size={14} />
+		<div className={`toast toast-${level}`} role={level === "error" ? "alert" : "status"}>
+			<span className="toast-icon">{level === "info" ? <InfoIcon size={15} /> : <AlertIcon size={15} />}</span>
+			<span className="toast-message">{message}</span>
+			<button className="toast-close" aria-label="关闭" onClick={onDismiss}>
+				<XIcon size={13} />
 			</button>
 		</div>
 	);

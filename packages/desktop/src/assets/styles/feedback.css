@@ -1,43 +1,82 @@
 /* ---------- 提示 ---------- */
 
+/* 右上角消息栈：紧贴标题栏下方，最新消息显示在最上方 */
 .toasts {
 	position: fixed;
+	top: 52px;
 	right: 20px;
-	bottom: 20px;
 	z-index: 80;
+	width: min(340px, calc(100vw - 40px));
 	display: flex;
-	flex-direction: column;
+	flex-direction: column-reverse;
 	gap: 8px;
-	max-width: 420px;
+	pointer-events: none;
 }
 
 .toast {
+	width: 100%;
+	pointer-events: auto;
 	display: flex;
 	align-items: flex-start;
-	gap: 12px;
-	padding: 10px 12px;
+	gap: 10px;
+	padding: 11px 12px;
 	border: 1px solid var(--line-strong);
 	border-radius: 10px;
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 	color: var(--text-secondary);
 	font-size: var(--text-small);
+	line-height: 1.5;
 	animation: toast-in 0.18s ease-out;
 }
 
-.toast > span {
-	flex: 1;
-	overflow-wrap: anywhere;
+.toast-icon {
+	flex: none;
+	display: flex;
+	margin-top: 1px;
+	color: var(--text-dim);
 }
 
-.toast-error {
-	border-color: var(--danger);
-	color: var(--danger);
+.toast-info .toast-icon {
+	color: var(--accent);
 }
 
 .toast-warn {
 	border-color: var(--warn);
+}
+
+.toast-warn .toast-icon {
 	color: var(--warn);
+}
+
+.toast-error {
+	border-color: var(--danger);
+}
+
+.toast-error .toast-icon {
+	color: var(--danger);
+}
+
+.toast-message {
+	flex: 1;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.toast-close {
+	width: 22px;
+	height: 22px;
+	flex: none;
+	display: grid;
+	place-items: center;
+	margin: -2px -3px 0 0;
+	border-radius: 5px;
+	color: var(--text-faint);
+}
+
+.toast-close:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
 }
 
 /* ---------- 动画 / 滚动条 ---------- */
@@ -87,7 +126,7 @@
 @keyframes toast-in {
 	from {
 		opacity: 0;
-		transform: translateY(6px);
+		transform: translateY(-6px);
 	}
 	to {
 		opacity: 1;
