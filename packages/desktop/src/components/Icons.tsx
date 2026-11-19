@@ -66,8 +66,8 @@ export function FileIcon(props: IconProps): JSX.Element {
 export function SettingsIcon(props: IconProps): JSX.Element {
 	return (
 		<Icon {...props}>
+			<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915" />
 			<circle cx="12" cy="12" r="3" />
-			<path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" />
 		</Icon>
 	);
 }
@@ -442,13 +442,60 @@ export function ArrowRightIcon(props: IconProps): JSX.Element {
 export function MessagePlusIcon(props: IconProps): JSX.Element {
 	return (
 		<Icon {...props}>
-			<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-			<path d="M12 7v6M9 10h6" />
+			<path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" />
+			<path d="M8 12h8" />
+			<path d="M12 8v8" />
 		</Icon>
 	);
 }
 
 /* 设置导航图标：按纵向列表语义补充，沿用统一 Icon 包装 */
+
+export function SlidersHorizontalIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M10 5H3" />
+			<path d="M12 19H3" />
+			<path d="M14 3v4" />
+			<path d="M16 17v4" />
+			<path d="M21 12h-9" />
+			<path d="M21 19h-5" />
+			<path d="M21 5h-7" />
+			<path d="M8 10v4" />
+			<path d="M8 12H3" />
+		</Icon>
+	);
+}
+
+export function PaletteIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z" />
+			<circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+			<circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+			<circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+			<circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+		</Icon>
+	);
+}
+
+export function UserCogIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M10 15H6a4 4 0 0 0-4 4v2" />
+			<path d="m14.305 16.53.923-.382" />
+			<path d="m15.228 13.852-.923-.383" />
+			<path d="m16.852 12.228-.383-.923" />
+			<path d="m16.852 17.772-.383.924" />
+			<path d="m19.148 12.228.383-.923" />
+			<path d="m19.53 18.696-.382-.924" />
+			<path d="m20.772 13.852.924-.383" />
+			<path d="m20.772 16.148.924.383" />
+			<circle cx="18" cy="15" r="3" />
+			<circle cx="9" cy="7" r="4" />
+		</Icon>
+	);
+}
 
 export function KeyboardIcon(props: IconProps): JSX.Element {
 	return (

@@ -13,11 +13,14 @@ import {
 	MinusIcon,
 	MonitorIcon,
 	MoonIcon,
+	PaletteIcon,
 	PlusIcon,
 	SearchIcon,
 	SettingsIcon,
+	SlidersHorizontalIcon,
 	SlidersIcon,
 	SunIcon,
+	UserCogIcon,
 } from "../components/Icons.tsx";
 import { ProvidersTab, WorkspaceTab } from "./SettingsPage.tsx";
 import { useApp } from "../store/state.tsx";
@@ -33,14 +36,14 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	{
 		title: "常规设置",
 		items: [
-			["general", "常规", SettingsIcon],
-			["appearance", "外观", SunIcon],
+			["general", "常规", SlidersHorizontalIcon],
+			["appearance", "外观", PaletteIcon],
 			["providers", "供应商", SlidersIcon],
 		],
 	},
 	{
 		title: "Agent 能力",
-		items: [["personalize", "个性化", SettingsIcon]],
+		items: [["personalize", "个性化", UserCogIcon]],
 	},
 	{
 		title: "数据与统计",

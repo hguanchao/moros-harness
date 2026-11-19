@@ -37,14 +37,14 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 				<span className="brand-tag">Harness</span>
 			</div>
 
-			<div className="sidebar-body">
-				<div className="side-menu">
-					<button className="menu-row" onClick={actions.newTask}>
-						<MessagePlusIcon size={16} />
-						<span className="menu-label">新建任务</span>
-					</button>
-				</div>
+			<div className="side-menu">
+				<button className="menu-row" onClick={actions.newTask}>
+					<MessagePlusIcon size={16} />
+					<span className="menu-label">新建任务</span>
+				</button>
+			</div>
 
+			<div className="sidebar-body">
 				<div className="workspace-head">
 					<span>任务</span>
 				</div>
@@ -94,13 +94,14 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 			</div>
 			<div className="sidebar-footer">
 				<button
-					className="icon-button"
+					className="settings-button"
 					aria-label="设置"
 					title="设置"
 					disabled={!state.ready}
 					onClick={() => dispatch({ type: "page", page: "settings" })}
 				>
 					<SettingsIcon size={16} />
+					<span>设置</span>
 				</button>
 			</div>
 		</aside>

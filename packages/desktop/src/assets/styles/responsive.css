@@ -30,18 +30,31 @@
 	flex: none;
 	display: flex;
 	align-items: center;
-	justify-content: flex-end;
 	padding: 8px 12px;
 	border-top: 1px solid var(--line);
 }
 
-.sidebar-footer .icon-button {
-	width: 28px;
-	height: 28px;
-	color: var(--text-dim);
+.sidebar-footer .settings-button {
+	width: 100%;
+	min-height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+	padding: 0 10px;
+	border-radius: 9px;
+	background: transparent;
+	color: var(--text-secondary);
+	font-size: var(--text-ui);
+	text-align: center;
 }
 
-.sidebar-footer .icon-button:hover:not(:disabled) {
-	background: var(--fill-soft);
+.sidebar-footer .settings-button:hover:not(:disabled) {
+	background: var(--fill-hover);
 	color: var(--text-primary);
+}
+
+.sidebar-footer .settings-button > svg {
+	flex: none;
+	color: var(--text-dim);
 }

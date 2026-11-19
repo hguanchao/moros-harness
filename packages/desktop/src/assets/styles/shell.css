@@ -162,10 +162,6 @@
 	white-space: nowrap;
 }
 
-.sidebar-footer {
-	gap: 4px;
-}
-
 .project-name {
 	flex: 1;
 	min-width: 0;
