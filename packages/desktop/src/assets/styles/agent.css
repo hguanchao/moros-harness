@@ -52,7 +52,7 @@
 }
 
 .tool-group-head:hover {
-	background: var(--fill-soft);
+	background: var(--fill-hover);
 	color: var(--text-primary);
 }
 
@@ -94,7 +94,7 @@
 }
 
 .tool-row-main:hover {
-	background: var(--fill-soft);
+	background: var(--fill-hover);
 	color: var(--text-primary);
 }
 

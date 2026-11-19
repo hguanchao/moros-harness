@@ -10,7 +10,7 @@ function Icon({ size = 16, children, ...props }: IconProps & { children: ReactNo
 			viewBox="0 0 24 24"
 			fill="none"
 			stroke="currentColor"
-			strokeWidth="1.7"
+			strokeWidth="2"
 			strokeLinecap="round"
 			strokeLinejoin="round"
 			aria-hidden="true"
@@ -118,6 +118,15 @@ export function SparklesIcon(props: IconProps): JSX.Element {
 		<Icon {...props}>
 			<path d="m12 3 1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8Z" />
 			<path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8Z" />
+		</Icon>
+	);
+}
+
+export function LightbulbIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5" />
+			<path d="M9 18h6M10 22h4" />
 		</Icon>
 	);
 }
@@ -376,10 +385,56 @@ export function ShieldIcon(props: IconProps): JSX.Element {
 	);
 }
 
+export function PointerIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M22 14a8 8 0 0 1-8 8" />
+			<path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2" />
+			<path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1" />
+			<path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10" />
+			<path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+		</Icon>
+	);
+}
+
+export function ShieldCheckIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.49 20.5 4 18 4 13V5a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 2.8 17 4 19 4a1 1 0 0 1 1 1Z" />
+			<path d="m9 12 2 2 4-4" />
+		</Icon>
+	);
+}
+
+export function ShieldAlertIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67 0C7.49 20.5 4 18 4 13V5a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 2.8 17 4 19 4a1 1 0 0 1 1 1Z" />
+			<path d="M12 8v4M12 16h.01" />
+		</Icon>
+	);
+}
+
 export function ArrowUpIcon(props: IconProps): JSX.Element {
 	return (
 		<Icon {...props}>
 			<path d="M12 19V5M5 12l7-7 7 7" />
+		</Icon>
+	);
+}
+
+export function ArrowLeftIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M19 12H5M12 19l-7-7 7-7" />
+		</Icon>
+	);
+}
+
+export function ArrowRightIcon(props: IconProps): JSX.Element {
+	return (
+		<Icon {...props}>
+			<path d="M5 12h14M12 5l7 7-7 7" />
 		</Icon>
 	);
 }

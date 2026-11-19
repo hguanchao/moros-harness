@@ -405,7 +405,7 @@
 }
 
 .trace-step:hover {
-	background: var(--fill-soft);
+	background: var(--fill-hover);
 }
 
 .trace-step.is-selected {
@@ -602,11 +602,11 @@
 }
 
 .session-table-row:hover {
-	background: var(--fill-soft);
+	background: var(--fill-hover);
 }
 
 .session-table-row.is-current {
-	background: var(--fill-soft);
+	background: var(--row-selected);
 }
 
 .session-table-title {

@@ -33,9 +33,31 @@
 	color: var(--text-primary);
 }
 
-/* 无项目欢迎页没有侧栏，隐藏侧栏开关 */
-.app[data-has-project="false"] .titlebar-toggle {
-	display: none;
+/* 顶栏导航：后退 / 前进 / 搜索占位 */
+.titlebar-nav {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	margin-left: 4px;
+}
+
+.titlebar-action {
+	width: 26px;
+	height: 26px;
+	display: grid;
+	place-items: center;
+	border-radius: 6px;
+	color: var(--text-muted);
+}
+
+.titlebar-action:hover:not(:disabled) {
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.titlebar-action:disabled {
+	opacity: 0.35;
+	cursor: default;
 }
 
 .caption-group {
@@ -165,7 +187,7 @@
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
-	font-size: var(--text-ui);
+	font-size: var(--text-title);
 }
 
 .menu-row:hover:not(:disabled) {
@@ -194,6 +216,11 @@
 	padding: 0 8px;
 	color: var(--text-dim);
 	font-size: var(--text-ui);
+	font-weight: var(--weight-semibold);
+}
+
+.task-list .session-row {
+	padding-left: 8px;
 }
 
 .project-group {

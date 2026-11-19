@@ -140,6 +140,20 @@ function createWindow(
 	contents.on("render-process-gone", (_event, details) => {
 		dialog.showErrorBox("Moros Harness renderer stopped", `Reason: ${details.reason}`);
 	});
+	if (process.env.ELECTRON_RENDERER_URL !== undefined) {
+		// 开发态保留菜单是空的，补一个 DevTools 快捷键并记录加载失败，避免白屏无日志。
+		contents.on("before-input-event", (event, input) => {
+			const isDevToolsKey =
+				input.type === "keyDown" &&
+				(input.key === "F12" || (input.control && input.shift && input.key.toLowerCase() === "i"));
+			if (!isDevToolsKey) return;
+			event.preventDefault();
+			contents.toggleDevTools();
+		});
+		contents.on("did-fail-load", (_event, code, description, url) => {
+			console.error(`[desktop] renderer failed to load: ${description} (${code}) ${url}`);
+		});
+	}
 	return window;
 }
 

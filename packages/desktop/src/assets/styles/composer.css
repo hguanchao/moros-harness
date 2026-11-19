@@ -25,6 +25,76 @@
 	box-shadow: 0 4px 16px var(--shadow-soft);
 }
 
+/* 新任务的项目关联入口固定在输入框左上角 */
+.composer-project {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 2px 2px 6px;
+}
+
+.branch-picker .dropdown-trigger {
+	max-width: 180px;
+}
+
+.branch-picker .dropdown-trigger > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.branch-picker .dropdown-menu {
+	min-width: 200px;
+	max-height: 280px;
+	overflow-y: auto;
+}
+
+.project-picker-wrap {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+}
+
+.project-picker .dropdown-trigger > svg:first-child {
+	transition: opacity 0.12s ease;
+}
+
+/* 已选择项目时，悬停或聚焦把文件夹图标换成取消按钮 */
+.project-picker-wrap.has-project:not(.is-disabled):hover .project-picker .dropdown-trigger > svg:first-child,
+.project-picker-wrap.has-project:not(.is-disabled):focus-within .project-picker .dropdown-trigger > svg:first-child {
+	opacity: 0;
+}
+
+.project-clear {
+	position: absolute;
+	left: 0;
+	top: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	padding: 0;
+	border: none;
+	background: transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.12s ease;
+}
+
+.project-picker-wrap.has-project:not(.is-disabled):hover .project-clear,
+.project-picker-wrap.has-project:not(.is-disabled):focus-within .project-clear {
+	opacity: 1;
+	pointer-events: auto;
+}
+
+.project-clear:hover {
+	color: var(--text-primary);
+}
+
 .composer .composer-input {
 	display: block;
 	width: 100%;
@@ -173,28 +243,34 @@
 	color: var(--text-muted);
 }
 
-.plan-control {
-	display: flex;
-	align-items: center;
-	gap: 5px;
-	height: 28px;
-	padding: 0 8px;
-	border: none;
+/* 计划模式用淡色强调，区别于普通权限档位；颜色过渡不循环 */
+.permission.dropdown-inline .dropdown-trigger {
+	padding: 0 6px;
 	border-radius: 7px;
-	background: transparent;
-	color: var(--text-faint);
-	font-size: var(--text-ui);
-	white-space: nowrap;
+	transition:
+		background-color 0.12s ease,
+		color 0.12s ease;
 }
 
-.plan-control:hover:not(:disabled) {
+.permission.is-plan.dropdown-inline .dropdown-trigger {
 	background: var(--fill-soft);
-	color: var(--text-primary);
+	color: var(--accent);
 }
 
-.plan-control.is-active {
-	background: var(--fill-soft);
-	color: var(--text-primary);
+.permission.is-plan .dropdown-trigger > svg:last-child {
+	color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.permission.dropdown-inline .dropdown-trigger {
+		transition: none;
+	}
+}
+
+/* 权限菜单固定宽度：默认字号 240px，并随界面字号缩放 */
+.permission .dropdown-menu {
+	width: calc(15rem * var(--ui-scale));
+	max-width: calc(100vw - 32px);
 }
 
 .send-button {

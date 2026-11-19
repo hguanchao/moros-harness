@@ -1,34 +1,60 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type JSX } from "react";
 
+import type { SettingsSnapshot } from "@moros/core/config/settings.ts";
+import type { ModelCatalog } from "@moros/core/core.ts";
 import type { PreparedImage, SessionView } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
+import { currentNavigationEpoch, useDesktopActions } from "../hooks/actions.ts";
 import { Dropdown, type DropdownOption } from "./Dropdown.tsx";
-import { ArrowUpIcon, ImageIcon, LinkIcon, PlusIcon, ShieldIcon, SparklesIcon, StopIcon, XIcon } from "./Icons.tsx";
+import { ProjectPicker } from "./ProjectPicker.tsx";
+import {
+	ArrowUpIcon,
+	ImageIcon,
+	LightbulbIcon,
+	LinkIcon,
+	PlusIcon,
+	PointerIcon,
+	ShieldAlertIcon,
+	ShieldCheckIcon,
+	StopIcon,
+	XIcon,
+} from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
+import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
-const MAX_IMAGES = 8;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-/** 输入框与运行控制；审批卡、信任页由 ChatPage 负责，避免输入组件知道所有业务状态。 */
+/** 输入框与首发/运行控制；信任页由 ChatPage 负责，新任务首次有效发送才创建会话。 */
 export function Composer(): JSX.Element {
 	const { state, dispatch } = useApp();
+	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
-	const [text, setText] = useState("");
-	const [images, setImages] = useState<readonly PreparedImage[]>([]);
-	const [sending, setSending] = useState(false);
+	const { text, images } = state.draft;
+	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
 	const [showUrlInput, setShowUrlInput] = useState(false);
 	const [imageUrl, setImageUrl] = useState("");
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
-
-	const trustBlocked = project?.trust.required === true && project.trust.decision === null;
+	const isSubmitting = useRef(false);
+	const platform = state.app?.platform ?? "win32";
+	const isDraftPrepared =
+		state.draftWorkspace !== undefined &&
+		workspaceTargetsMatch(state.draftWorkspace, workspaceTarget(state.draft.project), platform);
+	const trustBlocked =
+		(current !== undefined || isDraftPrepared) && project?.trust.required === true && project.trust.decision === null;
 	const readOnly = current?.readOnly === true;
 	const running =
 		current?.running === true || (current !== undefined && state.runStates[current.meta.id] === "running");
-	const disabled = current === undefined || project === undefined || readOnly || trustBlocked;
-	const canSend = !disabled && !sending && (text.trim().length > 0 || images.length > 0);
+	const disabled = !state.ready || state.isNavigating || readOnly || trustBlocked;
+	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
+	const model =
+		current === undefined ? (state.draft.model ?? configuredModel(state.models, state.settings)) : current.model;
+	const effort = current?.effort ?? state.draft.effort ?? state.settings?.config.reasoningEffort ?? "off";
+	const approval = current?.approval ?? state.draft.approval ?? state.settings?.config.approval ?? "ask";
+	const plan = current?.plan ?? state.draft.plan;
 
 	useEffect(() => {
 		const element = textarea.current;
@@ -38,68 +64,99 @@ export function Composer(): JSX.Element {
 	}, [text]);
 
 	useEffect(() => {
-		if (disabled) return;
-		textarea.current?.focus();
-	}, [current?.meta.id, disabled]);
+		if (!disabled) textarea.current?.focus();
+	}, [current?.meta.id, state.draftGeneration, disabled]);
+
+	const report = (error: unknown): void => {
+		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+	};
 
 	const send = async (): Promise<void> => {
-		if (current === undefined || disabled || sending) return;
+		if (disabled || isSending || isSubmitting.current) return;
 		const message = text.trim();
 		if (message.length === 0 && images.length === 0) return;
-		setSending(true);
+		const epoch = currentNavigationEpoch();
+		const generation = state.draftGeneration;
+		const revision = state.draftRevision;
+		const imageIds = images.map((image) => image.id);
+		isSubmitting.current = true;
+		dispatch({ type: "sending", isSending: true });
 		try {
+			let session = current;
+			if (session === undefined) {
+				const draftProject = state.draft.project;
+				const draftBranch = state.draft.branch;
+				const target = workspaceTarget(draftProject);
+				const prepared = await actions.prepareTask(target, generation);
+				if (prepared === undefined || epoch !== currentNavigationEpoch()) return;
+				if (prepared.trust.required && prepared.trust.decision === null) {
+					dispatch({ type: "notice", level: "info", message: "请确认工作区信任后再次发送，输入已保留" });
+					return;
+				}
+				if (draftProject !== null && draftBranch !== undefined) {
+					await call(window.moros.gitCheckout(draftProject.root, draftBranch));
+					if (epoch !== currentNavigationEpoch()) return;
+				}
+				const context = await actions.createTask(
+					{
+						target,
+						...(state.draft.model === undefined ? {} : { model: state.draft.model }),
+						...(state.draft.effort === undefined ? {} : { effort: state.draft.effort }),
+						...(state.draft.approval === undefined ? {} : { approval: state.draft.approval }),
+						plan: state.draft.plan,
+					},
+					generation,
+				);
+				if (context === undefined || epoch !== currentNavigationEpoch()) return;
+				session = context.session;
+			}
 			const result = await call(
 				window.moros.chatSend({
-					sessionId: current.meta.id,
+					sessionId: session.meta.id,
 					text: message,
-					...(images.length === 0 ? {} : { imageIds: images.map((image) => image.id) }),
+					...(imageIds.length === 0 ? {} : { imageIds }),
 				}),
 			);
-			setText("");
-			setImages([]);
+			dispatch({ type: "draft-sent", generation, revision, imageIds });
 			if (result.queued) {
 				dispatch({ type: "notice", level: "info", message: "已加入队列，当前回合结束后自动发送" });
 			}
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			report(error);
 		} finally {
-			setSending(false);
+			isSubmitting.current = false;
+			dispatch({ type: "sending", isSending: false });
 		}
+	};
+
+	const addImage = (image: PreparedImage, generation: number): void => {
+		dispatch({ type: "draft-image-added", image, generation });
 	};
 
 	const attach = async (): Promise<void> => {
 		setAttachMenu(false);
+		const generation = state.draftGeneration;
 		try {
 			const image = await call(window.moros.imagesPick());
-			if (image !== null) addImage(image);
+			if (image !== null) addImage(image, generation);
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			report(error);
 		}
 	};
 
-	const addImage = (image: PreparedImage): void => {
-		setImages((existing) => {
-			if (existing.length >= MAX_IMAGES) {
-				dispatch({ type: "notice", level: "warn", message: `最多附加 ${MAX_IMAGES} 张图片` });
-				return existing;
-			}
-			if (existing.some((entry) => entry.id === image.id)) return existing;
-			return [...existing, image];
-		});
-	};
-
 	const addFiles = async (files: FileList | readonly File[]): Promise<void> => {
+		const generation = state.draftGeneration;
 		for (const file of Array.from(files)) {
 			if (!file.type.startsWith("image/")) continue;
-			if (file.size > 8 * 1024 * 1024) {
+			if (file.size > MAX_IMAGE_BYTES) {
 				dispatch({ type: "notice", level: "warn", message: `${file.name} 超过单张图片上限` });
 				continue;
 			}
 			try {
 				const bytes = new Uint8Array(await file.arrayBuffer());
-				addImage(await call(window.moros.imagesFromBytes(bytes, file.type)));
+				addImage(await call(window.moros.imagesFromBytes(bytes, file.type)), generation);
 			} catch (error) {
-				dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+				report(error);
 			}
 		}
 	};
@@ -107,12 +164,13 @@ export function Composer(): JSX.Element {
 	const addImageUrl = async (): Promise<void> => {
 		const url = imageUrl.trim();
 		if (url.length === 0) return;
+		const generation = state.draftGeneration;
 		try {
-			addImage(await call(window.moros.imagesFromUrl(url)));
+			addImage(await call(window.moros.imagesFromUrl(url)), generation);
 			setImageUrl("");
 			setShowUrlInput(false);
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			report(error);
 		}
 	};
 
@@ -126,16 +184,52 @@ export function Composer(): JSX.Element {
 	const onDrop = (event: DragEvent<HTMLDivElement>): void => {
 		event.preventDefault();
 		setDragging(false);
-		if (event.dataTransfer.files.length > 0) void addFiles(event.dataTransfer.files);
+		if (!disabled && event.dataTransfer.files.length > 0) void addFiles(event.dataTransfer.files);
 	};
 
 	const changeModel = async (value: string): Promise<void> => {
-		try {
-			const [provider, model] = JSON.parse(value) as [string, string];
-			await call(window.moros.sessionSelectModel(provider, model));
-		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+		const selected = state.models.providers
+			.flatMap((provider) => provider.models.map((entry) => ({ provider: provider.name, model: entry.id })))
+			.find((entry) => JSON.stringify([entry.provider, entry.model]) === value);
+		if (selected === undefined) {
+			report(new Error("所选模型已不可用，请重新选择"));
+			return;
 		}
+		try {
+			if (current === undefined) dispatch({ type: "draft-options", options: { model: selected } });
+			else await call(window.moros.sessionSelectModel(selected.provider, selected.model));
+		} catch (error) {
+			report(error);
+		}
+	};
+
+	const changeEffort = async (value: SessionView["effort"]): Promise<void> => {
+		try {
+			if (current === undefined) dispatch({ type: "draft-options", options: { effort: value } });
+			else await call(window.moros.sessionSelectEffort(value));
+		} catch (error) {
+			report(error);
+		}
+	};
+
+	// 权限项与计划模式互斥：选择任一审批档位会退出计划模式。
+	const changeApproval = async (value: SessionView["approval"]): Promise<void> => {
+		try {
+			if (current === undefined) {
+				dispatch({ type: "draft-options", options: { approval: value, plan: false } });
+				return;
+			}
+			if (plan) await call(window.moros.sessionSetPlan(false));
+			await call(window.moros.sessionSelectApproval(value));
+		} catch (error) {
+			report(error);
+		}
+	};
+
+	const selectPlan = (): void => {
+		if (plan) return;
+		if (current === undefined) dispatch({ type: "draft-options", options: { plan: true } });
+		else void call(window.moros.sessionSetPlan(true)).catch(report);
 	};
 
 	return (
@@ -143,7 +237,7 @@ export function Composer(): JSX.Element {
 			className={`composer-wrap ${dragging ? "is-dragging" : ""}`}
 			onDragOver={(event) => {
 				event.preventDefault();
-				setDragging(true);
+				if (!disabled) setDragging(true);
 			}}
 			onDragLeave={() => setDragging(false)}
 			onDrop={onDrop}
@@ -156,9 +250,7 @@ export function Composer(): JSX.Element {
 					<button
 						className="ghost-button small"
 						onClick={() => {
-							void window.moros.chatClearQueue().catch((error: unknown) => {
-								dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-							});
+							void call(window.moros.chatClearQueue()).catch(report);
 						}}
 					>
 						清空
@@ -167,6 +259,11 @@ export function Composer(): JSX.Element {
 			) : null}
 
 			<div className="composer">
+				{current === undefined ? (
+					<div className="composer-project">
+						<ProjectPicker />
+					</div>
+				) : null}
 				{showUrlInput ? (
 					<div className="url-attach">
 						<LinkIcon size={14} />
@@ -201,7 +298,6 @@ export function Composer(): JSX.Element {
 						</button>
 					</div>
 				) : null}
-
 				{images.length > 0 ? (
 					<div className="attachments">
 						{images.map((image) => (
@@ -210,7 +306,7 @@ export function Composer(): JSX.Element {
 								<button
 									className="attachment-remove"
 									aria-label="移除图片"
-									onClick={() => setImages((existing) => existing.filter((entry) => entry.id !== image.id))}
+									onClick={() => dispatch({ type: "draft-image-removed", id: image.id })}
 								>
 									<XIcon size={12} />
 								</button>
@@ -232,11 +328,10 @@ export function Composer(): JSX.Element {
 								? "该会话正在另一个窗口中使用，当前为只读"
 								: "描述你的任务，/调用指令，@文件或对话"
 					}
-					onChange={(event) => setText(event.target.value)}
+					onChange={(event) => dispatch({ type: "draft-text", text: event.target.value })}
 					onPaste={onPaste}
 					onKeyDown={(event) => {
-						if (event.key !== "Enter" || event.shiftKey) return;
-						if ((event.nativeEvent as KeyboardEvent).isComposing) return;
+						if (event.key !== "Enter" || event.shiftKey || (event.nativeEvent as KeyboardEvent).isComposing) return;
 						event.preventDefault();
 						void send();
 					}}
@@ -279,32 +374,34 @@ export function Composer(): JSX.Element {
 								</>
 							) : null}
 						</div>
-						{current !== undefined ? <ApprovalPicker current={current} /> : null}
-						{current !== undefined ? (
-							<button
-								className={`plan-control ${current.plan ? "is-active" : ""}`}
-								disabled={running}
-								title="只读规划：模型只探索并提交计划"
-								onClick={() => {
-									void call(window.moros.sessionSetPlan(!current.plan)).catch((error: unknown) => {
-										dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-									});
-								}}
-							>
-								<SparklesIcon size={15} />
-								<span>{current.plan ? "计划模式" : "计划"}</span>
-							</button>
-						) : null}
+						<ApprovalPicker
+							approval={approval}
+							plan={plan}
+							disabled={disabled || isSending}
+							planDisabled={running || disabled || isSending}
+							onChange={(value) => void changeApproval(value)}
+							onSelectPlan={selectPlan}
+						/>
 					</div>
 					<div className="composer-right">
-						{current !== undefined ? <ModelPicker current={current} onChange={changeModel} /> : null}
-						{current !== undefined ? <EffortPicker current={current} /> : null}
+						<ModelPicker
+							model={model}
+							isDraft={current === undefined}
+							disabled={disabled || isSending}
+							onChange={changeModel}
+						/>
+						<EffortPicker
+							effort={effort}
+							isDraft={current === undefined}
+							disabled={disabled || isSending}
+							onChange={(value) => void changeEffort(value)}
+						/>
 						{running ? (
 							<button
 								className="stop-button"
 								title="停止当前回合"
 								onClick={() => {
-									void window.moros.chatAbort();
+									void call(window.moros.chatAbort()).catch(report);
 								}}
 							>
 								<StopIcon size={16} />
@@ -313,7 +410,7 @@ export function Composer(): JSX.Element {
 						<button
 							className={`send-button ${canSend ? "is-ready" : ""}`}
 							title={running ? "加入队列" : "发送"}
-							disabled={disabled || sending}
+							disabled={disabled || isSending}
 							onClick={() => void send()}
 						>
 							<ArrowUpIcon size={19} />
@@ -327,28 +424,31 @@ export function Composer(): JSX.Element {
 }
 
 function ModelPicker({
-	current,
+	model,
+	isDraft,
+	disabled,
 	onChange,
 }: {
-	readonly current: SessionView;
+	readonly model: SessionView["model"];
+	readonly isDraft: boolean;
+	readonly disabled: boolean;
 	readonly onChange: (value: string) => Promise<void>;
 }): JSX.Element {
 	const { state } = useApp();
 	const providers = state.models.providers;
-	const selected = current.model;
-	const selectedValue = selected === undefined ? "" : JSON.stringify([selected.provider, selected.model]);
+	const selectedValue = model === undefined ? "" : JSON.stringify([model.provider, model.model]);
 	const label =
-		selected === undefined
+		model === undefined
 			? "选择模型"
 			: (providers
-					.find((provider) => provider.name === selected.provider)
-					?.models.find((model) => model.id === selected.model)?.name ?? selected.model);
+					.find((provider) => provider.name === model.provider)
+					?.models.find((entry) => entry.id === model.model)?.name ?? model.model);
 	const options: DropdownOption[] = [{ value: "", label: "选择模型", disabled: true }];
 	for (const provider of providers) {
 		options.push(
-			...provider.models.map((model) => ({
-				value: JSON.stringify([provider.name, model.id]),
-				label: model.name ?? model.id,
+			...provider.models.map((entry) => ({
+				value: JSON.stringify([provider.name, entry.id]),
+				label: entry.name ?? entry.id,
 				group: provider.name,
 			})),
 		);
@@ -357,28 +457,35 @@ function ModelPicker({
 		<Dropdown
 			className="model-picker"
 			variant="inline"
-			title="切换模型（同时写入全局默认）"
+			disabled={disabled}
+			title={isDraft ? "新任务模型（未选择时使用工作区默认）" : "切换模型（同时写入全局默认）"}
 			value={selectedValue}
 			options={options}
 			placeholder="选择模型"
-			trigger={
-				<>
-					<span>{label}</span>
-				</>
-			}
+			trigger={<span>{label}</span>}
 			onChange={(value) => void onChange(value)}
 		/>
 	);
 }
 
-function EffortPicker({ current }: { readonly current: SessionView }): JSX.Element {
-	const { dispatch } = useApp();
+function EffortPicker({
+	effort,
+	isDraft,
+	disabled,
+	onChange,
+}: {
+	readonly effort: SessionView["effort"];
+	readonly isDraft: boolean;
+	readonly disabled: boolean;
+	readonly onChange: (value: SessionView["effort"]) => void;
+}): JSX.Element {
 	return (
 		<Dropdown
 			className="effort-picker"
 			variant="inline"
-			title="推理强度（同时写入全局默认）"
-			value={current.effort}
+			disabled={disabled}
+			title={isDraft ? "新任务推理强度（未选择时使用工作区默认）" : "推理强度（同时写入全局默认）"}
+			value={effort}
 			options={[
 				{ value: "off", label: "Off" },
 				{ value: "minimal", label: "Minimal" },
@@ -387,48 +494,98 @@ function EffortPicker({ current }: { readonly current: SessionView }): JSX.Eleme
 				{ value: "high", label: "High" },
 				{ value: "max", label: "Max" },
 			]}
-			trigger={<span>{effortLabel(current.effort)}</span>}
-			onChange={(effort) => {
-				void call(window.moros.sessionSelectEffort(effort as SessionView["effort"])).catch((error: unknown) =>
-					dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
-				);
-			}}
+			trigger={<span>{effortLabel(effort)}</span>}
+			onChange={(value) => onChange(value as SessionView["effort"])}
 		/>
 	);
 }
 
-function ApprovalPicker({ current }: { readonly current: SessionView }): JSX.Element {
-	const { dispatch } = useApp();
+function ApprovalPicker({
+	approval,
+	plan,
+	disabled,
+	planDisabled,
+	onChange,
+	onSelectPlan,
+}: {
+	readonly approval: SessionView["approval"];
+	readonly plan: boolean;
+	readonly disabled: boolean;
+	readonly planDisabled: boolean;
+	readonly onChange: (value: SessionView["approval"]) => void;
+	readonly onSelectPlan: () => void;
+}): JSX.Element {
 	return (
 		<Dropdown
-			className="permission"
+			className={`permission ${plan ? "is-plan" : ""}`}
 			variant="inline"
-			title="审批档位（仅本会话，不回写配置）"
-			value={current.approval}
+			title="权限模式（仅本会话，不回写配置）"
+			disabled={disabled}
+			value={plan ? "plan" : approval}
 			options={[
-				{ value: "ask", label: "每次确认" },
-				{ value: "auto", label: "自动审批" },
-				{ value: "yolo", label: "全部放行" },
+				{
+					value: "ask",
+					label: "每次确认",
+					description: "每次操作前都询问你",
+					icon: <PointerIcon size={14} />,
+				},
+				{
+					value: "auto",
+					label: "自动审批",
+					description: "低中风险自动放行高风险先审查",
+					icon: <ShieldCheckIcon size={14} />,
+				},
+				{
+					value: "yolo",
+					label: "完全访问",
+					description: "不再询问但危险命令仍会被拦截",
+					icon: <ShieldAlertIcon size={14} />,
+				},
+			]}
+			actions={[
+				{
+					label: "计划模式",
+					description: "只探索并提交计划不修改文件",
+					icon: <LightbulbIcon size={14} />,
+					selected: plan,
+					disabled: planDisabled,
+					onSelect: onSelectPlan,
+				},
 			]}
 			trigger={
 				<>
-					<ShieldIcon size={16} />
-					<span>{approvalLabel(current.approval)}</span>
+					{plan ? <LightbulbIcon size={16} /> : approvalIcon(approval)}
+					<span>{plan ? "计划模式" : approvalLabel(approval)}</span>
 				</>
 			}
-			onChange={(approval) => {
-				void call(window.moros.sessionSelectApproval(approval as SessionView["approval"])).catch((error: unknown) =>
-					dispatch({ type: "notice", level: "error", message: errorMessage(error) }),
-				);
-			}}
+			onChange={(value) => onChange(value as SessionView["approval"])}
 		/>
 	);
+}
+
+function configuredModel(catalog: ModelCatalog, settings: SettingsSnapshot | undefined): SessionView["model"] {
+	const configured = settings?.config.model;
+	if (configured === undefined) return undefined;
+	for (const provider of catalog.providers) {
+		if (settings?.config.provider !== undefined && settings.config.provider !== provider.name) continue;
+		const model = provider.models.find(
+			(entry) => entry.id === configured || `${provider.name}/${entry.id}` === configured,
+		);
+		if (model !== undefined) return { provider: provider.name, model: model.id };
+	}
+	return undefined;
 }
 
 function approvalLabel(mode: SessionView["approval"]): string {
 	if (mode === "ask") return "每次确认";
 	if (mode === "auto") return "自动审批";
-	return "全部放行";
+	return "完全访问";
+}
+
+function approvalIcon(mode: SessionView["approval"]): JSX.Element {
+	if (mode === "ask") return <PointerIcon size={16} />;
+	if (mode === "auto") return <ShieldCheckIcon size={16} />;
+	return <ShieldAlertIcon size={16} />;
 }
 
 function effortLabel(effort: SessionView["effort"]): string {

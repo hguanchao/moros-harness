@@ -7,10 +7,47 @@ import { SessionBusyError } from "@moros/core/session/session-lease.ts";
 import type { ApprovalDecision } from "@moros/core/harness/types.ts";
 import type { ProviderDraft } from "@moros/core/config/settings.ts";
 import type { DesktopHost } from "./core-host.ts";
-import { IPC, type RpcError, type RpcResult, type SessionListQuery, type WindowState } from "../shared/contract.ts";
+import {
+	IPC,
+	type RpcError,
+	type RpcResult,
+	type SessionCreateInput,
+	type SessionListQuery,
+	type WindowState,
+} from "../shared/contract.ts";
+import { DesktopGitError } from "./_git.ts";
+import { DesktopWorkspaceError } from "./_workspace.ts";
+
+const WorkspaceTargetSchema = z.discriminatedUnion("kind", [
+	z.object({ kind: z.literal("tasks") }).strict(),
+	z.object({ kind: z.literal("project"), root: z.string().min(1).max(4096) }).strict(),
+]);
+const ReasoningEffortSchema = z.enum(["off", "minimal", "low", "medium", "high", "max"]);
+const ApprovalModeSchema = z.enum(["ask", "auto", "yolo"]);
+
+const SessionCreateInputSchema = z
+	.object({
+		target: WorkspaceTargetSchema,
+		model: z
+			.object({ provider: z.string().min(1).max(200), model: z.string().min(1).max(500) })
+			.strict()
+			.optional(),
+		effort: ReasoningEffortSchema.optional(),
+		approval: ApprovalModeSchema.optional(),
+		plan: z.boolean().optional(),
+	})
+	.strict()
+	.transform((input): SessionCreateInput => ({
+		target: input.target,
+		...(input.model === undefined ? {} : { model: input.model }),
+		...(input.effort === undefined ? {} : { effort: input.effort }),
+		...(input.approval === undefined ? {} : { approval: input.approval }),
+		...(input.plan === undefined ? {} : { plan: input.plan }),
+	}));
 
 const SessionListQuerySchema = z
 	.object({
+		target: WorkspaceTargetSchema.optional(),
 		query: z.string().max(200).optional(),
 		includeArchived: z.boolean().optional(),
 		cursor: z.number().int().nonnegative().optional(),
@@ -38,6 +75,20 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.appState, getWindow, z.tuple([]), () => host.initialize());
 	handle(IPC.appOpenProjectDialog, getWindow, z.tuple([]), () => host.openProjectDialog());
 	handle(IPC.appOpenProject, getWindow, z.tuple([z.string().min(1).max(4096)]), ([path]) => host.openProject(path));
+	handle(IPC.appSelectProjectDialog, getWindow, z.tuple([]), () => host.selectProjectDialog());
+	handle(IPC.appCreateProjectDialog, getWindow, z.tuple([z.string().min(1).max(255)]), ([name]) =>
+		host.createProjectDialog(name),
+	);
+	handle(IPC.workspacePrepare, getWindow, z.tuple([WorkspaceTargetSchema]), ([target]) =>
+		host.prepareWorkspace(target),
+	);
+	handle(IPC.gitBranches, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) => host.gitBranches(root));
+	handle(
+		IPC.gitCheckout,
+		getWindow,
+		z.tuple([z.string().min(1).max(4096), z.string().min(1).max(255)]),
+		([root, branch]) => host.checkoutBranch(root, branch),
+	);
 	handle(IPC.appOpenExternal, getWindow, z.tuple([z.string().url().max(4096)]), ([url]) => host.openExternal(url));
 
 	handle(IPC.windowMinimize, getWindow, z.tuple([]), () => {
@@ -62,7 +113,7 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.sessionsList, getWindow, z.tuple([SessionListQuerySchema]), ([query]) =>
 		host.listSessions(query as SessionListQuery),
 	);
-	handle(IPC.sessionsCreate, getWindow, z.tuple([]), () => host.createSession());
+	handle(IPC.sessionsCreate, getWindow, z.tuple([SessionCreateInputSchema]), ([input]) => host.createSession(input));
 	handle(IPC.sessionsActivate, getWindow, z.tuple([z.string().min(1).max(200)]), ([id]) => host.activateSession(id));
 	handle(
 		IPC.sessionsRename,
@@ -178,15 +229,8 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 		z.tuple([z.string().min(1).max(200), z.string().min(1).max(500)]),
 		([provider, model]) => host.selectModel(provider, model),
 	);
-	handle(
-		IPC.sessionSelectEffort,
-		getWindow,
-		z.tuple([z.enum(["off", "minimal", "low", "medium", "high", "max"])]),
-		([effort]) => host.selectEffort(effort),
-	);
-	handle(IPC.sessionSelectApproval, getWindow, z.tuple([z.enum(["ask", "auto", "yolo"])]), ([mode]) =>
-		host.selectApproval(mode),
-	);
+	handle(IPC.sessionSelectEffort, getWindow, z.tuple([ReasoningEffortSchema]), ([effort]) => host.selectEffort(effort));
+	handle(IPC.sessionSelectApproval, getWindow, z.tuple([ApprovalModeSchema]), ([mode]) => host.selectApproval(mode));
 	handle(IPC.sessionSetPlan, getWindow, z.tuple([z.boolean()]), ([enabled]) => host.setPlan(enabled));
 	handle(IPC.skillsList, getWindow, z.tuple([]), () => host.skills());
 	handle(IPC.trustAccept, getWindow, z.tuple([z.boolean()]), ([remember]) => host.trustAccept(remember));
@@ -246,6 +290,8 @@ function fail(message: string, code?: string): RpcResult<never> {
 }
 
 function toRpcError(error: unknown): RpcError {
+	if (error instanceof DesktopWorkspaceError) return { message: error.message, code: error.code };
+	if (error instanceof DesktopGitError) return { message: error.message, code: error.code };
 	if (error instanceof SessionBusyError) return { message: error.message, code: "session-busy" };
 	if (error instanceof z.ZodError) return { message: error.message, code: "invalid-request" };
 	if (error instanceof Error && (error.name === "AbortError" || /aborted/i.test(error.message))) {

@@ -8,18 +8,16 @@ import { call, errorMessage } from "../api/api.ts";
 import { Dropdown } from "../components/Dropdown.tsx";
 import {
 	ArchiveIcon2,
+	ArrowLeftIcon,
 	FolderIcon,
-	MaximizeIcon,
 	MinusIcon,
 	MonitorIcon,
 	MoonIcon,
 	PlusIcon,
-	RestoreIcon,
 	SearchIcon,
 	SettingsIcon,
 	SlidersIcon,
 	SunIcon,
-	XIcon,
 } from "../components/Icons.tsx";
 import { ProvidersTab, WorkspaceTab } from "./SettingsPage.tsx";
 import { useApp } from "../store/state.tsx";
@@ -182,9 +180,12 @@ export function SettingsApp(): JSX.Element {
 
 	return (
 		<div className="settings-app">
-			<SettingsTopBar />
 			<div className="settings-app-body">
-				<nav className="settings-nav" aria-label="设置导航">
+				<nav className={`settings-nav ${state.sidebarOpen ? "" : "is-collapsed"}`} aria-label="设置导航">
+					<button className="settings-back" onClick={() => dispatch({ type: "page", page: "chat" })}>
+						<ArrowLeftIcon size={15} />
+						<span>返回工作区</span>
+					</button>
 					<div className="settings-search">
 						<SearchIcon size={15} />
 						<input
@@ -221,53 +222,6 @@ export function SettingsApp(): JSX.Element {
 				</main>
 			</div>
 		</div>
-	);
-}
-
-function SettingsTopBar(): JSX.Element {
-	const { state, dispatch } = useApp();
-	return (
-		<header className="settings-topbar">
-			<button className="settings-back" onClick={() => dispatch({ type: "page", page: "chat" })}>
-				<ChevronLeft size={15} />
-				<span>返回工作区</span>
-			</button>
-			<div className="settings-caption-group">
-				<button className="settings-caption" aria-label="最小化" onClick={() => void window.moros.windowMinimize()}>
-					<MinusIcon size={14} />
-				</button>
-				<button
-					className="settings-caption"
-					aria-label={state.windowMaximized ? "向下还原" : "最大化"}
-					onClick={() => void window.moros.windowToggleMaximize()}
-				>
-					{state.windowMaximized ? <RestoreIcon size={14} /> : <MaximizeIcon size={14} />}
-				</button>
-				<button
-					className="settings-caption settings-caption-close"
-					aria-label="关闭"
-					onClick={() => void window.moros.windowClose()}
-				>
-					<XIcon size={14} />
-				</button>
-			</div>
-		</header>
-	);
-}
-
-function ChevronLeft({ size }: { readonly size: number }): JSX.Element {
-	return (
-		<svg
-			width={size}
-			height={size}
-			viewBox="0 0 24 24"
-			fill="none"
-			stroke="currentColor"
-			strokeWidth="1.7"
-			aria-hidden="true"
-		>
-			<path d="M15 18l-6-6 6-6" />
-		</svg>
 	);
 }
 

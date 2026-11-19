@@ -1,81 +1,36 @@
 /* ============================================================
-   设置独立视图：顶栏 + 左侧分组导航 + 居中内容列
+   设置独立视图：共用窗口顶栏 + 左侧分组导航 + 居中内容列
    沿用配色与字号令牌，组件内不再散落硬编码字号。
    ============================================================ */
 
 .settings-app {
-	height: 100vh;
+	flex: 1;
+	min-height: 0;
 	display: flex;
 	flex-direction: column;
 	background: var(--surface-sidebar);
 	color: var(--text-primary);
 }
 
-/* 顶栏：左侧返回工作区，右侧窗口控件 */
-.settings-topbar {
-	flex: none;
-	height: 40px;
+/* 返回入口放在设置导航顶部、搜索框上方 */
+.settings-back {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	padding: 0 8px 0 12px;
-	-webkit-app-region: drag;
-	user-select: none;
-	background: var(--surface-sidebar);
-}
-
-.settings-back {
-	display: inline-flex;
-	align-items: center;
 	gap: 6px;
-	height: 28px;
+	height: 34px;
+	margin: 10px 12px 0;
 	padding: 0 10px;
 	border: none;
-	border-radius: 7px;
+	border-radius: 8px;
 	background: transparent;
 	color: var(--text-secondary);
+	text-align: left;
 	font-size: var(--text-small);
-	-webkit-app-region: no-drag;
 }
 
 .settings-back:hover {
-	background: var(--fill-soft);
+	background: var(--fill-hover);
 	color: var(--text-primary);
-}
-
-.settings-caption-group {
-	display: flex;
-	align-items: center;
-	align-self: stretch;
-	-webkit-app-region: no-drag;
-}
-
-.settings-caption {
-	width: 46px;
-	height: 100%;
-	display: grid;
-	place-items: center;
-	border: none;
-	background: transparent;
-	color: var(--text-secondary);
-}
-
-.settings-caption:hover {
-	background: var(--caption-hover);
-	color: var(--text-primary);
-}
-
-.settings-caption:active {
-	background: var(--caption-press);
-}
-
-.settings-caption-close:hover {
-	background: var(--close-hover);
-	color: #ffffff;
-}
-
-.settings-caption-close:active {
-	background: var(--close-press);
 }
 
 .settings-app-body {
@@ -91,7 +46,18 @@
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
+	overflow: hidden;
 	background: var(--surface-sidebar);
+	transition: width var(--duration-sidebar) var(--ease-sidebar);
+}
+
+/* 与工作区共用顶栏的侧栏开关 */
+.settings-nav.is-collapsed {
+	width: 0;
+}
+
+.settings-nav.is-collapsed > * {
+	opacity: 0;
 }
 
 .settings-search {

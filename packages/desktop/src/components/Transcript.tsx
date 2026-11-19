@@ -11,10 +11,10 @@ import {
 	ClockIcon,
 	FileIcon,
 	FolderOpenIcon,
-	MetaIcon,
 	SparklesIcon,
 	TerminalIcon,
 } from "./Icons.tsx";
+import { EmptyBrand } from "./EmptyBrand.tsx";
 import { Markdown } from "./Markdown.tsx";
 import type { SubagentProgressView } from "../store/state.tsx";
 
@@ -321,13 +321,7 @@ export function Transcript({ turns, planning, running, onApprovePlan, onRevisePl
 	if (turns.length === 0) {
 		return (
 			<div className="chat-empty">
-				<div className="welcome-brand">
-					<span className="welcome-brand-logo">
-						<MetaIcon size={30} />
-					</span>
-					<h2 className="welcome-brand-name">Moros Harness</h2>
-					<p className="welcome-brand-desc">轻量、本地优先的办公与编程双场景 Agent</p>
-				</div>
+				<EmptyBrand />
 			</div>
 		);
 	}

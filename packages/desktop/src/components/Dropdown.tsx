@@ -8,8 +8,22 @@ export interface DropdownOption {
 	readonly label: string;
 	/** 选项前的图标。 */
 	readonly icon?: ReactNode;
+	/** 选项下方的补充说明；存在时菜单项自动增高并允许换行。 */
+	readonly description?: string;
 	/** 分组名；同一分组的连续选项共用一个小标题。 */
 	readonly group?: string;
+	readonly disabled?: boolean;
+}
+
+/** 菜单底部操作项：只执行动作、不改变当前选中值，例如“创建项目”或开关项。 */
+export interface DropdownAction {
+	readonly label: string;
+	readonly icon?: ReactNode;
+	/** 操作下方的补充说明；存在时菜单项自动增高并允许换行。 */
+	readonly description?: string;
+	/** 是否作为当前单选结果；开启时显示勾选。 */
+	readonly selected?: boolean;
+	readonly onSelect: () => void;
 	readonly disabled?: boolean;
 }
 
@@ -29,6 +43,8 @@ export function Dropdown({
 	trigger,
 	className,
 	title,
+	disabled = false,
+	actions = [],
 }: {
 	readonly value: string;
 	readonly options: readonly DropdownOption[];
@@ -39,6 +55,10 @@ export function Dropdown({
 	readonly trigger?: ReactNode;
 	readonly className?: string;
 	readonly title?: string;
+	/** 禁用时不可打开菜单或选择选项。 */
+	readonly disabled?: boolean;
+	/** 选项之后、分割线下方展示的操作项。 */
+	readonly actions?: readonly DropdownAction[];
 }): JSX.Element {
 	const [open, setOpen] = useState(false);
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -47,6 +67,10 @@ export function Dropdown({
 
 	useEffect(() => {
 		if (!open) return;
+		if (disabled) {
+			setOpen(false);
+			return;
+		}
 		const onPointerDown = (event: PointerEvent): void => {
 			if (rootRef.current !== null && !rootRef.current.contains(event.target as Node)) setOpen(false);
 		};
@@ -59,7 +83,7 @@ export function Dropdown({
 			document.removeEventListener("pointerdown", onPointerDown);
 			document.removeEventListener("keydown", onKeyDown);
 		};
-	}, [open]);
+	}, [open, disabled]);
 
 	const groups = groupOptions(options);
 
@@ -69,7 +93,8 @@ export function Dropdown({
 				type="button"
 				className={`dropdown-trigger ${open ? "is-open" : ""}`}
 				aria-haspopup="listbox"
-				aria-expanded={open}
+				aria-expanded={open && !disabled}
+				disabled={disabled}
 				onClick={() => setOpen((previous) => !previous)}
 			>
 				{trigger ?? (
@@ -80,7 +105,7 @@ export function Dropdown({
 				)}
 				<ChevronDownIcon size={variant === "inline" ? 12 : 15} />
 			</button>
-			{open ? (
+			{open && !disabled ? (
 				<div className="dropdown-menu" role="listbox">
 					{groups.map((group, groupIndex) => (
 						<div className="dropdown-group" key={group.name ?? groupIndex}>
@@ -92,25 +117,73 @@ export function Dropdown({
 									role="option"
 									data-value={option.value}
 									aria-selected={option.value === value}
-									className={`dropdown-option ${option.value === value ? "is-selected" : ""}`}
+									className={`dropdown-option ${option.value === value ? "is-selected" : ""} ${option.description === undefined ? "" : "has-description"}`}
 									disabled={option.disabled === true}
 									onClick={() => {
 										onChange(option.value);
 										setOpen(false);
 									}}
 								>
-									<span className="dropdown-option-text">
-										{option.icon !== undefined ? <span className="dropdown-option-icon">{option.icon}</span> : null}
-										<span>{option.label}</span>
-									</span>
+									<DropdownItem icon={option.icon} label={option.label} description={option.description} />
 									{option.value === value ? <CheckIcon size={14} /> : null}
 								</button>
 							))}
 						</div>
 					))}
+					{actions.length > 0 ? (
+						<div className={`dropdown-actions ${groups.length === 0 ? "is-first" : ""}`}>
+							{actions.map((action, index) => (
+								<button
+									key={`${action.label}-${index}`}
+									type="button"
+									className={`dropdown-option ${action.description === undefined ? "" : "has-description"} ${action.selected === true ? "is-selected" : ""}`}
+									disabled={action.disabled === true}
+									onClick={() => {
+										setOpen(false);
+										action.onSelect();
+									}}
+								>
+									<DropdownItem icon={action.icon} label={action.label} description={action.description} />
+									{action.selected === true ? <CheckIcon size={14} /> : null}
+								</button>
+							))}
+						</div>
+					) : null}
 				</div>
 			) : null}
 		</div>
+	);
+}
+
+/** 选项与操作共用的内容排版：有说明时标题行与说明分开。 */
+function DropdownItem({
+	icon,
+	label,
+	description,
+}: {
+	readonly icon?: ReactNode;
+	readonly label: string;
+	/** 显式允许 undefined，调用方直接透传可选字段。 */
+	readonly description: string | undefined;
+}): JSX.Element {
+	if (description === undefined) {
+		return (
+			<span className="dropdown-option-text">
+				{icon !== undefined ? <span className="dropdown-option-icon">{icon}</span> : null}
+				<span>{label}</span>
+			</span>
+		);
+	}
+	return (
+		<span className="dropdown-option-text">
+			<span className={`dropdown-option-copy ${icon === undefined ? "" : "has-icon"}`}>
+				<span className="dropdown-option-title">
+					{icon !== undefined ? <span className="dropdown-option-icon">{icon}</span> : null}
+					<span>{label}</span>
+				</span>
+				<span className="dropdown-option-description">{description}</span>
+			</span>
+		</span>
 	);
 }
 

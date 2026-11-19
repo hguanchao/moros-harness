@@ -8,14 +8,25 @@ import type {
 	AppSnapshot,
 	ApprovalCard,
 	LiveState,
+	PreparedImage,
+	ProjectRef,
+	ProjectSelection,
 	ProjectSnapshot,
 	PushMessage,
 	QueuedMessage,
+	RecentProject,
+	SessionContext,
 	SessionView,
+	WorkspaceTarget,
 	WorkspaceTrustView,
 } from "../shared/contract.ts";
+import { createTaskDraft, MAX_DRAFT_IMAGES, type TaskDraft } from "./draft.ts";
+import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
 export type Page = "chat" | "files" | "changes" | "trace" | "sessions" | "settings";
+
+/** 顶栏前进/后退记录：只保存可恢复的会话或新建任务视图。 */
+export type HistoryEntry = { readonly type: "new-task" } | { readonly type: "session"; readonly sessionId: string };
 export type ThemeChoice = "auto" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
@@ -41,6 +52,15 @@ export interface SubagentProgressView {
 export interface AppState {
 	readonly ready: boolean;
 	readonly loadError: string | undefined;
+	readonly isNavigating: boolean;
+	readonly isSending: boolean;
+	readonly history: readonly HistoryEntry[];
+	readonly historyIndex: number;
+	readonly draft: TaskDraft;
+	/** 导航代次与编辑版本分开记录，迟到的发送不能清掉新任务或新输入。 */
+	readonly draftGeneration: number;
+	readonly draftRevision: number;
+	readonly draftWorkspace: WorkspaceTarget | undefined;
 	readonly app: AppSnapshot | undefined;
 	readonly project: ProjectSnapshot | undefined;
 	readonly page: Page;
@@ -66,8 +86,42 @@ export interface AppState {
 }
 
 export type Action =
-	| { readonly type: "init"; readonly app: AppSnapshot; readonly settings?: SettingsSnapshot }
-	| { readonly type: "open-project"; readonly project: ProjectSnapshot }
+	| {
+			readonly type: "init";
+			readonly app: AppSnapshot;
+			readonly settings?: SettingsSnapshot;
+			readonly shouldRestoreSession?: boolean;
+	  }
+	| { readonly type: "new-task" }
+	| { readonly type: "view-new-task" }
+	| { readonly type: "history-entry"; readonly entry: HistoryEntry }
+	| { readonly type: "history-index"; readonly index: number }
+	| { readonly type: "navigation-loading"; readonly isLoading: boolean }
+	| { readonly type: "sending"; readonly isSending: boolean }
+	| { readonly type: "draft-text"; readonly text: string }
+	| { readonly type: "draft-image-added"; readonly image: PreparedImage; readonly generation: number }
+	| { readonly type: "draft-image-removed"; readonly id: string }
+	| { readonly type: "draft-project"; readonly project: ProjectRef | null }
+	| { readonly type: "draft-branch"; readonly branch: string | undefined }
+	| { readonly type: "project-selected"; readonly selection: ProjectSelection; readonly generation: number }
+	| {
+			readonly type: "draft-options";
+			readonly options: Partial<Pick<TaskDraft, "model" | "effort" | "approval" | "plan">>;
+	  }
+	| {
+			readonly type: "draft-sent";
+			readonly generation: number;
+			readonly revision: number;
+			readonly imageIds: readonly string[];
+	  }
+	| { readonly type: "prepare-workspace"; readonly project: ProjectSnapshot; readonly generation: number }
+	| { readonly type: "session-created"; readonly context: SessionContext; readonly generation: number }
+	| {
+			readonly type: "open-project";
+			readonly project: ProjectSnapshot;
+			/** 会话激活与前进/后退保留历史；真正打开项目时重置。 */
+			readonly keepHistory?: boolean;
+	  }
 	| { readonly type: "project"; readonly project: ProjectSnapshot }
 	| { readonly type: "sessions"; readonly items: readonly SessionMeta[] }
 	| { readonly type: "session"; readonly view: SessionView }
@@ -108,6 +162,14 @@ const EMPTY_LIVE: LiveState = {
 export const initialState: AppState = {
 	ready: false,
 	loadError: undefined,
+	isNavigating: false,
+	isSending: false,
+	history: [{ type: "new-task" }],
+	historyIndex: 0,
+	draft: createTaskDraft(),
+	draftGeneration: 0,
+	draftRevision: 0,
+	draftWorkspace: undefined,
 	app: undefined,
 	project: undefined,
 	current: undefined,
@@ -137,69 +199,179 @@ let noticeSequence = 0;
 export function reducer(state: AppState, action: Action): AppState {
 	switch (action.type) {
 		case "init": {
-			const project = action.app.project;
+			const shouldRestore = action.shouldRestoreSession !== false && state.draftGeneration === 0;
+			const project = state.ready && !shouldRestore ? state.project : action.app.project;
 			const settings = action.settings ?? state.settings;
+			const draft = state.draft;
+			const current = shouldRestore ? project?.session : state.current;
+			const restoredEntry: HistoryEntry =
+				current === undefined ? { type: "new-task" } : { type: "session", sessionId: current.meta.id };
+			const history = shouldRestore ? [restoredEntry] : state.history;
 			return {
 				...state,
 				ready: true,
 				loadError: undefined,
+				history,
+				historyIndex: shouldRestore ? 0 : Math.min(state.historyIndex, history.length - 1),
 				app: action.app,
-				...(project === undefined ? {} : { project }),
+				project,
 				settings,
+				draft,
 				theme: themeFromSettings(settings) ?? state.theme,
 				uiFontSize: settings?.config.ui.fontSize ?? state.uiFontSize,
 				models: project?.models ?? state.models,
-				current: project?.session ?? state.current,
-				...(project?.session === undefined
-					? {}
-					: {
-							live: { ...state.live, [project.session.meta.id]: project.session.live },
-						}),
+				current,
+				draftWorkspace:
+					current === undefined &&
+					project !== undefined &&
+					workspaceTargetsMatch(project.target, workspaceTarget(draft.project), action.app.platform)
+						? project.target
+						: undefined,
+				...(current === undefined ? {} : { live: { ...state.live, [current.meta.id]: current.live } }),
+			};
+		}
+		case "new-task":
+			// 已在新建草稿页时重复点击只回到聊天页，不清空已选项目、分支与输入。
+			if (state.current === undefined) {
+				return state.page === "chat" ? state : { ...state, page: "chat" };
+			}
+			return { ...newTaskState(state), ...pushHistory(state, { type: "new-task" }) };
+		case "view-new-task":
+			return {
+				...state,
+				current: undefined,
+				page: "chat",
+				loadError: undefined,
+				isNavigating: false,
+				review: undefined,
+				draftWorkspace: undefined,
+			};
+		case "history-entry":
+			return { ...state, ...pushHistory(state, action.entry) };
+		case "history-index":
+			return action.index < 0 || action.index >= state.history.length || action.index === state.historyIndex
+				? state
+				: { ...state, historyIndex: action.index };
+		case "navigation-loading":
+			return { ...state, isNavigating: action.isLoading };
+		case "sending":
+			return { ...state, isSending: action.isSending };
+		case "draft-text":
+			return action.text === state.draft.text
+				? state
+				: { ...state, draft: { ...state.draft, text: action.text }, draftRevision: state.draftRevision + 1 };
+		case "draft-image-added": {
+			if (
+				action.generation !== state.draftGeneration ||
+				state.draft.images.some((image) => image.id === action.image.id)
+			) {
+				return state;
+			}
+			if (state.draft.images.length >= MAX_DRAFT_IMAGES) {
+				return { ...state, notices: pushNotice(state.notices, "warn", `最多附加 ${MAX_DRAFT_IMAGES} 张图片`) };
+			}
+			return {
+				...state,
+				draft: { ...state.draft, images: [...state.draft.images, action.image] },
+				draftRevision: state.draftRevision + 1,
+			};
+		}
+		case "draft-image-removed":
+			return {
+				...state,
+				draft: { ...state.draft, images: state.draft.images.filter((image) => image.id !== action.id) },
+				draftRevision: state.draftRevision + 1,
+			};
+		case "draft-project":
+			return state.current === undefined
+				? {
+						...state,
+						draft: { ...state.draft, project: action.project, branch: undefined },
+						draftWorkspace: undefined,
+					}
+				: state;
+		case "draft-branch":
+			return state.current === undefined ? { ...state, draft: { ...state.draft, branch: action.branch } } : state;
+		case "project-selected": {
+			const canAssociate = action.generation === state.draftGeneration && state.current === undefined;
+			return {
+				...state,
+				app: appWithRecentProjects(state.app, action.selection.recentProjects),
+				sessionsVersion: state.sessionsVersion + 1,
+				...(canAssociate
+					? {
+							draft: { ...state.draft, project: action.selection.project, branch: undefined },
+							draftWorkspace: undefined,
+						}
+					: {}),
+			};
+		}
+		case "draft-options":
+			return { ...state, draft: { ...state.draft, ...action.options } };
+		case "draft-sent": {
+			if (action.generation !== state.draftGeneration) return state;
+			const images = state.draft.images.filter((image) => !action.imageIds.includes(image.id));
+			return {
+				...state,
+				draft: {
+					...state.draft,
+					text: action.revision === state.draftRevision ? "" : state.draft.text,
+					images,
+				},
+				draftRevision: state.draftRevision + 1,
+			};
+		}
+		case "prepare-workspace": {
+			if (
+				action.generation !== state.draftGeneration ||
+				state.current !== undefined ||
+				!workspaceTargetsMatch(
+					action.project.target,
+					workspaceTarget(state.draft.project),
+					state.app?.platform ?? "win32",
+				)
+			) {
+				return state;
+			}
+			return { ...updateWorkspace(state, action.project), draftWorkspace: action.project.target, loadError: undefined };
+		}
+		case "session-created": {
+			if (action.generation !== state.draftGeneration) return state;
+			return {
+				...selectSession(updateWorkspace(state, action.context.project), action.context.session),
+				...enterCreatedSession(state, action.context.session.meta.id),
+				draftWorkspace: undefined,
 			};
 		}
 		case "open-project": {
+			const entry: HistoryEntry =
+				action.project.session === undefined
+					? { type: "new-task" }
+					: { type: "session", sessionId: action.project.session.meta.id };
 			return {
-				...state,
-				project: action.project,
-				models: action.project.models,
+				...updateWorkspace(state, action.project),
 				current: action.project.session,
-				sessions: [],
+				draft: createTaskDraft(),
+				draftGeneration: state.draftGeneration + 1,
+				draftRevision: 0,
+				draftWorkspace: undefined,
 				sessionsVersion: state.sessionsVersion + 1,
-				events: {},
-				live: {},
-				queue: {},
-				subagents: {},
-				approvals: [],
-				runStates: {},
-				workspaceVersion: state.workspaceVersion + 1,
+				loadError: undefined,
 				page: "chat",
 				ready: true,
+				...(action.keepHistory === true ? {} : resetHistory(entry)),
 			};
 		}
-		case "project": {
-			const rootChanged = state.project?.root !== action.project.root;
-			return {
-				...state,
-				project: action.project,
-				models: action.project.models,
-				...(rootChanged
-					? { events: {}, live: {}, queue: {}, subagents: {}, current: action.project.session }
-					: action.project.session === undefined
-						? {}
-						: { current: action.project.session }),
-			};
-		}
+		case "project":
+			return state.project?.root === action.project.root ? updateWorkspace(state, action.project) : state;
 		case "sessions":
 			return { ...state, sessions: action.items };
-		case "session": {
-			const id = action.view.meta.id;
+		case "session":
 			return {
-				...state,
-				current: action.view,
-				live: { ...state.live, [id]: action.view.live },
-				sessions: upsertMeta(state.sessions, action.view.meta),
+				...selectSession(state, action.view),
+				draftGeneration: state.draftGeneration + 1,
+				draftWorkspace: undefined,
 			};
-		}
 		case "events": {
 			const existing = state.events[action.sessionId] ?? [];
 			const merged = mergeEvents(existing, action.events);
@@ -373,6 +545,16 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 				...(state.current?.meta.id === message.meta.id ? { current: { ...state.current, meta: message.meta } } : {}),
 			};
 		}
+		case "session-cleared": {
+			const next = {
+				...state,
+				sessions: state.sessions.filter((meta) => meta.id !== message.sessionId),
+				sessionsVersion: state.sessionsVersion + 1,
+			};
+			return state.current?.meta.id === message.sessionId
+				? { ...newTaskState(next), ...resetHistory({ type: "new-task" }) }
+				: next;
+		}
 		case "session-view": {
 			if (state.current?.meta.id !== message.view.meta.id) return state;
 			return {
@@ -389,15 +571,8 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 			return { ...state, workspaceVersion: state.workspaceVersion + 1 };
 		case "notice":
 			return { ...state, notices: pushNotice(state.notices, message.level, message.message) };
-		case "project": {
-			const rootChanged = state.project?.root !== message.project.root;
-			return {
-				...state,
-				project: message.project,
-				models: message.project.models,
-				...(rootChanged ? { events: {}, live: {}, queue: {}, current: message.project.session } : {}),
-			};
-		}
+		case "project":
+			return state.project?.root === message.project.root ? updateWorkspace(state, message.project) : state;
 		case "trust":
 			return {
 				...state,
@@ -423,6 +598,102 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 		case "window-state":
 			return { ...state, windowMaximized: message.state.maximized };
 	}
+}
+
+/** 追加导航记录；重复当前项不新增，已后退时丢弃前进分支。 */
+function pushHistory(state: AppState, entry: HistoryEntry): Pick<AppState, "history" | "historyIndex"> {
+	const current = state.history[state.historyIndex];
+	if (current !== undefined && sameHistoryEntry(current, entry)) {
+		return { history: state.history, historyIndex: state.historyIndex };
+	}
+	const history = [...state.history.slice(0, state.historyIndex + 1), entry];
+	return { history, historyIndex: history.length - 1 };
+}
+
+/** 切换项目或删除当前会话后，导航历史收敛为单条入口。 */
+function resetHistory(entry: HistoryEntry): Pick<AppState, "history" | "historyIndex"> {
+	return { history: [entry], historyIndex: 0 };
+}
+
+/** 首次发送创建会话后，把草稿入口替换为新会话，避免后退回到已清空的草稿。 */
+function enterCreatedSession(state: AppState, sessionId: string): Pick<AppState, "history" | "historyIndex"> {
+	const current = state.history[state.historyIndex];
+	if (current?.type === "new-task") {
+		const history = [...state.history.slice(0, state.historyIndex), { type: "session" as const, sessionId }];
+		return { history, historyIndex: history.length - 1 };
+	}
+	return pushHistory(state, { type: "session", sessionId });
+}
+
+function sameHistoryEntry(left: HistoryEntry, right: HistoryEntry): boolean {
+	if (left.type !== right.type) return false;
+	return left.type === "new-task" || (right.type === "session" && left.sessionId === right.sessionId);
+}
+
+function newTaskState(state: AppState): AppState {
+	return {
+		...state,
+		current: undefined,
+		page: "chat",
+		loadError: undefined,
+		isNavigating: false,
+		review: undefined,
+		draft: createTaskDraft(),
+		draftGeneration: state.draftGeneration + 1,
+		draftRevision: 0,
+		draftWorkspace: undefined,
+	};
+}
+
+// 工作区信息与会话选择分离；配置推送不得覆盖用户正在编辑的新任务。
+function updateWorkspace(state: AppState, project: ProjectSnapshot): AppState {
+	const rootChanged = state.project?.root !== project.root;
+	return {
+		...state,
+		project,
+		models: project.models,
+		app: appWithRecentProjects(state.app, project.recentProjects),
+		...(rootChanged
+			? {
+					events: {},
+					live: {},
+					queue: {},
+					subagents: {},
+					approvals: [],
+					runStates: {},
+					review: undefined,
+					workspaceVersion: state.workspaceVersion + 1,
+				}
+			: {}),
+	};
+}
+
+function selectSession(state: AppState, view: SessionView): AppState {
+	return {
+		...state,
+		current: view,
+		loadError: undefined,
+		live: { ...state.live, [view.meta.id]: view.live },
+		sessions: upsertMeta(state.sessions, view.meta),
+	};
+}
+
+function appWithRecentProjects(
+	app: AppSnapshot | undefined,
+	projects: readonly RecentProject[],
+): AppSnapshot | undefined {
+	if (app === undefined) return undefined;
+	const unchanged =
+		app.recentProjects.length === projects.length &&
+		projects.every((project, index) => {
+			const previous = app.recentProjects[index];
+			return (
+				previous?.root === project.root &&
+				previous.name === project.name &&
+				previous.lastOpenedAt === project.lastOpenedAt
+			);
+		});
+	return unchanged ? app : { ...app, recentProjects: projects };
 }
 
 function themeFromSettings(settings: SettingsSnapshot | undefined): ThemeChoice | undefined {

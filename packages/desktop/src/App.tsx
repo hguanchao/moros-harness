@@ -1,6 +1,6 @@
 import { useEffect, type JSX } from "react";
 
-import { useDesktopActions } from "./hooks/actions.ts";
+import { currentNavigationEpoch, useDesktopActions } from "./hooks/actions.ts";
 import { call, errorMessage } from "./api/api.ts";
 import { ChangesPage } from "./views/ChangesPage.tsx";
 import { ChatPage } from "./views/ChatPage.tsx";
@@ -11,7 +11,7 @@ import { TracePage } from "./views/TracePage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useApp } from "./store/state.tsx";
-import { FolderPlusIcon, MetaIcon, XIcon } from "./components/Icons.tsx";
+import { XIcon } from "./components/Icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
 
@@ -22,14 +22,19 @@ export function App(): JSX.Element {
 	useEffect(() => {
 		let cancelled = false;
 		const off = window.moros.onPush((message) => dispatch({ type: "push", message }));
+		const epoch = currentNavigationEpoch();
 		void (async () => {
 			try {
 				const app = await call(window.moros.appState());
-				const settings = await call(window.moros.settingsGet()).catch(() => undefined);
+				const settings = await call(window.moros.settingsGet()).catch((error: unknown) => {
+					dispatch({ type: "notice", level: "warn", message: `无法加载设置：${errorMessage(error)}` });
+					return undefined;
+				});
 				if (cancelled) return;
-				dispatch({ type: "init", app, ...(settings === undefined ? {} : { settings }) });
-				if (app.project?.session !== undefined) {
-					await actions.hydrate(app.project.session);
+				const shouldRestoreSession = epoch === currentNavigationEpoch();
+				dispatch({ type: "init", app, shouldRestoreSession, ...(settings === undefined ? {} : { settings }) });
+				if (shouldRestoreSession && app.project?.session !== undefined) {
+					await actions.hydrate(app.project.session, epoch);
 				}
 			} catch (error) {
 				if (!cancelled) dispatch({ type: "error", message: errorMessage(error) });
@@ -42,11 +47,11 @@ export function App(): JSX.Element {
 	}, [dispatch, actions.hydrate]);
 
 	useEffect(() => {
-		if (state.project === undefined) return;
+		if (!state.ready) return;
 		void actions.refreshSessions().catch((error: unknown) => {
 			dispatch({ type: "notice", level: "warn", message: `无法刷新会话列表：${errorMessage(error)}` });
 		});
-	}, [state.project?.root, state.sessionsVersion, actions.refreshSessions, dispatch]);
+	}, [state.ready, state.sessionsVersion, actions.refreshSessions, dispatch]);
 
 	useEffect(() => {
 		const query = window.matchMedia("(prefers-color-scheme: dark)");
@@ -84,6 +89,7 @@ export function App(): JSX.Element {
 			}
 			if (event.key.toLowerCase() === "o") {
 				event.preventDefault();
+				if (!state.ready) return;
 				void actions.openProjectDialog().catch((error: unknown) => {
 					dispatch({ type: "notice", level: "error", message: errorMessage(error) });
 				});
@@ -91,104 +97,38 @@ export function App(): JSX.Element {
 			}
 			if (event.key.toLowerCase() === "n") {
 				event.preventDefault();
-				if (state.project === undefined) return;
-				void actions.createSession().catch((error: unknown) => {
-					dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-				});
+				actions.newTask();
 			}
 		};
 		window.addEventListener("keydown", onKeyDown);
 		return () => window.removeEventListener("keydown", onKeyDown);
-	}, [state.sidebarOpen, state.project, actions, dispatch]);
-
-	// 设置是独立全屏视图，整窗替代主工作区
-	if (state.page === "settings") {
-		return (
-			<>
-				<SettingsApp />
-				<Toasts />
-			</>
-		);
-	}
+	}, [state.sidebarOpen, state.ready, actions, dispatch]);
 
 	return (
 		<div
 			className="app"
 			data-platform={state.app?.platform ?? (isMac ? "darwin" : "win32")}
-			data-has-project={state.project === undefined ? "false" : "true"}
+			data-has-project={state.project?.target.kind === "project" ? "true" : "false"}
 		>
 			<TitleBar
 				sidebarOpen={state.sidebarOpen}
 				onToggleSidebar={() => dispatch({ type: "sidebar", open: !state.sidebarOpen })}
 			/>
-			<div className="app-body">
-				<Sidebar open={state.sidebarOpen} />
-				<main className="main">
-					{state.page === "chat" ? <ChatPage /> : null}
-					{state.page === "files" ? <FilesPage /> : null}
-					{state.page === "changes" ? <ChangesPage /> : null}
-					{state.page === "trace" ? <TracePage /> : null}
-					{state.page === "sessions" ? <SessionsPage /> : null}
-				</main>
-			</div>
-			{state.ready && state.page === "chat" && state.project === undefined ? <Welcome /> : null}
-			<Toasts />
-		</div>
-	);
-}
-
-function Welcome(): JSX.Element {
-	const { dispatch } = useApp();
-	const actions = useDesktopActions();
-	return (
-		<div className="welcome-layer">
-			<div className="welcome">
-				<div className="welcome-brand">
-					<span className="welcome-brand-logo">
-						<MetaIcon size={30} />
-					</span>
-					<h2 className="welcome-brand-name">Moros Harness</h2>
-					<p className="welcome-brand-desc">轻量、本地优先的办公与编程双场景 Agent</p>
+			{state.page === "settings" ? (
+				<SettingsApp />
+			) : (
+				<div className="app-body">
+					<Sidebar open={state.sidebarOpen} />
+					<main className="main">
+						{state.page === "chat" ? <ChatPage /> : null}
+						{state.page === "files" ? <FilesPage /> : null}
+						{state.page === "changes" ? <ChangesPage /> : null}
+						{state.page === "trace" ? <TracePage /> : null}
+						{state.page === "sessions" ? <SessionsPage /> : null}
+					</main>
 				</div>
-				<button
-					className="primary-button"
-					onClick={() => {
-						void actions.openProjectDialog().catch((error: unknown) => {
-							dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-						});
-					}}
-				>
-					<FolderPlusIcon size={16} />
-					打开项目
-				</button>
-				<RecentProjects />
-			</div>
-		</div>
-	);
-}
-
-function RecentProjects(): JSX.Element | null {
-	const { state, dispatch } = useApp();
-	const actions = useDesktopActions();
-	if (state.app === undefined || state.app.recentProjects.length === 0) return null;
-	return (
-		<div className="recent-projects">
-			<div className="side-label">最近项目</div>
-			{state.app.recentProjects.slice(0, 6).map((project) => (
-				<button
-					key={project.root}
-					className="recent-project"
-					title={project.root}
-					onClick={() => {
-						void actions.openProject(project.root).catch((error: unknown) => {
-							dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-						});
-					}}
-				>
-					<span>{project.name}</span>
-					<small>{project.root}</small>
-				</button>
-			))}
+			)}
+			<Toasts />
 		</div>
 	);
 }

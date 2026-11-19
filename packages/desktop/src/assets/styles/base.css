@@ -134,7 +134,7 @@
 	/* 正文与辅助字号：正文默认 14px */
 	--text-body: calc(0.875rem * var(--ui-scale)); /* 14px，对话 / Markdown / 输入框 */
 	--text-ui: calc(0.875rem * var(--ui-scale)); /* 14px，侧栏 / 列表项 / 控件 */
-	--text-title: calc(1rem * var(--ui-scale)); /* 16px，界面标题（非 h 标签，如会话标题 / 侧栏项目名） */
+	--text-title: calc(1rem * var(--ui-scale)); /* 16px，界面标题（非 h 标签，如会话标题 / 侧栏主操作） */
 	--text-brand: calc(1.125rem * var(--ui-scale)); /* 18px，品牌字 */
 	--text-small: calc(0.8125rem * var(--ui-scale)); /* 13px */
 	--text-caption: calc(0.75rem * var(--ui-scale)); /* 12px */
@@ -222,10 +222,10 @@ h6 {
 	line-height: var(--leading-heading);
 }
 
-/* 侧栏层级：项目名 > 任务名 */
+/* 侧栏项目名与任务名保持一致的字号和字重 */
 .project-row .project-name {
-	font-size: var(--text-title);
-	font-weight: var(--weight-semibold);
+	font-size: var(--text-ui);
+	font-weight: var(--weight-regular);
 }
 
 .session-title {

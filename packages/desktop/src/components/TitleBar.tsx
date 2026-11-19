@@ -1,7 +1,17 @@
 import { useEffect, type JSX } from "react";
 
-import { call } from "../api/api.ts";
-import { MaximizeIcon, MinusIcon, PanelIcon, RestoreIcon, XIcon } from "./Icons.tsx";
+import { call, errorMessage } from "../api/api.ts";
+import { useDesktopActions } from "../hooks/actions.ts";
+import {
+	ArrowLeftIcon,
+	ArrowRightIcon,
+	MaximizeIcon,
+	MinusIcon,
+	PanelIcon,
+	RestoreIcon,
+	SearchIcon,
+	XIcon,
+} from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
 export interface TitleBarProps {
@@ -9,10 +19,16 @@ export interface TitleBarProps {
 	readonly onToggleSidebar: () => void;
 }
 
-/** Windows 11 风格标题栏：左侧只留侧栏开关，右侧自绘最小化/最大化/关闭。 */
+/** Windows 11 风格标题栏：左侧侧栏开关与前进/后退/搜索占位，右侧自绘窗口控制。 */
 export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.Element {
 	const { state, dispatch } = useApp();
+	const actions = useDesktopActions();
 	const isMac = state.app?.platform === "darwin";
+	const canGoBack = state.historyIndex > 0;
+	const canGoForward = state.historyIndex < state.history.length - 1;
+	const report = (error: unknown): void => {
+		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+	};
 
 	useEffect(() => {
 		void call(window.moros.windowState())
@@ -39,6 +55,29 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.E
 				>
 					<PanelIcon size={16} />
 				</button>
+				<div className="titlebar-nav">
+					<button
+						className="titlebar-action"
+						aria-label="后退"
+						title="后退"
+						disabled={!canGoBack}
+						onClick={() => void actions.goBack().catch(report)}
+					>
+						<ArrowLeftIcon size={16} />
+					</button>
+					<button
+						className="titlebar-action"
+						aria-label="前进"
+						title="前进"
+						disabled={!canGoForward}
+						onClick={() => void actions.goForward().catch(report)}
+					>
+						<ArrowRightIcon size={16} />
+					</button>
+					<button className="titlebar-action" aria-label="搜索" title="搜索（即将推出）" disabled>
+						<SearchIcon size={16} />
+					</button>
+				</div>
 			</div>
 			{isMac ? null : (
 				<div className="caption-group">

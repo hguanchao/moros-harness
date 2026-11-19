@@ -3,6 +3,8 @@ import { useEffect, useMemo, useRef, useState, type JSX } from "react";
 import type { ApprovalCard } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { Composer } from "../components/Composer.tsx";
+import { EmptyBrand } from "../components/EmptyBrand.tsx";
+import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 import { AlertIcon, CheckIcon, ChevronDownIcon, SparklesIcon, XIcon } from "../components/Icons.tsx";
 import { Markdown } from "../components/Markdown.tsx";
 import { useApp } from "../store/state.tsx";
@@ -31,7 +33,11 @@ export function ChatPage(): JSX.Element {
 		const rightCurrent = current !== undefined && right.sessionId === current.meta.id ? 0 : 1;
 		return leftCurrent - rightCurrent;
 	});
-	const trustBlocked = project?.trust.required === true && project.trust.decision === null;
+	const isDraftPrepared =
+		state.draftWorkspace !== undefined &&
+		workspaceTargetsMatch(state.draftWorkspace, workspaceTarget(state.draft.project), state.app?.platform ?? "win32");
+	const trustBlocked =
+		(current !== undefined || isDraftPrepared) && project?.trust.required === true && project.trust.decision === null;
 	const activePlan = turns
 		.flatMap((turn) => turn.blocks)
 		.filter((block): block is Extract<typeof block, { kind: "plan" }> => block.kind === "plan")
@@ -85,61 +91,74 @@ export function ChatPage(): JSX.Element {
 		})();
 	};
 
+	const dock = (
+		<div className="composer-dock">
+			{approvals.map((card) => (
+				<ApprovalPanel key={card.id} card={card} currentSessionId={current?.meta.id} />
+			))}
+			<Composer />
+			{state.review !== undefined ? <ReviewModal /> : null}
+		</div>
+	);
+
 	return (
-		<div className="chat-page">
-			<header className="main-bar">
-				<div className="main-bar-left">
-					<span className="conversation-title">{current?.meta.title ?? project?.name ?? "Moros Harness"}</span>
-					{current?.plan === true ? <span className="pill">计划模式</span> : null}
-					{current?.readOnly === true ? <span className="pill warn">只读</span> : null}
-				</div>
-			</header>
+		<div className={`chat-page ${current === undefined ? "is-new-task" : ""}`}>
+			{current === undefined ? null : (
+				<header className="main-bar">
+					<div className="main-bar-left">
+						<span className="conversation-title">{current.meta.title}</span>
+						{current.readOnly === true ? <span className="pill warn">只读</span> : null}
+					</div>
+				</header>
+			)}
 
-			<div
-				className="conversation"
-				ref={scrollRef}
-				onScroll={(event) => {
-					const element = event.currentTarget;
-					stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-				}}
-			>
-				<div className="transcript">
-					{current !== undefined && events.length > 0 && (events[0]?.seq ?? 1) > 1 ? (
-						<button className="load-older" disabled={loadingOlder} onClick={() => void loadOlder()}>
-							{loadingOlder ? "加载中…" : "加载更早消息"}
-						</button>
-					) : null}
-					{state.loadError !== undefined ? (
-						<div className="load-error">
-							<AlertIcon size={16} />
-							<span>{state.loadError}</span>
-						</div>
-					) : null}
-					<Transcript
-						turns={turns}
-						planning={current?.plan === true}
-						running={current?.running === true}
-						onApprovePlan={approvePlan}
-						onRevisePlan={() => {
-							if (activePlan === undefined) return;
-							document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+			{current === undefined ? (
+				<div className="new-task-stage">
+					<EmptyBrand />
+					{dock}
+				</div>
+			) : (
+				<>
+					<div
+						className="conversation"
+						ref={scrollRef}
+						onScroll={(event) => {
+							const element = event.currentTarget;
+							stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
 						}}
-					/>
-				</div>
-			</div>
-
-			<div className="composer-dock">
-				{approvals.map((card) => (
-					<ApprovalPanel key={card.id} card={card} currentSessionId={current?.meta.id} />
-				))}
-				<Composer />
-				{state.review !== undefined ? <ReviewModal /> : null}
-			</div>
+					>
+						<div className="transcript">
+							{events.length > 0 && (events[0]?.seq ?? 1) > 1 ? (
+								<button className="load-older" disabled={loadingOlder} onClick={() => void loadOlder()}>
+									{loadingOlder ? "加载中…" : "加载更早消息"}
+								</button>
+							) : null}
+							{state.loadError !== undefined ? (
+								<div className="load-error">
+									<AlertIcon size={16} />
+									<span>{state.loadError}</span>
+								</div>
+							) : null}
+							<Transcript
+								turns={turns}
+								planning={current.plan === true}
+								running={current.running === true}
+								onApprovePlan={approvePlan}
+								onRevisePlan={() => {
+									if (activePlan === undefined) return;
+									document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+								}}
+							/>
+						</div>
+					</div>
+					{dock}
+				</>
+			)}
 
 			{trustBlocked && project !== undefined ? <TrustGate /> : null}
-			{current === undefined && project !== undefined ? (
-				<div className="chat-empty">
-					<p>正在打开会话…</p>
+			{state.isNavigating ? (
+				<div className="chat-loading" role="status">
+					正在打开会话…
 				</div>
 			) : null}
 		</div>
@@ -173,9 +192,7 @@ function ApprovalPanel({
 				<AlertIcon size={16} />
 				<span className="approval-title">需要审批 · {card.tool}</span>
 				<span className={`risk-badge risk-${card.risk}`}>{card.risk}</span>
-				{currentSessionId !== undefined && card.sessionId !== currentSessionId ? (
-					<span className="pill">来自另一个会话</span>
-				) : null}
+				{card.sessionId !== currentSessionId ? <span className="pill">来自另一个会话</span> : null}
 			</div>
 			<div className="approval-reason">{card.reason}</div>
 			<div className="approval-summary">{card.summary}</div>

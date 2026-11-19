@@ -75,12 +75,6 @@
 	gap: 2px;
 }
 
-.prov-sidebar-empty {
-	padding: 12px 8px;
-	font-size: var(--text-small);
-	color: var(--text-faint);
-}
-
 .prov-sidebar .provider-card.prov-item {
 	width: 100%;
 	display: flex;
@@ -142,6 +136,41 @@
 	flex-direction: column;
 	min-width: 0;
 	padding: 22px 24px 24px;
+}
+
+.prov-detail-empty {
+	align-items: center;
+	justify-content: center;
+	text-align: center;
+}
+
+.prov-empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 10px;
+	max-width: 380px;
+	color: var(--text-dim);
+}
+
+.prov-empty-state h2 {
+	margin: 0;
+	font-size: var(--text-h4);
+	font-weight: var(--weight-semibold);
+	color: var(--text-primary);
+}
+
+.prov-empty-state p {
+	margin: 0;
+	font-size: var(--text-ui);
+	line-height: 1.6;
+}
+
+.prov-empty-state .primary-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 6px;
 }
 
 .prov-detail-head {
@@ -483,13 +512,14 @@
 	color: var(--accent);
 }
 
-.dropdown-option:hover:not(:disabled) {
-	background: var(--fill-strong);
+/* 已选中项保持选中的背景，悬停只改变文字颜色 */
+.dropdown-option:hover:not(:disabled):not(.is-selected) {
+	background: var(--fill-hover);
 	color: var(--text-primary);
 }
 
 .dropdown-option.is-selected {
-	background: var(--accent-soft);
+	background: var(--row-selected);
 	color: var(--text-primary);
 	font-weight: var(--weight-medium);
 }
@@ -497,6 +527,90 @@
 .dropdown-option:disabled {
 	opacity: 0.5;
 	cursor: default;
+}
+
+/* 带说明的选项：图标贴顶，主文案与说明上下排列 */
+.dropdown-option.has-description {
+	min-height: 48px;
+	padding: 7px 9px;
+	align-items: flex-start;
+	white-space: normal;
+}
+
+.dropdown-option.has-description .dropdown-option-text {
+	align-items: flex-start;
+	overflow: visible;
+	white-space: normal;
+}
+
+/* 图标与主标题在同一行居中，说明单独占下一行 */
+.dropdown-option-title {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	min-width: 0;
+}
+
+.dropdown-option-title > span:last-child {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dropdown-option.has-description > svg {
+	align-self: center;
+}
+
+.dropdown-option-copy {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.dropdown-option-description {
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+	font-weight: var(--weight-regular);
+	line-height: 1.45;
+	white-space: normal;
+}
+
+/* 说明与小标题文字对齐：跳过前导图标与间距 */
+.dropdown-option-copy.has-icon .dropdown-option-description {
+	margin-left: 21px;
+}
+
+/* 选项之后的独立操作，与可选项用分割线区分 */
+.dropdown-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	margin-top: 8px;
+	padding-top: 8px;
+	border-top: 1px solid var(--line);
+}
+
+/* 没有可选项时，操作项就是菜单内容，不需要分割线 */
+.dropdown-actions.is-first {
+	margin-top: 0;
+	padding-top: 0;
+	border-top: none;
+}
+
+/* 输入框内的项目选择：触发器只占内容宽度，菜单加宽以容纳项目名 */
+.project-picker .dropdown-trigger {
+	max-width: 200px;
+}
+
+.project-picker .dropdown-trigger > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.project-picker .dropdown-menu {
+	min-width: 210px;
 }
 
 /* 供应商详情里的 API 格式下拉占满字段宽度 */

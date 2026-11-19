@@ -46,18 +46,33 @@ import {
 	type CheckpointView,
 	type ConfigSummary,
 	type FileChangeSummary,
+	type GitBranches,
+	type GitCheckoutResult,
 	type LiveState,
 	type PreparedImage,
+	type ProjectSelection,
 	type ProjectSnapshot,
 	type PushMessage,
+	type RecentProject,
 	type QueuedMessage,
 	type ReviewResult,
+	type SessionContext,
+	type SessionCreateInput,
 	type SessionListQuery,
 	type SessionPage,
 	type SessionView,
 	type TraceTurn,
+	type WorkspaceTarget,
 	type WorkspaceTrustView,
 } from "../shared/contract.ts";
+import { checkoutGitBranch, listGitBranches } from "./_git.ts";
+import {
+	DesktopWorkspaceError,
+	assertProjectDirectory,
+	createProjectDirectory,
+	createTaskWorkspace,
+	validateProjectName,
+} from "./_workspace.ts";
 import { DesktopStore } from "./store.ts";
 import { buildTrace } from "./trace.ts";
 
@@ -121,7 +136,9 @@ export class DesktopHost {
 	readonly #getWindow: () => BrowserWindow | undefined;
 	readonly #pushMessage: (message: PushMessage) => void;
 	readonly #homeDir: string | undefined;
+	readonly #taskRoot: string;
 	readonly #broker: ApprovalBroker = createApprovalBroker({ timeoutMs: 120_000 });
+	#workspaceOperation: Promise<void> = Promise.resolve();
 
 	#core: Core | undefined;
 	#projectRoot: string | undefined;
@@ -146,16 +163,25 @@ export class DesktopHost {
 	#startingRun = false;
 	#disposed = false;
 
-	private constructor(store: DesktopStore, options: DesktopHostOptions) {
+	private constructor(store: DesktopStore, taskRoot: string, options: DesktopHostOptions) {
 		this.#store = store;
+		this.#taskRoot = taskRoot;
 		this.#getWindow = options.getWindow;
 		this.#pushMessage = options.push;
 		this.#homeDir = options.homeDir;
 	}
 
+	/**
+	 * 打开桌面本地状态并建立稳定任务根，不创建或恢复会话。
+	 * @param options userDataDir 必须是绝对路径；homeDir 仍只控制 Core 存储。
+	 * @returns 尚未初始化工作区的宿主；退出时必须 await dispose()。
+	 * @throws DesktopWorkspaceError 默认任务目录无法建立或校验时。
+	 * @example const host = await DesktopHost.create({ userDataDir, getWindow, push });
+	 */
 	static async create(options: DesktopHostOptions): Promise<DesktopHost> {
+		const taskRoot = await createTaskWorkspace(options.userDataDir);
 		const store = await DesktopStore.open(options.userDataDir);
-		return new DesktopHost(store, options);
+		return new DesktopHost(store, taskRoot, options);
 	}
 
 	async rememberWindow(
@@ -174,22 +200,31 @@ export class DesktopHost {
 	}
 
 	async initialize(): Promise<AppSnapshot> {
-		const recent = this.#store.recentProjects();
-		const last = recent[0];
-		let project: ProjectSnapshot | undefined;
-		if (last !== undefined) {
-			try {
-				project = await this.openProject(last.root);
-			} catch (error) {
-				this.#notice("warn", `Could not reopen ${last.root}: ${messageOf(error)}`);
+		return this.#withWorkspace(async () => {
+			let project: ProjectSnapshot | undefined;
+			if (this.#core !== undefined) {
+				// appState 也是刷新入口；picker-only 更新最近项目不能使它跳到另一个执行根。
+				project = await this.projectSnapshot();
+			} else {
+				const last = this.#recentProjects()[0];
+				if (last !== undefined) {
+					try {
+						project = await this.#openProject(last.root);
+					} catch (error) {
+						this.#notice("warn", `Could not reopen the recent project: ${messageOf(error)}`);
+						await this.#teardownProject();
+					}
+				}
+				project ??= await this.#prepareWorkspace({ kind: "tasks" });
 			}
-		}
-		return {
-			version: VERSION,
-			platform: process.platform,
-			recentProjects: this.#store.recentProjects(),
-			...(project === undefined ? {} : { project }),
-		};
+			return {
+				version: VERSION,
+				platform: process.platform,
+				taskRoot: this.#taskRoot,
+				recentProjects: this.#recentProjects(),
+				project,
+			};
+		});
 	}
 
 	async openProjectDialog(): Promise<ProjectSnapshot | null> {
@@ -205,75 +240,116 @@ export class DesktopHost {
 	}
 
 	async openProject(input: string): Promise<ProjectSnapshot> {
-		const root = await assertWorkspaceRoot(input);
-		if (this.#core !== undefined && this.#projectRoot === root) return this.projectSnapshot();
+		return this.#withWorkspace(() => this.#openProject(input));
+	}
 
-		await this.#teardownProject();
-		this.#warnings = [];
-		const core = new Core({
-			requestApproval: (request, signal) => this.#requestApproval(request, signal),
-			onWarning: (message) => {
-				this.#warnings = [...this.#warnings.slice(-(MAX_WARNINGS - 1)), message];
-				this.#notice("warn", message);
-			},
-			hostKind: "desktop",
-			...(this.#homeDir === undefined ? {} : { homeDir: this.#homeDir }),
+	/**
+	 * 原生选择并登记项目，不打开 Core、不激活历史、不打断运行。
+	 * @returns canonical 项目引用与最近项目；用户取消时返回 null，状态不变。
+	 * @throws DesktopWorkspaceError 选择无效目录或内部任务根时。
+	 * @example const selection = await host.selectProjectDialog();
+	 */
+	async selectProjectDialog(): Promise<ProjectSelection | null> {
+		const result = await showOpenDialog(this.#getWindow(), {
+			title: "选择项目",
+			properties: ["openDirectory"],
 		});
-		this.#core = core;
-		this.#projectRoot = root;
-		this.#startWatcher(root);
-		await this.#store.rememberProject(root).catch((error: unknown) => {
-			this.#notice("warn", `Could not save the recent project list: ${messageOf(error)}`);
-		});
+		const input = result.filePaths[0];
+		if (result.canceled || input === undefined) return null;
+		const root = await assertProjectDirectory(input, this.#taskRoot);
+		await this.#rememberProject(root);
+		return { project: { root, name: basename(root) }, recentProjects: this.#recentProjects() };
+	}
 
+	/**
+	 * 在用户原生选择的父目录中新建文件夹并登记；不覆盖、不初始化 Git、不切 Core。
+	 * @param name 单段项目名称，非法名称在弹出对话框前拒绝。
+	 * @returns 新项目引用及最近项目；取消返回 null 且不创建目录。
+	 * @throws DesktopWorkspaceError 名称非法、已有同名路径或目录无法访问时。
+	 * @example const selection = await host.createProjectDialog("my-project");
+	 */
+	async createProjectDialog(name: string): Promise<ProjectSelection | null> {
+		validateProjectName(name);
+		const result = await showOpenDialog(this.#getWindow(), {
+			title: "选择新项目的父目录",
+			properties: ["openDirectory"],
+		});
+		const parent = result.filePaths[0];
+		if (result.canceled || parent === undefined) return null;
+		const root = await createProjectDirectory(parent, name, this.#taskRoot);
+		await this.#rememberProject(root);
+		return { project: { root, name: basename(root) }, recentProjects: this.#recentProjects() };
+	}
+
+	/**
+	 * 准备草稿的明确执行根，不恢复或创建会话；同根保留现有运行/队列。
+	 * @param target tasks 使用内部稳定目录，project 使用经校验的明确 root。
+	 * @returns 目标工作区的信任、模型和完整快照，供首次发送检查。
+	 * @throws DesktopWorkspaceError 跨根时有运行/队列（workspace-busy）或目录无效时。
+	 * @example const project = await host.prepareWorkspace({ kind: "tasks" });
+	 */
+	async prepareWorkspace(target: WorkspaceTarget): Promise<ProjectSnapshot> {
+		return this.#withWorkspace(() => this.#prepareWorkspace(target));
+	}
+
+	/**
+	 * 查询已登记项目的本地分支；非 Git 仓库返回空列表。
+	 * @param root 最近项目中的目录，不接受任意路径或任务根。
+	 * @returns 分支名与当前分支；detached HEAD 时 current 缺省。
+	 * @throws DesktopWorkspaceError 目录未登记或不可访问时。
+	 * @example const { branches, current } = await host.gitBranches(project.root);
+	 */
+	async gitBranches(root: string): Promise<GitBranches> {
+		const projectRoot = await this.#knownProjectRoot(root);
+		return listGitBranches(projectRoot);
+	}
+
+	/**
+	 * 首次发送前切换分支；同一工作区正在运行任务时拒绝，避免改动执行中的目录。
+	 * @param root 最近项目中的目录。
+	 * @param branch 分支选择器提供的本地分支名，必须仍存在于 refs/heads。
+	 * @returns 切换到的分支。
+	 * @throws DesktopWorkspaceError 目录未登记或工作区忙时；DesktopGitError 脏工作区或切换失败时。
+	 * @example await host.checkoutBranch(project.root, "feature/login");
+	 */
+	async checkoutBranch(root: string, branch: string): Promise<GitCheckoutResult> {
+		const projectRoot = await this.#knownProjectRoot(root);
+		const activeRoot = this.#projectRoot;
+		const busy =
+			activeRoot !== undefined &&
+			normalizeProjectRoot(activeRoot) === normalizeProjectRoot(projectRoot) &&
+			(this.#activeRun !== undefined ||
+				this.#activeRunPromise !== undefined ||
+				this.#startingRun ||
+				this.#queue.length > 0);
+		if (busy) {
+			throw new DesktopWorkspaceError("workspace-busy", "当前工作区正在执行任务，暂时无法切换分支");
+		}
+		return checkoutGitBranch(projectRoot, branch);
+	}
+
+	/** 分支接口只接受已登记为最近项目的目录，防止渲染层传入任意路径。 */
+	async #knownProjectRoot(input: string): Promise<string> {
+		let root: string;
 		try {
-			await core.prepareMcp(root);
+			root = await assertWorkspaceRoot(input);
 		} catch (error) {
-			this.#notice("warn", `Could not start MCP servers: ${messageOf(error)}`);
+			throw new DesktopWorkspaceError("invalid-project", "项目目录不可访问", { cause: error });
 		}
-
-		const page = await core.listSessionsPage(root, { limit: 1, includeArchived: false });
-		const latest = page.items[0];
-		let session: Session;
-		if (latest !== undefined) {
-			session = await core.openSession(latest.id);
-		} else {
-			session = await core.createSession(root);
-			this.#createdSessionIds.add(session.meta.id);
-		}
-		this.#sessions.set(session.meta.id, session);
-		this.#current = session;
-		await this.#acquireLease(session);
-		this.#ensureSubscribed(session);
-		await this.#refreshMetas();
-		await this.#refreshCatalog();
-		return this.projectSnapshot();
+		const known = this.#store
+			.recentProjects()
+			.some((project) => normalizeProjectRoot(project.root) === normalizeProjectRoot(root));
+		if (!known) throw new DesktopWorkspaceError("invalid-project", "项目尚未登记，请重新选择");
+		return root;
 	}
 
 	async projectSnapshot(): Promise<ProjectSnapshot> {
-		const core = this.#requiredCore();
-		const root = this.#requiredProject();
-		const trust = await this.#readTrust();
-		const models = await core.listModels(root).catch(() => this.#catalog);
-		this.#catalog = models;
-		const skills = await core.listSkills(root).catch(() => []);
-		const mcp = core.mcpStatus(root);
-		const session = this.#current === undefined ? undefined : await this.#buildView(this.#current);
-		return {
-			root,
-			name: basename(root),
-			trust,
-			models,
-			skills,
-			mcp,
-			warnings: [...this.#warnings],
-			...(session === undefined ? {} : { session }),
-		};
+		return this.#projectSnapshot(this.#current);
 	}
 
 	async listSessions(query: SessionListQuery): Promise<SessionPage> {
 		const core = this.#requiredCore();
-		const root = this.#requiredProject();
+		const root = query.target === undefined ? this.#requiredProject() : await this.#resolveTarget(query.target);
 		const page = await core.listSessionsPage(root, {
 			...(query.query === undefined ? {} : { query: query.query }),
 			...(query.includeArchived === undefined ? {} : { includeArchived: query.includeArchived }),
@@ -286,43 +362,26 @@ export class DesktopHost {
 		};
 	}
 
-	async createSession(): Promise<SessionView> {
-		const core = this.#requiredCore();
-		const root = this.#requiredProject();
-		if (this.#current !== undefined) {
-			await this.#discardIfEmpty(this.#current.meta.id);
-			await this.#releaseIfIdle(this.#current.meta.id);
-			this.#dropSubscriptionIfIdle(this.#current.meta.id);
-		}
-		const session = await core.createSession(root);
-		this.#sessions.set(session.meta.id, session);
-		this.#createdSessionIds.add(session.meta.id);
-		this.#current = session;
-		this.#readOnlyIds.delete(session.meta.id);
-		await this.#acquireLease(session);
-		this.#ensureSubscribed(session);
-		await this.#refreshMetas();
-		this.#push({ type: "sessions-changed" });
-		await this.#pushView(session);
-		return this.#buildView(session);
+	/**
+	 * 在 input.target 下创建会话并应用会话级草稿选项，不修改全局默认配置。
+	 * @param input 必填 target；可覆盖模型、推理强度、审批和计划模式。
+	 * @returns 同一执行根的 ProjectSnapshot 与 SessionView。
+	 * @throws 目标无效、工作区忙或选项失败时；失败的新会话会删除并释放租约。
+	 * @example const context = await host.createSession({ target: { kind: "tasks" }, plan: true });
+	 */
+	async createSession(input: SessionCreateInput): Promise<SessionContext> {
+		return this.#withWorkspace(() => this.#createSession(input));
 	}
 
-	async activateSession(id: string): Promise<SessionView> {
-		if (this.#current?.meta.id === id) return this.#buildView(this.#current);
-
-		const previous = this.#current;
-		const session = await this.#sessionFor(id);
-		this.#sessions.set(session.meta.id, session);
-		if (previous !== undefined) {
-			await this.#discardIfEmpty(previous.meta.id);
-			await this.#releaseIfIdle(previous.meta.id);
-			this.#dropSubscriptionIfIdle(previous.meta.id);
-		}
-		this.#current = session;
-		await this.#acquireLease(session);
-		this.#ensureSubscribed(session);
-		await this.#pushView(session);
-		return this.#buildView(session);
+	/**
+	 * 按持久化会话归属跨根激活；只有此入口可改变归属，其他会话动作仍受当前根校验。
+	 * @param id 已存在会话的 ID（或 Core 支持的唯一前缀）。
+	 * @returns 正确工作区与会话；租约冲突沿用只读行为。
+	 * @throws 会话/根无效，或跨根时另一任务仍在运行（workspace-busy）。
+	 * @example const context = await host.activateSession(sessionId);
+	 */
+	async activateSession(id: string): Promise<SessionContext> {
+		return this.#withWorkspace(() => this.#activateSession(id));
 	}
 
 	async renameSession(id: string, title: string): Promise<void> {
@@ -346,6 +405,12 @@ export class DesktopHost {
 	async deleteSessions(
 		ids: readonly string[],
 	): Promise<{ deleted: readonly string[]; failed: readonly { id: string; error: string }[] }> {
+		return this.#withWorkspace(() => this.#deleteSessions(ids));
+	}
+
+	async #deleteSessions(
+		ids: readonly string[],
+	): Promise<{ deleted: readonly string[]; failed: readonly { id: string; error: string }[] }> {
 		const core = this.#requiredCore();
 		const allowed: string[] = [];
 		const rejected: { id: string; error: string }[] = [];
@@ -358,6 +423,8 @@ export class DesktopHost {
 			}
 		}
 		const result = await core.deleteSessions(allowed);
+		const currentId = this.#current?.meta.id;
+		const clearedId = currentId !== undefined && result.deleted.includes(currentId) ? currentId : undefined;
 		if (result.deleted.length > 0) {
 			const deleted = new Set(result.deleted);
 			this.#queue = this.#queue.filter((entry) => !deleted.has(entry.sessionId));
@@ -366,17 +433,18 @@ export class DesktopHost {
 			this.#sessions.delete(id);
 			this.#readOnlyIds.delete(id);
 			this.#createdSessionIds.delete(id);
+			this.#live.delete(id);
 			this.#dropSubscription(id);
 			if (this.#current?.meta.id === id) this.#current = undefined;
 		}
 		await this.#refreshMetas();
 		this.#push({ type: "sessions-changed" });
-		if (this.#current === undefined && this.#projectRoot !== undefined) {
+		if (clearedId !== undefined) {
 			const latest = this.#metas.filter((meta) => !meta.archived).at(-1);
 			if (latest !== undefined) {
-				await this.activateSession(latest.id);
+				await this.#activateSession(latest.id);
 			} else {
-				await this.createSession();
+				this.#push({ type: "session-cleared", sessionId: clearedId });
 			}
 		}
 		return { deleted: result.deleted, failed: [...rejected, ...result.failed] };
@@ -504,6 +572,10 @@ export class DesktopHost {
 	}
 
 	async send(input: ChatSendInput): Promise<ChatSendResult> {
+		return this.#withWorkspace(() => this.#send(input));
+	}
+
+	async #send(input: ChatSendInput): Promise<ChatSendResult> {
 		const session = this.#requireCurrent();
 		if (input.sessionId !== session.meta.id) throw new Error("The active session changed; send again");
 		if (this.#reviewing) throw new Error("A review is running; wait for it to finish");
@@ -515,6 +587,7 @@ export class DesktopHost {
 		const text = input.text.trim();
 		const imageIds = input.imageIds ?? [];
 		if (text.length === 0 && imageIds.length === 0) throw new Error("Message is empty");
+		this.#prunePreparedImages();
 		const images = imageIds.map((id) => {
 			const entry = this.#preparedImages.get(id);
 			if (entry === undefined) throw new Error("An attached image has expired; attach it again");
@@ -531,7 +604,7 @@ export class DesktopHost {
 		}
 
 		const entry: QueuedEntry = { id: randomUUID(), sessionId: session.meta.id, text, images };
-		const queued = this.#activeRun !== undefined || this.#startingRun;
+		const queued = this.#activeRun !== undefined || this.#activeRunPromise !== undefined || this.#startingRun;
 		if (queued) {
 			if (this.#queue.length >= MAX_QUEUE) throw new Error(`Queue is full (${MAX_QUEUE})`);
 			this.#queue.push(entry);
@@ -778,10 +851,245 @@ export class DesktopHost {
 		this.#disposed = true;
 		this.#broker.denyAll();
 		this.#activeRun?.controller.abort(new Error("Application is shutting down"));
-		if (this.#activeRunPromise !== undefined) {
-			await Promise.race([this.#activeRunPromise.catch(() => undefined), delay(3_000)]);
+		try {
+			await this.#workspaceOperation;
+			await this.#teardownProject();
+		} finally {
+			// 草稿附件跨工作区保留，但最终退出不能继续占用主进程内存。
+			this.#preparedImages.clear();
+		}
+	}
+
+	// 工作区切换与发送准备按顺序执行；等待的是创建/租约/信任检查，不是后台整轮任务。
+	#withWorkspace<T>(operation: () => Promise<T>): Promise<T> {
+		const result = this.#workspaceOperation.then(() => {
+			if (this.#disposed) throw new Error("Application is shutting down");
+			return operation();
+		});
+		// 失败仍由 result 返回给调用方；队尾恢复可用，后续请求才能重试。
+		this.#workspaceOperation = result.then(
+			() => undefined,
+			() => undefined,
+		);
+		return result;
+	}
+
+	#recentProjects(): readonly RecentProject[] {
+		return this.#store
+			.recentProjects()
+			.filter((project) => normalizeProjectRoot(project.root) !== normalizeProjectRoot(this.#taskRoot));
+	}
+
+	async #rememberProject(root: string): Promise<void> {
+		if (normalizeProjectRoot(root) === normalizeProjectRoot(this.#taskRoot)) return;
+		await this.#store.rememberProject(root).catch((error: unknown) => {
+			this.#notice("warn", `Could not save the recent project list: ${messageOf(error)}`);
+		});
+	}
+
+	async #resolveTarget(target: WorkspaceTarget): Promise<string> {
+		if (target.kind === "project") return assertProjectDirectory(target.root, this.#taskRoot);
+		try {
+			const root = await assertWorkspaceRoot(this.#taskRoot);
+			if (normalizeProjectRoot(root) !== normalizeProjectRoot(this.#taskRoot)) {
+				throw new Error("The tasks workspace directory changed");
+			}
+			return root;
+		} catch (error) {
+			throw new DesktopWorkspaceError("task-workspace-error", "The default tasks workspace is not accessible", {
+				cause: error,
+			});
+		}
+	}
+
+	async #openProject(input: string): Promise<ProjectSnapshot> {
+		const root = await assertProjectDirectory(input, this.#taskRoot);
+		if (!(await this.#switchWorkspace(root))) return this.projectSnapshot();
+		try {
+			await this.#rememberProject(root);
+			const page = await this.#requiredCore().listSessionsPage(root, { limit: 1, includeArchived: false });
+			const latest = page.items[0];
+			if (latest !== undefined) return (await this.#activateSession(latest.id)).project;
+			return await this.projectSnapshot();
+		} catch (error) {
+			await this.#teardownProject();
+			throw error;
+		}
+	}
+
+	async #prepareWorkspace(target: WorkspaceTarget): Promise<ProjectSnapshot> {
+		const root = await this.#resolveTarget(target);
+		await this.#switchWorkspace(root);
+		await this.#rememberProject(root);
+		return this.projectSnapshot();
+	}
+
+	async #switchWorkspace(root: string): Promise<boolean> {
+		if (
+			this.#core !== undefined &&
+			this.#projectRoot !== undefined &&
+			normalizeProjectRoot(this.#projectRoot) === normalizeProjectRoot(root)
+		) {
+			return false;
+		}
+		if (
+			this.#activeRun !== undefined ||
+			this.#activeRunPromise !== undefined ||
+			this.#startingRun ||
+			this.#reviewing ||
+			this.#queue.length > 0
+		) {
+			throw new DesktopWorkspaceError("workspace-busy", "Wait for the current workspace task to finish, then retry");
 		}
 		await this.#teardownProject();
+		this.#warnings = [];
+		const core = new Core({
+			requestApproval: (request, signal) => this.#requestApproval(request, signal),
+			onWarning: (message) => {
+				this.#warnings = [...this.#warnings.slice(-(MAX_WARNINGS - 1)), message];
+				this.#notice("warn", message);
+			},
+			hostKind: "desktop",
+			...(this.#homeDir === undefined ? {} : { homeDir: this.#homeDir }),
+		});
+		this.#core = core;
+		this.#projectRoot = root;
+		try {
+			this.#startWatcher(root);
+			try {
+				await core.prepareMcp(root);
+			} catch (error) {
+				this.#notice("warn", `Could not start MCP servers: ${messageOf(error)}`);
+			}
+			await this.#refreshMetas();
+			await this.#refreshCatalog();
+			return true;
+		} catch (error) {
+			await this.#teardownProject();
+			throw error;
+		}
+	}
+
+	async #projectSnapshot(current: Session | undefined): Promise<ProjectSnapshot> {
+		const core = this.#requiredCore();
+		const root = this.#requiredProject();
+		const trust = await this.#readTrust();
+		const models = await core.listModels(root).catch(() => this.#catalog);
+		this.#catalog = models;
+		const skills = await core.listSkills(root).catch(() => []);
+		const mcp = core.mcpStatus(root);
+		const session = current === undefined ? undefined : await this.#buildView(current);
+		const target: WorkspaceTarget =
+			normalizeProjectRoot(root) === normalizeProjectRoot(this.#taskRoot)
+				? { kind: "tasks" }
+				: { kind: "project", root };
+		return {
+			root,
+			name: basename(root),
+			target,
+			recentProjects: this.#recentProjects(),
+			trust,
+			models,
+			skills,
+			mcp,
+			warnings: [...this.#warnings],
+			...(session === undefined ? {} : { session }),
+		};
+	}
+
+	async #sessionContext(session: Session): Promise<SessionContext> {
+		const project = await this.#projectSnapshot(undefined);
+		const view = await this.#buildView(session);
+		return { project: { ...project, session: view }, session: view };
+	}
+
+	async #createSession(input: SessionCreateInput): Promise<SessionContext> {
+		const root = await this.#resolveTarget(input.target);
+		await this.#switchWorkspace(root);
+		await this.#rememberProject(root);
+		const core = this.#requiredCore();
+		const previous = this.#current;
+		const session = await core.createSession(root);
+		const id = session.meta.id;
+		this.#createdSessionIds.add(id);
+		try {
+			await core.acquireSessionLease(session);
+			if (input.model !== undefined) await core.selectModel(session, input.model.provider, input.model.model);
+			if (input.effort !== undefined) core.selectEffort(session, input.effort);
+			if (input.approval !== undefined) core.setSessionApproval(session, input.approval);
+			if (input.plan !== undefined) core.setSessionPlan(session, input.plan);
+			await this.#refreshMetas();
+			// 选项及快照均成功后才提交当前会话，避免失败草稿顶掉原来会话。
+			const context = await this.#sessionContext(session);
+			if (previous !== undefined) {
+				await this.#discardIfEmpty(previous.meta.id);
+				await this.#releaseIfIdle(previous.meta.id);
+				this.#dropSubscriptionIfIdle(previous.meta.id);
+			}
+			await this.#refreshMetas();
+			this.#sessions.set(id, session);
+			this.#current = session;
+			this.#readOnlyIds.delete(id);
+			this.#ensureSubscribed(session);
+			this.#push({ type: "sessions-changed" });
+			this.#push({ type: "project", project: context.project });
+			this.#push({ type: "session-view", view: context.session });
+			return context;
+		} catch (error) {
+			if (this.#current?.meta.id === id) {
+				this.#current = previous !== undefined && this.#sessions.has(previous.meta.id) ? previous : undefined;
+			}
+			this.#sessions.delete(id);
+			this.#readOnlyIds.delete(id);
+			this.#dropSubscription(id);
+			try {
+				await core.deleteSession(id);
+				this.#createdSessionIds.delete(id);
+			} catch (cleanupError) {
+				throw new AggregateError([error, cleanupError], "Could not clean up the failed new session");
+			} finally {
+				await core.releaseSessionLease(id);
+			}
+			await this.#refreshMetas().catch((refreshError: unknown) =>
+				this.#notice("warn", `Could not refresh sessions: ${messageOf(refreshError)}`),
+			);
+			throw error;
+		}
+	}
+
+	async #activateSession(id: string): Promise<SessionContext> {
+		if (this.#current?.meta.id === id) {
+			this.#assertSessionInProject(this.#current);
+			return this.#sessionContext(this.#current);
+		}
+		// 只有显式激活可先读取持久化归属；切根后仍经 #sessionFor 做边界验证。
+		const candidate = await this.#requiredCore().openSession(id);
+		const root = await assertWorkspaceRoot(candidate.meta.projectRoot);
+		if (normalizeProjectRoot(candidate.meta.projectRoot) !== normalizeProjectRoot(root)) {
+			throw new DesktopWorkspaceError("invalid-project", "The session workspace directory changed");
+		}
+		await this.#switchWorkspace(root);
+		await this.#rememberProject(root);
+		const previous = this.#current;
+		const session = await this.#sessionFor(candidate.meta.id);
+		let context: SessionContext;
+		try {
+			await this.#acquireLease(session);
+			context = await this.#sessionContext(session);
+		} catch (error) {
+			await this.#releaseIfIdle(session.meta.id);
+			throw error;
+		}
+		if (previous !== undefined) {
+			await this.#discardIfEmpty(previous.meta.id);
+			await this.#releaseIfIdle(previous.meta.id);
+			this.#dropSubscriptionIfIdle(previous.meta.id);
+		}
+		this.#current = session;
+		this.#ensureSubscribed(session);
+		this.#push({ type: "project", project: context.project });
+		this.#push({ type: "session-view", view: context.session });
+		return context;
 	}
 
 	async #teardownProject(): Promise<void> {
@@ -802,23 +1110,30 @@ export class DesktopHost {
 		this.#queue = [];
 		this.#activeRun = undefined;
 		this.#activeRunPromise = undefined;
+		this.#startingRun = false;
 		this.#reviewing = false;
-		this.#preparedImages.clear();
+		this.#prunePreparedImages();
 		this.#readOnlyIds.clear();
-		if (this.#core !== undefined) {
-			const core = this.#core;
-			for (const id of [...this.#createdSessionIds]) {
-				await core.discardEmptySession(id).catch(() => false);
+		try {
+			if (this.#core !== undefined) {
+				const core = this.#core;
+				for (const id of [...this.#createdSessionIds]) {
+					await core.discardEmptySession(id).catch((error: unknown) => {
+						this.#notice("warn", `Could not clean up an empty session: ${messageOf(error)}`);
+					});
+				}
+				await core.dispose();
 			}
-			await core.dispose();
+		} finally {
+			this.#core = undefined;
+			this.#projectRoot = undefined;
+			this.#current = undefined;
+			this.#sessions.clear();
+			this.#createdSessionIds.clear();
+			this.#metas = [];
+			this.#catalog = { providers: [] };
+			this.#viewVersion++;
 		}
-		this.#core = undefined;
-		this.#projectRoot = undefined;
-		this.#current = undefined;
-		this.#sessions.clear();
-		this.#createdSessionIds.clear();
-		this.#metas = [];
-		this.#catalog = { providers: [] };
 	}
 
 	#startWatcher(root: string): void {
@@ -997,7 +1312,7 @@ export class DesktopHost {
 		return session;
 	}
 
-	/** 单窗口只服务当前项目；会话事件、导出与删除都不得跨出这个边界。 */
+	/** 除显式激活先切工作区外，事件、导出与删除都不得跨出当前根边界。 */
 	#assertSessionInProject(session: Session): void {
 		const project = this.#requiredProject();
 		if (normalizeProjectRoot(session.meta.projectRoot) !== normalizeProjectRoot(project)) {
@@ -1031,6 +1346,7 @@ export class DesktopHost {
 	async #discardIfEmpty(id: string): Promise<void> {
 		if (!this.#createdSessionIds.has(id)) return;
 		if (this.#activeRun?.sessionId === id) return;
+		if (this.#queue.some((entry) => entry.sessionId === id)) return;
 		const core = this.#core;
 		if (core === undefined) return;
 		try {
@@ -1280,6 +1596,8 @@ export class DesktopHost {
 	}
 
 	#rememberImage(image: SessionImageInput): PreparedImage {
+		// 异步 URL/文件选择可能在 dispose 后才完成，不能重新填充已释放的池。
+		if (this.#disposed) throw new Error("Application is shutting down");
 		this.#prunePreparedImages();
 		if (this.#preparedImages.size >= MAX_PREPARED_IMAGES) {
 			const oldest = [...this.#preparedImages.entries()].sort(

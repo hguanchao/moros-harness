@@ -22,8 +22,6 @@ import {
 } from "../components/Icons.tsx";
 import { useApp } from "../store/state.tsx";
 
-const NEW_PROVIDER = "__new__";
-
 const API_OPTIONS: ReadonlyArray<readonly [ProviderView["api"], string]> = [
 	["anthropic-messages", "Anthropic Messages (/v1/messages)"],
 	["chat-completions", "OpenAI Chat Completions (/v1/chat/completions)"],
@@ -98,7 +96,9 @@ export function ProvidersTab({
 	readonly onNotice: (level: "info" | "warn" | "error", message: string) => void;
 }): JSX.Element {
 	const firstProvider = settings.providers[0];
-	const [selected, setSelected] = useState<string>(() => firstProvider?.name ?? NEW_PROVIDER);
+	const [selected, setSelected] = useState<string | undefined>(() => firstProvider?.name);
+	const [isNew, setIsNew] = useState(false);
+	const nextDraftNumber = useRef(1);
 	const [draft, setDraft] = useState<ProviderForm>(() =>
 		firstProvider === undefined ? emptyForm() : formFromProvider(firstProvider),
 	);
@@ -110,9 +110,10 @@ export function ProvidersTab({
 	const [renameValue, setRenameValue] = useState("");
 	const moreRef = useRef<HTMLDivElement>(null);
 
-	const isNew = selected === NEW_PROVIDER;
-	const current = settings.providers.find((provider) => provider.name === selected);
-	const keyDisplay = revealed[selected] ?? current?.apiKey.display ?? "";
+	const current =
+		selected === undefined ? undefined : settings.providers.find((provider) => provider.name === selected);
+	const keyDisplay = selected === undefined ? "" : (revealed[selected] ?? current?.apiKey.display ?? "");
+	const isEditing = isNew || selected !== undefined;
 	const set = (patch: Partial<ProviderForm>): void => setDraft((previous) => ({ ...previous, ...patch }));
 
 	useEffect(() => {
@@ -126,6 +127,7 @@ export function ProvidersTab({
 
 	const selectProvider = (provider: ProviderView): void => {
 		setSelected(provider.name);
+		setIsNew(false);
 		setDraft(formFromProvider(provider));
 		setRevealed({});
 		setShowKey(false);
@@ -134,9 +136,27 @@ export function ProvidersTab({
 		setEditingName(false);
 	};
 
-	const startNew = (): void => {
-		setSelected(NEW_PROVIDER);
+	const clearSelection = (): void => {
+		setSelected(undefined);
+		setIsNew(false);
 		setDraft(emptyForm());
+		setRevealed({});
+		setShowKey(false);
+		setModelEditor(undefined);
+		setMoreOpen(false);
+		setEditingName(false);
+	};
+
+	const startNew = (): void => {
+		let name = `新供应商-${nextDraftNumber.current}`;
+		while (settings.providers.some((provider) => provider.name === name)) {
+			nextDraftNumber.current += 1;
+			name = `新供应商-${nextDraftNumber.current}`;
+		}
+		nextDraftNumber.current += 1;
+		setSelected(undefined);
+		setIsNew(true);
+		setDraft({ ...emptyForm(), name });
 		setRevealed({});
 		setShowKey(false);
 		setModelEditor(undefined);
@@ -185,14 +205,15 @@ export function ProvidersTab({
 	/** 字段变更后自动保存；可传入覆盖值以绕过 setState 的异步性。 */
 	const autoSave = async (overrides?: Partial<ProviderForm>): Promise<void> => {
 		const form = { ...draft, ...overrides };
-		const name = (isNew ? form.name : selected).trim();
+		const name = (isNew ? form.name : (selected ?? "")).trim();
 		if (!readyToSave(form, name)) return;
 		try {
 			await call(window.moros.settingsUpsertProvider(name, buildPayload(form)));
 			await onRefresh();
 			if (isNew) {
+				setIsNew(false);
 				setSelected(name);
-				setDraft((previous) => ({ ...previous, name }));
+				setDraft((previous) => ({ ...previous, name, originalName: name }));
 				setRevealed({});
 				setShowKey(false);
 			}
@@ -202,7 +223,7 @@ export function ProvidersTab({
 	};
 
 	const toggleReveal = async (): Promise<void> => {
-		if (isNew || current === undefined) {
+		if (isNew || current === undefined || selected === undefined) {
 			setShowKey((previous) => !previous);
 			return;
 		}
@@ -225,7 +246,7 @@ export function ProvidersTab({
 	};
 
 	const remove = async (): Promise<void> => {
-		if (isNew || current === undefined) return;
+		if (isNew || current === undefined || selected === undefined) return;
 		setMoreOpen(false);
 		if (!window.confirm(`删除供应商 ${selected}？`)) return;
 		try {
@@ -233,7 +254,7 @@ export function ProvidersTab({
 			await onRefresh();
 			const provider = settings.providers.find((item) => item.name !== selected);
 			if (provider === undefined) {
-				startNew();
+				clearSelection();
 			} else {
 				selectProvider(provider);
 			}
@@ -245,7 +266,7 @@ export function ProvidersTab({
 
 	const startEditName = (): void => {
 		setMoreOpen(false);
-		if (isNew) return;
+		if (isNew || selected === undefined) return;
 		setRenameValue(selected);
 		setEditingName(true);
 	};
@@ -254,7 +275,7 @@ export function ProvidersTab({
 	const commitRename = async (): Promise<void> => {
 		const next = renameValue.trim();
 		setEditingName(false);
-		if (next.length === 0 || next === selected) return;
+		if (selected === undefined || next.length === 0 || next === selected) return;
 		try {
 			await call(window.moros.settingsRenameProvider(selected, next));
 			await onRefresh();
@@ -343,161 +364,183 @@ export function ProvidersTab({
 								<span className={`prov-item-status ${provider.apiKey.source === "empty" ? "is-warn" : "is-ok"}`} />
 							</button>
 						))}
-						{settings.providers.length === 0 ? <div className="prov-sidebar-empty">还没有自定义供应商</div> : null}
-					</div>
-				</aside>
-
-				<section className="prov-detail">
-					<div className="prov-detail-head">
-						<div className="prov-detail-identity">
-							<span className="prov-detail-icon">
-								<ServerIcon size={18} />
-							</span>
-							{isNew ? (
-								<input
-									className="prov-name-input is-inline"
-									value={draft.name}
-									placeholder="新供应商"
-									onChange={(event) => set({ name: event.target.value })}
-									onBlur={() => void autoSave()}
-								/>
-							) : editingName ? (
-								<input
-									className="prov-name-input is-inline"
-									value={renameValue}
-									autoFocus
-									onChange={(event) => setRenameValue(event.target.value)}
-									onBlur={() => void commitRename()}
-									onKeyDown={(event) => {
-										if (event.key === "Enter") commitRename();
-										if (event.key === "Escape") {
-											setEditingName(false);
-											setRenameValue(selected);
-										}
-									}}
-								/>
-							) : (
-								<h2 className="prov-detail-name" title="双击重命名" onDoubleClick={startEditName}>
-									{selected}
-								</h2>
-							)}
-						</div>
-						{!isNew ? (
-							<div className="prov-more" ref={moreRef}>
-								<button className="icon-button" title="更多" onClick={() => setMoreOpen((previous) => !previous)}>
-									<MoreIcon size={16} />
-								</button>
-								{moreOpen ? (
-									<div className="prov-more-menu" role="menu">
-										<button type="button" role="menuitem" onClick={startEditName}>
-											<PencilIcon size={14} />
-											重命名
-										</button>
-										<button type="button" role="menuitem" className="danger" onClick={() => void remove()}>
-											<TrashIcon size={14} />
-											删除
-										</button>
-									</div>
-								) : null}
+						{isNew ? (
+							<div className="provider-card prov-item is-active">
+								<ServerIcon size={15} />
+								<span className="prov-item-name">{draft.name.trim() || "新供应商"}</span>
+								<span className="prov-item-status is-warn" />
 							</div>
 						) : null}
 					</div>
+				</aside>
 
-					<div className="prov-fields">
-						<label className="prov-field">
-							<span>Base URL</span>
-							<input
-								className="prov-input"
-								value={draft.baseUrl}
-								placeholder="https://api.example.com/v1"
-								onChange={(event) => set({ baseUrl: event.target.value })}
-								onBlur={() => void autoSave()}
-							/>
-						</label>
-						<label className="prov-field">
-							<span>API 格式</span>
-							<Dropdown
-								value={draft.api}
-								options={API_OPTIONS.map(([value, label]) => ({ value, label }))}
-								onChange={(api) => {
-									const next = api as ProviderView["api"];
-									set({ api: next });
-									void autoSave({ api: next });
-								}}
-							/>
-						</label>
-						<label className="prov-field">
-							<span>API Key</span>
-							<span className="prov-key-wrap">
+				{isEditing ? (
+					<section className="prov-detail">
+						<div className="prov-detail-head">
+							<div className="prov-detail-identity">
+								<span className="prov-detail-icon">
+									<ServerIcon size={18} />
+								</span>
+								{isNew ? (
+									<input
+										className="prov-name-input is-inline"
+										value={draft.name}
+										placeholder="新供应商"
+										onChange={(event) => set({ name: event.target.value })}
+										onBlur={() => void autoSave()}
+									/>
+								) : editingName ? (
+									<input
+										className="prov-name-input is-inline"
+										value={renameValue}
+										autoFocus
+										onChange={(event) => setRenameValue(event.target.value)}
+										onBlur={() => void commitRename()}
+										onKeyDown={(event) => {
+											if (event.key === "Enter") commitRename();
+											if (event.key === "Escape") {
+												setEditingName(false);
+												setRenameValue(selected ?? "");
+											}
+										}}
+									/>
+								) : (
+									<h2 className="prov-detail-name" title="双击重命名" onDoubleClick={startEditName}>
+										{selected}
+									</h2>
+								)}
+							</div>
+							{!isNew ? (
+								<div className="prov-more" ref={moreRef}>
+									<button className="icon-button" title="更多" onClick={() => setMoreOpen((previous) => !previous)}>
+										<MoreIcon size={16} />
+									</button>
+									{moreOpen ? (
+										<div className="prov-more-menu" role="menu">
+											<button type="button" role="menuitem" onClick={startEditName}>
+												<PencilIcon size={14} />
+												重命名
+											</button>
+											<button type="button" role="menuitem" className="danger" onClick={() => void remove()}>
+												<TrashIcon size={14} />
+												删除
+											</button>
+										</div>
+									) : null}
+								</div>
+							) : null}
+						</div>
+
+						<div className="prov-fields">
+							<label className="prov-field">
+								<span>Base URL</span>
 								<input
 									className="prov-input"
-									type={showKey ? "text" : "password"}
-									value={draft.apiKey}
-									placeholder={
-										isNew ? "输入 API Key" : `留空保持不变${keyDisplay.length > 0 ? `（当前 ${keyDisplay}）` : ""}`
-									}
-									onChange={(event) => set({ apiKey: event.target.value })}
+									value={draft.baseUrl}
+									placeholder="https://api.example.com/v1"
+									onChange={(event) => set({ baseUrl: event.target.value })}
 									onBlur={() => void autoSave()}
 								/>
-								<button
-									type="button"
-									className="prov-key-eye"
-									title={showKey ? "隐藏" : "显示原始表达式"}
-									onClick={() => void toggleReveal()}
-								>
-									{showKey ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
-								</button>
-							</span>
-						</label>
-					</div>
+							</label>
+							<label className="prov-field">
+								<span>API 格式</span>
+								<Dropdown
+									value={draft.api}
+									options={API_OPTIONS.map(([value, label]) => ({ value, label }))}
+									onChange={(api) => {
+										const next = api as ProviderView["api"];
+										set({ api: next });
+										void autoSave({ api: next });
+									}}
+								/>
+							</label>
+							<label className="prov-field">
+								<span>API Key</span>
+								<span className="prov-key-wrap">
+									<input
+										className="prov-input"
+										type={showKey ? "text" : "password"}
+										value={draft.apiKey}
+										placeholder={
+											isNew ? "输入 API Key" : `留空保持不变${keyDisplay.length > 0 ? `（当前 ${keyDisplay}）` : ""}`
+										}
+										onChange={(event) => set({ apiKey: event.target.value })}
+										onBlur={() => void autoSave()}
+									/>
+									<button
+										type="button"
+										className="prov-key-eye"
+										title={showKey ? "隐藏" : "显示原始表达式"}
+										onClick={() => void toggleReveal()}
+									>
+										{showKey ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
+									</button>
+								</span>
+							</label>
+						</div>
 
-					<div className="prov-models">
-						<div className="prov-models-head">
-							<h3>模型列表</h3>
-							<button className="ghost-button small" onClick={() => setModelEditor({ model: emptyModel() })}>
-								<PlusIcon size={13} />
-								添加模型
+						<div className="prov-models">
+							<div className="prov-models-head">
+								<h3>模型列表</h3>
+								<button className="ghost-button small" onClick={() => setModelEditor({ model: emptyModel() })}>
+									<PlusIcon size={13} />
+									添加模型
+								</button>
+							</div>
+							{draft.models.length === 0 ? (
+								<div className="prov-empty">
+									<InfoIcon size={16} />
+									<span>当前没有配置模型，添加模型后可在聊天中使用。</span>
+								</div>
+							) : (
+								<div className="prov-model-list">
+									{draft.models.map((model, index) => (
+										<div className="prov-model-card" key={`${index}-${model.id}`}>
+											<div className="prov-model-main">
+												<div className="prov-model-title">
+													<strong>{model.id}</strong>
+													{model.name.trim().length > 0 ? <span>{model.name}</span> : null}
+												</div>
+												<div className="prov-model-meta">
+													<span>maxTokens {model.maxTokens}</span>
+													{model.contextWindow.trim().length > 0 ? <span>context {model.contextWindow}</span> : null}
+													{model.reasoning ? <span className="pill">reasoning</span> : null}
+													{model.image ? <span className="pill">image</span> : null}
+												</div>
+											</div>
+											<div className="prov-model-actions">
+												<button
+													className="icon-button"
+													title="编辑模型"
+													onClick={() => setModelEditor({ index, model: { ...model } })}
+												>
+													<PencilIcon size={14} />
+												</button>
+												<button className="icon-button danger" title="删除模型" onClick={() => deleteModel(index)}>
+													<TrashIcon size={14} />
+												</button>
+											</div>
+										</div>
+									))}
+								</div>
+							)}
+						</div>
+					</section>
+				) : (
+					<section className="prov-detail prov-detail-empty">
+						<div className="prov-empty-state">
+							<span className="prov-detail-icon">
+								<ServerIcon size={18} />
+							</span>
+							<h2>还没有自定义供应商</h2>
+							<p>添加供应商并填写 Base URL、API Key 和模型后，就可以在聊天中选择使用。</p>
+							<button className="primary-button" onClick={startNew}>
+								<PlusIcon size={15} />
+								添加供应商
 							</button>
 						</div>
-						{draft.models.length === 0 ? (
-							<div className="prov-empty">
-								<InfoIcon size={16} />
-								<span>当前没有配置模型，添加模型后可在聊天中使用。</span>
-							</div>
-						) : (
-							<div className="prov-model-list">
-								{draft.models.map((model, index) => (
-									<div className="prov-model-card" key={`${index}-${model.id}`}>
-										<div className="prov-model-main">
-											<div className="prov-model-title">
-												<strong>{model.id}</strong>
-												{model.name.trim().length > 0 ? <span>{model.name}</span> : null}
-											</div>
-											<div className="prov-model-meta">
-												<span>maxTokens {model.maxTokens}</span>
-												{model.contextWindow.trim().length > 0 ? <span>context {model.contextWindow}</span> : null}
-												{model.reasoning ? <span className="pill">reasoning</span> : null}
-												{model.image ? <span className="pill">image</span> : null}
-											</div>
-										</div>
-										<div className="prov-model-actions">
-											<button
-												className="icon-button"
-												title="编辑模型"
-												onClick={() => setModelEditor({ index, model: { ...model } })}
-											>
-												<PencilIcon size={14} />
-											</button>
-											<button className="icon-button danger" title="删除模型" onClick={() => deleteModel(index)}>
-												<TrashIcon size={14} />
-											</button>
-										</div>
-									</div>
-								))}
-							</div>
-						)}
-					</div>
-				</section>
+					</section>
+				)}
 			</div>
 
 			{modelEditor !== undefined ? (

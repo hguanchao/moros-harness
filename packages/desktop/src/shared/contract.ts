@@ -16,6 +16,11 @@ export const IPC = {
 	appState: "moros:app-state",
 	appOpenProjectDialog: "moros:app-open-project-dialog",
 	appOpenProject: "moros:app-open-project",
+	appSelectProjectDialog: "moros:app-select-project-dialog",
+	appCreateProjectDialog: "moros:app-create-project-dialog",
+	workspacePrepare: "moros:workspace-prepare",
+	gitBranches: "moros:git-branches",
+	gitCheckout: "moros:git-checkout",
 	appOpenExternal: "moros:app-open-external",
 	windowMinimize: "moros:window-minimize",
 	windowToggleMaximize: "moros:window-toggle-maximize",
@@ -87,6 +92,48 @@ export interface RecentProject {
 	readonly lastOpenedAt: string;
 }
 
+/**
+ * 桌面任务的明确归属；内部任务目录由主进程决定，客户端不能覆盖其路径。
+ * @example { kind: "tasks" } 或 { kind: "project", root: "/work/project" }
+ */
+export type WorkspaceTarget = { readonly kind: "tasks" } | { readonly kind: "project"; readonly root: string };
+
+/** 已校验的项目目录引用；仅供草稿关联，不代表已经激活该项目或会话。 */
+export interface ProjectRef {
+	readonly root: string;
+	readonly name: string;
+}
+
+/** 选择或创建项目的结果；包含更新后的最近项目，取消目录对话框时返回 null 而非该结构。 */
+export interface ProjectSelection {
+	readonly project: ProjectRef;
+	readonly recentProjects: readonly RecentProject[];
+}
+
+/** 项目 Git 分支查询结果；非 Git 仓库或查询失败时 branches 为空。 */
+export interface GitBranches {
+	readonly branches: readonly string[];
+	/** 当前分支；detached HEAD 时缺省。 */
+	readonly current?: string;
+}
+
+/** 切换分支成功后的目标分支。 */
+export interface GitCheckoutResult {
+	readonly branch: string;
+}
+
+/**
+ * 首次发送时创建会话的参数；归属必填，未提供的会话选项沿用目标工作区的配置。
+ * 配置选择在创建后应用，失败不得留下未发送的空会话。
+ */
+export interface SessionCreateInput {
+	readonly target: WorkspaceTarget;
+	readonly model?: { readonly provider: string; readonly model: string };
+	readonly effort?: ReasoningEffort;
+	readonly approval?: ApprovalMode;
+	readonly plan?: boolean;
+}
+
 export interface WorkspaceTrustView {
 	readonly required: boolean;
 	readonly decision: boolean | null;
@@ -120,6 +167,9 @@ export interface SessionView {
 export interface ProjectSnapshot {
 	readonly root: string;
 	readonly name: string;
+	/** 实际工作区归属；tasks 工作区不作为普通项目展示。 */
+	readonly target: WorkspaceTarget;
+	readonly recentProjects: readonly RecentProject[];
 	readonly trust: WorkspaceTrustView;
 	readonly models: ModelCatalog;
 	readonly skills: readonly SkillSummary[];
@@ -128,9 +178,17 @@ export interface ProjectSnapshot {
 	readonly session?: SessionView;
 }
 
+/** 创建或激活会话后的完整上下文；会话与工作区必须一起切换，避免沿用旧项目的信任或模型。 */
+export interface SessionContext {
+	readonly project: ProjectSnapshot;
+	readonly session: SessionView;
+}
+
 export interface AppSnapshot {
 	readonly version: string;
 	readonly platform: NodeJS.Platform;
+	/** 稳定的内部任务根，只用于会话归组；不是客户端指定执行目录的入口。 */
+	readonly taskRoot: string;
 	readonly recentProjects: readonly RecentProject[];
 	readonly project?: ProjectSnapshot;
 }
@@ -146,6 +204,8 @@ export interface SessionPage {
 }
 
 export interface SessionListQuery {
+	/** 查询指定归属，不切换执行工作区；省略时查询当前工作区以兼容会话管理页。 */
+	readonly target?: WorkspaceTarget;
 	readonly query?: string;
 	readonly includeArchived?: boolean;
 	readonly cursor?: number;
@@ -303,6 +363,7 @@ export type PushMessage =
 	| { readonly type: "approval-cleared"; readonly id: string }
 	| { readonly type: "session-updated"; readonly meta: SessionMeta }
 	| { readonly type: "session-view"; readonly view: SessionView }
+	| { readonly type: "session-cleared"; readonly sessionId: string }
 	| { readonly type: "sessions-changed" }
 	| { readonly type: "workspace"; readonly paths: readonly string[] }
 	| { readonly type: "notice"; readonly level: "info" | "warn" | "error"; readonly message: string }
@@ -324,6 +385,16 @@ export interface DesktopBridge {
 	appState(): Promise<RpcResult<AppSnapshot>>;
 	openProjectDialog(): Promise<RpcResult<ProjectSnapshot | null>>;
 	openProject(path: string): Promise<RpcResult<ProjectSnapshot>>;
+	/** 只选择并登记目录，不切换执行工作区；取消返回 null，路径错误以 RpcError 返回。 */
+	selectProjectDialog(): Promise<RpcResult<ProjectSelection | null>>;
+	/** 在用户选择的父目录中新建 name 文件夹；取消返回 null，已有路径不会被覆盖。 */
+	createProjectDialog(name: string): Promise<RpcResult<ProjectSelection | null>>;
+	/** 准备明确的任务目标，不自动恢复或创建会话；返回信任与模型信息供首次发送校验。 */
+	prepareWorkspace(target: WorkspaceTarget): Promise<RpcResult<ProjectSnapshot>>;
+	/** 查询已登记项目的本地分支；非 Git 仓库返回空列表。 */
+	gitBranches(root: string): Promise<RpcResult<GitBranches>>;
+	/** 首次发送前切换到所选分支；工作区有未提交改动或切换失败时返回 RpcError。 */
+	gitCheckout(root: string, branch: string): Promise<RpcResult<GitCheckoutResult>>;
 	openExternal(url: string): Promise<RpcResult<void>>;
 	windowMinimize(): Promise<RpcResult<void>>;
 	windowToggleMaximize(): Promise<RpcResult<void>>;
@@ -332,8 +403,10 @@ export interface DesktopBridge {
 	windowSetTheme(dark: boolean): Promise<RpcResult<void>>;
 
 	sessionsList(query: SessionListQuery): Promise<RpcResult<SessionPage>>;
-	sessionsCreate(): Promise<RpcResult<SessionView>>;
-	sessionsActivate(id: string): Promise<RpcResult<SessionView>>;
+	/** 在 input.target 下创建一次会话并应用草稿选项；错误以 RpcError 返回，不使用隐含项目。 */
+	sessionsCreate(input: SessionCreateInput): Promise<RpcResult<SessionContext>>;
+	/** 根据持久化会话归属激活 id；返回会话与正确工作区，保留租约及根路径校验。 */
+	sessionsActivate(id: string): Promise<RpcResult<SessionContext>>;
 	sessionsRename(id: string, title: string): Promise<RpcResult<void>>;
 	sessionsArchive(id: string, archived: boolean): Promise<RpcResult<void>>;
 	sessionsDelete(
