@@ -1,3 +1,5 @@
+import type { DiscoveredModel, DiscoverModelsRequest } from "@moros/core/config/model-discovery.ts";
+import type { ModelMetadata as CatalogModelMetadata } from "@moros/core/config/model-catalog/fill.ts";
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft } from "@moros/core/config/settings.ts";
 import type { ApprovalMode, FileChangeDiff, ModelCatalog, SessionMetrics } from "@moros/core/core.ts";
 import type { EventRecord } from "@moros/core/events/schema.ts";
@@ -61,6 +63,8 @@ export const IPC = {
 	settingsDeleteProvider: "moros:settings-delete-provider",
 	settingsRenameProvider: "moros:settings-rename-provider",
 	settingsRevealSecret: "moros:settings-reveal-secret",
+	settingsDiscoverModels: "moros:settings-discover-models",
+	settingsLookupModelMetadata: "moros:settings-lookup-model-metadata",
 	modelsList: "moros:models-list",
 	configSummary: "moros:config-summary",
 	sessionSelectModel: "moros:session-select-model",
@@ -445,6 +449,8 @@ export interface DesktopBridge {
 	settingsDeleteProvider(name: string): Promise<RpcResult<SettingsSnapshot>>;
 	settingsRenameProvider(from: string, to: string): Promise<RpcResult<SettingsSnapshot>>;
 	settingsRevealSecret(name: string): Promise<RpcResult<string>>;
+	settingsDiscoverModels(input: DiscoverModelsRequest): Promise<RpcResult<readonly DiscoveredModel[]>>;
+	settingsLookupModelMetadata(id: string): Promise<RpcResult<CatalogModelMetadata | null>>;
 	modelsList(): Promise<RpcResult<ModelCatalog>>;
 	configSummary(): Promise<RpcResult<ConfigSummary>>;
 

@@ -60,6 +60,8 @@ const bridge: DesktopBridge = {
 	settingsDeleteProvider: (name) => invoke(IPC.settingsDeleteProvider, name),
 	settingsRenameProvider: (from, to) => invoke(IPC.settingsRenameProvider, from, to),
 	settingsRevealSecret: (name) => invoke(IPC.settingsRevealSecret, name),
+	settingsDiscoverModels: (input) => invoke(IPC.settingsDiscoverModels, input),
+	settingsLookupModelMetadata: (id) => invoke(IPC.settingsLookupModelMetadata, id),
 	modelsList: () => invoke(IPC.modelsList),
 	configSummary: () => invoke(IPC.configSummary),
 

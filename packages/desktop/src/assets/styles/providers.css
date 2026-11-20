@@ -316,6 +316,61 @@
 	color: var(--text-secondary);
 }
 
+/* 字段标签 + 问号提示：说明收进问号图标，悬停/聚焦时在标签右侧浮出 */
+.prov-field-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.prov-field-help {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	color: var(--text-faint);
+	cursor: help;
+	outline: none;
+}
+
+.prov-field-help:hover,
+.prov-field-help:focus-visible {
+	color: var(--text-secondary);
+}
+
+.prov-field-tooltip {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	left: 50%;
+	transform: translateX(-50%) translateY(4px);
+	z-index: 30;
+	width: max-content;
+	max-width: 260px;
+	padding: 7px 9px;
+	border: 1px solid var(--line-strong);
+	border-radius: 8px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+	color: var(--text-secondary);
+	font-size: var(--text-caption);
+	line-height: 1.5;
+	text-align: left;
+	white-space: normal;
+	opacity: 0;
+	visibility: hidden;
+	pointer-events: none;
+	transition:
+		opacity 0.12s ease,
+		transform 0.12s ease,
+		visibility 0.12s;
+}
+
+.prov-field-help:hover .prov-field-tooltip,
+.prov-field-help:focus-visible .prov-field-tooltip {
+	opacity: 1;
+	visibility: visible;
+	transform: translateX(-50%) translateY(0);
+}
+
 .prov-input {
 	width: 100%;
 	height: 36px;
@@ -728,6 +783,501 @@
 	color: var(--text-primary);
 }
 
+/* 模型来源菜单：外观保持小号次按钮，弹层提供添加与获取两个入口 */
+.prov-models-head .prov-model-add {
+	min-width: 0;
+}
+
+.prov-model-add .dropdown-trigger {
+	width: auto;
+	height: 26px;
+	gap: 6px;
+	padding: 0 8px;
+	border-color: var(--line);
+	border-radius: 8px;
+	background: transparent;
+	color: var(--text-secondary);
+	font-size: var(--text-small);
+}
+
+.prov-model-add .dropdown-trigger:hover,
+.prov-model-add .dropdown-trigger.is-open {
+	border-color: var(--line);
+	background: var(--fill-soft);
+	color: var(--text-primary);
+}
+
+.prov-model-add .dropdown-trigger > svg:last-child {
+	color: var(--text-faint);
+}
+
+.prov-model-add .dropdown-menu {
+	min-width: 160px;
+}
+
+/* 模型编辑 / 获取面板：直接占用模型列表区域，关闭后恢复列表 */
+.prov-model-panel {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	padding: 16px;
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	background: var(--surface-main);
+}
+
+.prov-model-fields {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 14px 16px;
+}
+
+.prov-model-fields .prov-field {
+	gap: 6px;
+}
+
+.prov-model-fields .prov-field-wide {
+	grid-column: 1 / -1;
+}
+
+/* 推理档位：标签独占一行，按钮组铺满整行；档位为关闭时 reasoning=false */
+.prov-reasoning {
+	flex-direction: column;
+	align-items: stretch;
+	flex-wrap: nowrap;
+	gap: 8px;
+}
+
+.prov-reasoning > span:first-child {
+	flex: none;
+}
+
+.prov-reasoning .prov-checkbox-group {
+	margin-top: 0;
+	width: 100%;
+}
+
+/* Element Plus 风格按钮式多选：按钮平分整行、共享边框，选中态用主题色填充 */
+.prov-checkbox-group {
+	display: flex;
+	align-items: stretch;
+	width: 100%;
+}
+
+.prov-checkbox-button {
+	position: relative;
+	display: inline-flex;
+	flex: 1 1 0;
+	align-items: center;
+	justify-content: center;
+	min-width: 0;
+	height: 34px;
+	padding: 0 8px;
+	margin-left: -1px;
+	border: 1px solid var(--line-strong);
+	background: var(--surface-main);
+	color: var(--text-secondary);
+	font-size: var(--text-ui);
+	white-space: nowrap;
+	cursor: pointer;
+	user-select: none;
+	transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.prov-checkbox-button:first-child {
+	margin-left: 0;
+	border-radius: 5px 0 0 5px;
+}
+
+.prov-checkbox-button:last-child {
+	border-radius: 0 5px 5px 0;
+}
+
+.prov-checkbox-button:hover:not(.is-checked) {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.prov-checkbox-button.is-checked {
+	z-index: 1;
+	border-color: var(--accent);
+	background: var(--accent);
+	color: var(--accent-contrast);
+}
+
+.prov-checkbox-button:focus-visible {
+	z-index: 2;
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
+}
+
+/* 容量预设：未选中保持轻量文字，选中后显示胶囊描边 */
+.prov-preset-group {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	margin-top: 2px;
+}
+
+.prov-preset {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 24px;
+	padding: 0 10px;
+	border: 1px solid transparent;
+	border-radius: 999px;
+	color: var(--text-muted);
+	font-size: var(--text-caption);
+	cursor: pointer;
+	user-select: none;
+}
+
+.prov-preset:hover {
+	background: var(--fill-hover);
+	color: var(--text-secondary);
+}
+
+.prov-preset.is-selected {
+	border-color: var(--line-strong);
+	background: var(--surface-main);
+	color: var(--text-primary);
+}
+
+.prov-preset input {
+	position: absolute;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.prov-preset:has(input:focus-visible) {
+	outline: 1px solid var(--text-faint);
+	outline-offset: 1px;
+}
+
+/* 多选下拉：标签式触发器 + 勾选菜单；菜单通过 portal 固定定位，避免被滚动容器裁剪 */
+.multi-select {
+	position: relative;
+	width: 100%;
+}
+
+.multi-select-trigger {
+	width: 100%;
+	min-height: 36px;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 8px;
+	border: 1px solid var(--line-strong);
+	border-radius: 8px;
+	background: var(--surface-main);
+	color: var(--text-primary);
+	font-size: var(--text-body);
+	cursor: pointer;
+	outline: none;
+}
+
+.multi-select-trigger:hover,
+.multi-select-trigger.is-open,
+.multi-select-trigger:focus-visible {
+	border-color: var(--text-faint);
+}
+
+.multi-select-tags {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	overflow: hidden;
+}
+
+.multi-select-placeholder {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-faint);
+	font-size: var(--text-body);
+}
+
+.multi-select-tag {
+	flex: 0 1 auto;
+	min-width: 0;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 0 3px 0 6px;
+	border-radius: 4px;
+	background: var(--fill-soft);
+	color: var(--text-secondary);
+	font-size: var(--text-caption);
+}
+
+.multi-select-tag-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.multi-select-tag-remove {
+	width: 16px;
+	height: 16px;
+	flex: none;
+	display: grid;
+	place-items: center;
+	border-radius: 3px;
+	color: var(--text-faint);
+}
+
+.multi-select-tag-remove:hover {
+	background: var(--fill-strong);
+	color: var(--text-primary);
+}
+
+.multi-select-count {
+	flex: none;
+	height: 22px;
+	display: inline-flex;
+	align-items: center;
+	padding: 0 6px;
+	border-radius: 4px;
+	background: var(--fill-soft);
+	color: var(--text-secondary);
+	font-size: var(--text-caption);
+}
+
+.multi-select-trigger > svg:last-child {
+	flex: none;
+	color: var(--text-faint);
+	transition: transform 0.15s ease;
+}
+
+.multi-select-trigger.is-open > svg:last-child {
+	transform: rotate(180deg);
+}
+
+.multi-select-menu {
+	position: fixed;
+	z-index: 70;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 6px;
+	overflow-y: auto;
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+}
+
+.multi-select-option {
+	width: 100%;
+	min-height: 34px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 0 10px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-primary);
+	font-size: var(--text-small);
+	text-align: left;
+	cursor: pointer;
+}
+
+.multi-select-option:hover {
+	background: var(--fill-hover);
+}
+
+.multi-select-option.is-selected {
+	color: var(--accent);
+	font-weight: var(--weight-medium);
+}
+
+.multi-select-option.is-selected > svg {
+	flex: none;
+	color: var(--accent);
+}
+
+.multi-select-option.is-locked {
+	cursor: default;
+}
+
+.multi-select-option-label {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.prov-model-panel-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	padding-top: 12px;
+	border-top: 1px solid var(--line);
+}
+
+/* 可搜索单选下拉：触发器贴合普通输入框，菜单通过 portal 固定定位 */
+.search-select {
+	width: 100%;
+}
+
+.search-select-trigger {
+	width: 100%;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0 8px 0 11px;
+	border: 1px solid var(--line-strong);
+	border-radius: 8px;
+	background: var(--surface-main);
+	color: var(--text-primary);
+	cursor: text;
+	outline: none;
+}
+
+.search-select-trigger:hover,
+.search-select-trigger.is-open,
+.search-select-trigger:focus-within {
+	border-color: var(--text-faint);
+}
+
+.search-select-input {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: none;
+	outline: none;
+	background: transparent;
+	color: var(--text-primary);
+	font-size: var(--text-body);
+}
+
+.search-select-input::placeholder {
+	color: var(--text-faint);
+}
+
+.search-select-chevron {
+	width: 20px;
+	height: 20px;
+	flex: none;
+	display: grid;
+	place-items: center;
+	border-radius: 4px;
+	color: var(--text-faint);
+	cursor: pointer;
+}
+
+.search-select-chevron:hover {
+	background: var(--fill-soft);
+	color: var(--text-secondary);
+}
+
+.search-select-chevron > svg {
+	transition: transform 0.15s ease;
+}
+
+.search-select-trigger.is-open .search-select-chevron > svg {
+	transform: rotate(180deg);
+}
+
+.search-select-menu {
+	position: fixed;
+	z-index: 70;
+	display: flex;
+	flex-direction: column;
+	padding: 6px;
+	border: 1px solid var(--line-strong);
+	border-radius: 10px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+}
+
+.search-select-options {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	overflow-y: auto;
+}
+
+.search-select-option {
+	width: 100%;
+	min-height: 38px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 4px 9px;
+	border: none;
+	border-radius: 6px;
+	background: transparent;
+	color: var(--text-primary);
+	font-size: var(--text-small);
+	text-align: left;
+	cursor: pointer;
+}
+
+.search-select-option:hover,
+.search-select-option.is-active {
+	background: var(--fill-hover);
+}
+
+.search-select-option.is-selected {
+	color: var(--accent);
+	font-weight: var(--weight-medium);
+}
+
+.search-select-option.is-selected > svg {
+	flex: none;
+	color: var(--accent);
+}
+
+.search-select-copy {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.search-select-label {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.search-select-description {
+	flex: 1 1 0;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: right;
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+}
+
+.search-select-empty {
+	padding: 12px 9px;
+	color: var(--text-faint);
+	font-size: var(--text-small);
+	text-align: center;
+}
+
 .prov-empty {
 	display: flex;
 	align-items: center;
@@ -763,6 +1313,7 @@
 }
 
 .prov-model-main {
+	flex: 1;
 	min-width: 0;
 }
 
@@ -790,21 +1341,45 @@
 	white-space: nowrap;
 }
 
-.prov-model-meta {
+.prov-model-facts {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 4px 16px;
+	margin-top: 5px;
+}
+
+.prov-model-facts > span {
 	display: flex;
-	align-items: center;
-	flex-wrap: wrap;
-	gap: 6px;
-	margin-top: 4px;
+	align-items: baseline;
+	gap: 5px;
+	min-width: 0;
 	font-size: var(--text-caption);
+}
+
+.prov-fact-label {
+	flex-shrink: 0;
 	color: var(--text-faint);
+}
+
+.prov-fact-value {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-secondary);
+	font-variant-numeric: tabular-nums;
 }
 
 .prov-model-actions {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 4px;
 	flex: none;
+}
+
+.prov-model-actions .icon-button {
+	width: 36px;
+	height: 36px;
 }
 
 .prov-detail-actions {
@@ -824,22 +1399,158 @@
 	background: var(--danger-soft);
 }
 
-/* 添加 / 编辑模型模态框 */
-.model-modal {
-	width: min(520px, 100%);
+/* ---------- 获取模型弹窗 ---------- */
+
+.discover-modal {
+	width: min(880px, 100%);
 }
 
-.model-modal .field-grid .field {
-	margin-bottom: 4px;
-}
-
-.model-modal .check {
-	font-size: var(--text-small);
+.discover-status {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	min-height: 160px;
 	color: var(--text-secondary);
+	font-size: var(--text-ui);
+}
+
+.discover-status .inline-notice {
+	width: 100%;
+}
+
+.discover-hint {
+	margin-bottom: 8px;
+	color: var(--text-muted);
+	font-size: var(--text-caption);
+}
+
+.discover-table {
+	width: 100%;
+}
+
+.discover-row {
+	display: grid;
+	grid-template-columns: 32px minmax(0, 2fr) minmax(0, 1.3fr) 110px 130px 68px;
+	align-items: center;
+	column-gap: 10px;
+	padding: 8px 6px;
+}
+
+.discover-row-head {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	border-bottom: 1px solid var(--line);
+	color: var(--text-secondary);
+	font-size: var(--text-caption);
+	font-weight: 600;
+	background: var(--surface-chrome);
+}
+
+.discover-list {
+	max-height: min(52vh, 420px);
+	overflow-y: auto;
+}
+
+.discover-item {
+	border-radius: 8px;
 	cursor: pointer;
+	font-size: var(--text-caption);
+}
+
+.discover-item:hover {
+	background: var(--fill-soft);
+}
+
+/* 自定义复选框：统一各平台原生控件差异，选中态用主题强调色。 */
+.discover-check {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.discover-check input[type="checkbox"] {
+	appearance: none;
+	width: 16px;
+	height: 16px;
+	margin: 0;
+	border: 1px solid var(--line-strong);
+	border-radius: 4px;
+	background: var(--surface-main);
+	cursor: pointer;
+	position: relative;
+	flex-shrink: 0;
+}
+
+.discover-check input[type="checkbox"]:hover {
+	border-color: var(--accent);
+}
+
+.discover-check input[type="checkbox"]:checked {
+	background: var(--accent);
+	border-color: var(--accent);
+}
+
+.discover-check input[type="checkbox"]:checked::after {
+	content: "";
+	position: absolute;
+	left: 4px;
+	top: 1px;
+	width: 5px;
+	height: 9px;
+	border: solid var(--accent-contrast);
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
+.discover-check input[type="checkbox"]:focus-visible {
+	outline: 2px solid var(--accent-ring);
+	outline-offset: 1px;
+}
+
+.discover-item-id,
+.discover-item-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.discover-item-id {
+	font-family: ui-monospace, Consolas, "SF Mono", monospace;
+}
+
+.discover-item-name {
+	color: var(--text-secondary);
+}
+
+.discover-num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.discover-yes {
+	color: var(--accent);
+}
+
+.discover-no {
+	color: var(--text-muted);
+}
+
+.modal-actions .primary-button:disabled,
+.modal-actions .ghost-button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
 }
 
 @media (max-width: 820px) {
+	.discover-row {
+		grid-template-columns: 28px minmax(0, 1.6fr) minmax(0, 1fr) 84px 100px 56px;
+		column-gap: 6px;
+	}
+
 	.prov-workspace {
 		grid-template-columns: 1fr;
 	}
@@ -847,6 +1558,10 @@
 	.prov-sidebar {
 		border-right: none;
 		border-bottom: 1px solid var(--line);
+	}
+
+	.prov-model-fields {
+		grid-template-columns: 1fr;
 	}
 
 	.prov-sidebar-list {

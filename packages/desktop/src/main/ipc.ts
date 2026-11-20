@@ -1,6 +1,7 @@
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { z } from "zod";
 
+import type { DiscoverModelsRequest } from "@moros/core/config/model-discovery.ts";
 import { SettingsPatchSchema } from "@moros/core/config/settings.ts";
 import { readFileBytes, readTextFile } from "@moros/core/workspace/files.ts";
 import { SessionBusyError } from "@moros/core/session/session-lease.ts";
@@ -64,6 +65,21 @@ const ChatSendSchema = z
 	.strict();
 
 const TraceQuerySchema = z.string().min(1).max(200).optional();
+
+const DiscoverModelsSchema = z
+	.object({
+		api: z.enum(["anthropic-messages", "chat-completions", "responses"]),
+		baseUrl: z.string().min(1).max(4096),
+		apiKey: z.string().max(8192).optional(),
+		providerName: z.string().min(1).max(100).optional(),
+	})
+	.strict()
+	.transform((input): DiscoverModelsRequest => ({
+		api: input.api,
+		baseUrl: input.baseUrl,
+		...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
+		...(input.providerName === undefined ? {} : { providerName: input.providerName }),
+	}));
 
 /**
  * 注册渲染进程可调用的全部方法。
@@ -219,6 +235,12 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	);
 	handle(IPC.settingsRevealSecret, getWindow, z.tuple([z.string().min(1).max(100)]), ([name]) =>
 		host.revealSecret(name),
+	);
+	handle(IPC.settingsDiscoverModels, getWindow, z.tuple([DiscoverModelsSchema]), ([input]) =>
+		host.discoverModels(input),
+	);
+	handle(IPC.settingsLookupModelMetadata, getWindow, z.tuple([z.string().min(1).max(200)]), ([id]) =>
+		host.lookupModelMetadata(id),
 	);
 	handle(IPC.modelsList, getWindow, z.tuple([]), () => host.models());
 	handle(IPC.configSummary, getWindow, z.tuple([]), () => host.configSummary());

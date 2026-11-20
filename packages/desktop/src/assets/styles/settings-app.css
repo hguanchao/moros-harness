@@ -56,6 +56,13 @@
 	width: 0;
 }
 
+/* 收起时保持子元素定宽被裁剪并淡出，避免宽度收缩过程中文字被挤压变形。 */
+.settings-nav > * {
+	width: var(--sidebar-width);
+	flex-shrink: 0;
+	transition: opacity var(--duration-sidebar) var(--ease-sidebar);
+}
+
 .settings-nav.is-collapsed > * {
 	opacity: 0;
 }

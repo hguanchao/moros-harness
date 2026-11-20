@@ -34,6 +34,7 @@ pnpm desktop:dev             # Electron + Vite 开发
 pnpm desktop:build           # 打包 main/preload/renderer 到 packages/desktop/out/
 pnpm desktop:smoke           # 构建后跑本地 mock 端到端冒烟
 pnpm desktop:package         # 生成当前平台安装包（packages/desktop/dist-desktop/）
+pnpm --filter @moros/core update-model-catalog  # 联网更新 models.dev 模型元数据快照
 ```
 
 ## 质量检查

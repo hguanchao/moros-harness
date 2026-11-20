@@ -24,6 +24,8 @@
 .titlebar-toggle {
 	width: 26px;
 	height: 26px;
+	display: grid;
+	place-items: center;
 	border-radius: 6px;
 	color: var(--text-muted);
 }

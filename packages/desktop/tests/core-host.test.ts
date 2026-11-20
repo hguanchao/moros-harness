@@ -669,6 +669,39 @@ describe("DesktopHost running drafts and prepared images", () => {
 });
 
 describe("desktop workspace IPC and preload", () => {
+	it("IPC 删除最后一个供应商模型后保留空列表，刷新目录与重开宿主不会恢复模型", async () => {
+		const input = await fixture();
+		await input.core.upsertProvider("fixture", {
+			api: "chat-completions",
+			baseUrl: "https://example.invalid/v1",
+			models: [{ id: "sample", maxTokens: 1024, reasoning: false, input: ["text"] }],
+		});
+		const { host } = await openHost(input);
+		const initial = await host.initialize();
+		const client = ipcClient(host);
+		expect(initial.project?.models.providers).toMatchObject([{ name: "fixture", models: [{ id: "sample" }] }]);
+
+		const emptyCatalog = { providers: [{ name: "fixture", models: [] }] };
+		const emptySettings = {
+			ok: true,
+			value: {
+				providers: [{ name: "fixture", api: "chat-completions", baseUrl: "https://example.invalid/v1", models: [] }],
+				skipped: [],
+			},
+		};
+		expect(await client.request(IPC.settingsUpsertProvider, "fixture", { models: [] })).toMatchObject(emptySettings);
+		expect(await client.request(IPC.settingsGet)).toMatchObject(emptySettings);
+		expect(await client.request(IPC.modelsList)).toEqual({ ok: true, value: emptyCatalog });
+		expect((await host.initialize()).project?.models).toEqual(emptyCatalog);
+
+		await host.dispose();
+		const { host: reopened } = await openHost(input);
+		expect((await reopened.initialize()).project?.models).toEqual(emptyCatalog);
+		const reopenedClient = ipcClient(reopened);
+		expect(await reopenedClient.request(IPC.settingsGet)).toMatchObject(emptySettings);
+		expect(await reopenedClient.request(IPC.modelsList)).toEqual({ ok: true, value: emptyCatalog });
+	});
+
 	it("新增 IPC/显式 target schema 与 SessionContext 返回值对齐", async () => {
 		const input = await fixture();
 		const root = await projectDirectory(input, "project");

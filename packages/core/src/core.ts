@@ -11,10 +11,22 @@ import type { EventRecord, UserInputImage } from "./events/schema.ts";
 import { ContextCompactor } from "./compaction/compactor.ts";
 import { decodeDiffText, diffLines, type DiffResult } from "./diff/line-diff.ts";
 import { loadConfig as loadConfigFiles, type LoadedConfig } from "./config/loader.ts";
+import {
+	type ModelMetadata as CatalogModelMetadata,
+	lookupModelMetadata as lookupModelMetadataInCatalog,
+} from "./config/model-catalog/metadata.ts";
+import { discoverProviderModels, type DiscoveredModel, type DiscoverModelsRequest } from "./config/model-discovery.ts";
 import { parseModelRef } from "./config/model-ref.ts";
 import { resolveActiveProvider, type ResolvedProvider } from "./config/resolve-providers.ts";
 import { redactSecrets, runSecretCommand } from "./config/secrets.ts";
-import { parseProvidersFile, type AppConfig, type ProviderConfig, type ProvidersFile } from "./config/schema.ts";
+import {
+	parseProvidersFile,
+	type AppConfig,
+	type ModelCapability,
+	type ModelInputType,
+	type ProviderConfig,
+	type ProvidersFile,
+} from "./config/schema.ts";
 import { updateGlobalConfig, updateGlobalTrusts } from "./config/writer.ts";
 import {
 	deleteProvider,
@@ -156,7 +168,8 @@ export interface ModelCatalog {
 			readonly maxTokens: number;
 			readonly contextWindow?: number;
 			readonly reasoning: boolean;
-			readonly input: readonly ("text" | "image")[];
+			readonly input: readonly ModelInputType[];
+			readonly capabilities?: readonly ModelCapability[];
 		}[];
 	}[];
 	/** 当前配置选中的 provider/model；未配置时缺省。 */
@@ -688,6 +701,7 @@ export class Core {
 				...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
 				reasoning: model.reasoning,
 				input: model.input,
+				...(model.capabilities === undefined ? {} : { capabilities: model.capabilities }),
 			})),
 		}));
 		const selected =
@@ -839,6 +853,33 @@ export class Core {
 	/** 读取供应商原始密钥表达式（`${ENV}` / `!command` 原样返回）。 */
 	async revealProviderSecret(name: string): Promise<string> {
 		return revealProviderSecret(this.#homeDir, name);
+	}
+
+	/**
+	 * 读取供应商 `/models` 接口的可用模型；未提供 API Key 时复用已保存供应商的密钥。
+	 * @throws Base URL/密钥缺失、供应商不存在、请求失败或响应无法解析时。
+	 */
+	async discoverModels(input: DiscoverModelsRequest): Promise<readonly DiscoveredModel[]> {
+		let apiKey = input.apiKey?.trim() ?? "";
+		if (apiKey.length === 0) {
+			if (input.providerName === undefined) throw new Error("请先填写 API Key");
+			apiKey = (await revealProviderSecret(this.#homeDir, input.providerName)).trim();
+			if (apiKey.length === 0) throw new Error("请先填写 API Key");
+		}
+		return discoverProviderModels({
+			api: input.api,
+			baseUrl: input.baseUrl,
+			apiKey,
+			...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+		});
+	}
+
+	/**
+	 * 按模型 ID 查询 models.dev 元数据用于回填表单。
+	 * 优先读本地缓存，缓存过期时后台刷新；命中失败返回 null，不影响用户手填。
+	 */
+	async lookupModelMetadata(id: string): Promise<CatalogModelMetadata | null> {
+		return lookupModelMetadataInCatalog(id, { cachePath: join(this.#homeDir, "model-catalog.json") });
 	}
 
 	/** 新增或更新供应商；`apiKey: "***"` 保留原密钥。 */

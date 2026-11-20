@@ -1,16 +1,23 @@
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
+import { applyModelMetadata, type ModelMetadata } from "@moros/core/config/model-catalog/fill.ts";
+import type { DiscoveredModel } from "@moros/core/config/model-discovery.ts";
+import type { ModelCapability, ModelInputType } from "@moros/core/config/schema.ts";
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft, ProviderView } from "@moros/core/config/settings.ts";
+import type { ReasoningEffort } from "@moros/core/llm/types.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
 import type { SkillSummary } from "@moros/core/skills.ts";
 import type { ConfigSummary } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { Dropdown } from "../components/Dropdown.tsx";
+import { MultiSelect, type MultiSelectOption } from "../components/MultiSelect.tsx";
 import {
 	AlertIcon,
 	CheckIcon,
 	EyeIcon,
 	EyeOffIcon,
+	HelpCircleIcon,
 	InfoIcon,
 	MoreIcon,
 	PencilIcon,
@@ -28,13 +35,117 @@ const API_OPTIONS: ReadonlyArray<readonly [ProviderView["api"], string]> = [
 	["responses", "OpenAI Responses (/v1/responses)"],
 ];
 
+interface ModelPreset {
+	readonly label: string;
+	readonly value: number;
+}
+
+const CONTEXT_WINDOW_PRESETS: readonly ModelPreset[] = [
+	{ label: "64K", value: 64 * 1024 },
+	{ label: "256K", value: 256 * 1024 },
+	{ label: "500K", value: 500 * 1024 },
+	{ label: "1M", value: 1024 * 1024 },
+];
+
+const MAX_TOKEN_PRESETS: readonly ModelPreset[] = [
+	{ label: "64K", value: 64 * 1024 },
+	{ label: "128K", value: 128 * 1024 },
+	{ label: "256K", value: 256 * 1024 },
+	{ label: "384K", value: 384 * 1024 },
+];
+
+interface ModelInputOption extends MultiSelectOption {
+	readonly value: ModelInputType;
+}
+
+interface ModelCapabilityOption extends MultiSelectOption {
+	readonly value: ModelCapability;
+}
+
+const MODEL_INPUT_OPTIONS: readonly ModelInputOption[] = [
+	{ value: "text", label: "文本", locked: true },
+	{ value: "image", label: "图片" },
+	{ value: "video", label: "视频" },
+	{ value: "pdf", label: "PDF" },
+];
+
+const MODEL_CAPABILITY_OPTIONS: readonly ModelCapabilityOption[] = [
+	{ value: "structured-output", label: "结构化输出" },
+	{ value: "web-search", label: "原生联网搜索" },
+	{ value: "mid-conversation-system", label: "对话中系统消息" },
+];
+
+type ReasoningLevel = Exclude<ReasoningEffort, "off">;
+
+const REASONING_OPTIONS: readonly { readonly value: ReasoningLevel; readonly label: string }[] = [
+	{ value: "minimal", label: "最低" },
+	{ value: "low", label: "低" },
+	{ value: "medium", label: "中" },
+	{ value: "high", label: "高" },
+	{ value: "max", label: "最高" },
+];
+
 interface ModelForm {
 	id: string;
 	name: string;
 	maxTokens: string;
 	contextWindow: string;
-	reasoning: boolean;
-	image: boolean;
+	input: ModelInputType[];
+	capabilities: ModelCapability[];
+	reasoningEfforts: ReasoningLevel[];
+}
+
+/** 模型发现列表的一行：上游字段优先，缺失项由 models.dev 快照补全后的最终值。 */
+interface DiscoveredRow {
+	readonly id: string;
+	readonly name: string;
+	readonly contextWindow?: number;
+	readonly maxTokens?: number;
+	readonly reasoning: boolean;
+	readonly reasoningEfforts: readonly Exclude<ReasoningEffort, "off">[];
+	readonly input: readonly ModelInputType[];
+	/** 该模型原本已在列表中，用于打开弹窗时的默认勾选。 */
+	readonly added: boolean;
+}
+
+/**
+ * 合并上游 `/models` 与 models.dev 快照：上游字段优先，缺失才用快照补。
+ * reasoning 只要任一来源声明支持即为支持；档位与输入类型按上游优先取。
+ */
+function mergeDiscoveredModel(model: DiscoveredModel, fallback: ModelMetadata | null): Omit<DiscoveredRow, "added"> {
+	const id = model.id.trim();
+	const name = model.name?.trim() || fallback?.name?.trim() || "";
+	const reasoning = model.reasoning === true || (fallback?.reasoningEfforts?.length ?? 0) > 0;
+	const efforts = model.reasoningEfforts?.length ? model.reasoningEfforts : (fallback?.reasoningEfforts ?? []);
+	const input = model.input?.length ? model.input : (fallback?.input ?? ["text"]);
+	const contextWindow = model.contextWindow ?? fallback?.contextWindow;
+	const maxTokens = model.maxTokens ?? fallback?.maxTokens;
+	return {
+		id,
+		name,
+		...(contextWindow === undefined ? {} : { contextWindow }),
+		...(maxTokens === undefined ? {} : { maxTokens }),
+		reasoning,
+		reasoningEfforts: efforts,
+		input,
+	};
+}
+
+function ensureInputTypes(values: readonly string[]): ModelInputType[] {
+	const selected = MODEL_INPUT_OPTIONS.filter((option) => values.includes(option.value)).map((option) => option.value);
+	return selected.includes("text") ? selected : ["text", ...selected];
+}
+
+function ensureCapabilities(values: readonly string[]): ModelCapability[] {
+	return MODEL_CAPABILITY_OPTIONS.filter((option) => values.includes(option.value)).map((option) => option.value);
+}
+
+function inputTypeLabel(value: ModelInputType): string {
+	return MODEL_INPUT_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+function reasoningLabel(value: ReasoningLevel): string {
+	return REASONING_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
 export interface ProviderForm {
@@ -53,7 +164,24 @@ interface ModelEditorState {
 }
 
 function emptyModel(): ModelForm {
-	return { id: "", name: "", maxTokens: "8192", contextWindow: "", reasoning: false, image: false };
+	return {
+		id: "",
+		name: "",
+		maxTokens: "8192",
+		contextWindow: "",
+		input: ["text"],
+		capabilities: [],
+		reasoningEfforts: [],
+	};
+}
+
+function isHttpUrl(value: string): boolean {
+	try {
+		const url = new URL(value);
+		return url.protocol === "http:" || url.protocol === "https:";
+	} catch {
+		return false;
+	}
 }
 
 function emptyForm(): ProviderForm {
@@ -67,7 +195,7 @@ function emptyForm(): ProviderForm {
 	};
 }
 
-function formFromProvider(provider: ProviderView): ProviderForm {
+function formFromProvider(provider: ProviderView, fallbackEffort: ReasoningEffort): ProviderForm {
 	return {
 		originalName: provider.name,
 		name: provider.name,
@@ -80,10 +208,72 @@ function formFromProvider(provider: ProviderView): ProviderForm {
 			name: model.name ?? "",
 			maxTokens: String(model.maxTokens),
 			contextWindow: model.contextWindow === undefined ? "" : String(model.contextWindow),
-			reasoning: model.reasoning,
-			image: model.input.includes("image"),
+			input: [...model.input],
+			capabilities: [...(model.capabilities ?? [])],
+			reasoningEfforts: model.reasoning
+				? (
+						model.reasoningEfforts ?? [model.reasoningEffort ?? (fallbackEffort === "off" ? "medium" : fallbackEffort)]
+					).filter((effort): effort is ReasoningLevel => effort !== "off")
+				: [],
 		})),
 	};
+}
+
+/** 字段标签 + 问号提示：悬停或键盘聚焦时在标签旁显示说明，替代行内小字。 */
+function FieldLabel({ children, hint }: { readonly children: ReactNode; readonly hint: string }): JSX.Element {
+	return (
+		<span className="prov-field-label">
+			{children}
+			<span
+				className="prov-field-help"
+				tabIndex={0}
+				role="img"
+				aria-label={hint}
+				onClick={(event) => event.preventDefault()}
+			>
+				<HelpCircleIcon size={13} />
+				<span className="prov-field-tooltip" role="tooltip">
+					{hint}
+				</span>
+			</span>
+		</span>
+	);
+}
+
+/** 模型容量预设：单选后把对应 Token 数写入输入框，自定义数值仍可直接编辑。 */
+function ModelPresetOptions({
+	name,
+	ariaLabel,
+	value,
+	presets,
+	onChange,
+}: {
+	readonly name: string;
+	readonly ariaLabel: string;
+	readonly value: string;
+	readonly presets: readonly ModelPreset[];
+	readonly onChange: (value: string) => void;
+}): JSX.Element {
+	const numeric = Number(value);
+	return (
+		<div className="prov-preset-group" role="radiogroup" aria-label={ariaLabel}>
+			{presets.map((preset) => {
+				const checked = value.trim().length > 0 && numeric === preset.value;
+				return (
+					<label key={preset.label} className={`prov-preset ${checked ? "is-selected" : ""}`}>
+						<input
+							type="radio"
+							name={name}
+							value={preset.value}
+							checked={checked}
+							onChange={() => onChange(String(preset.value))}
+						/>
+						<span>{preset.label}</span>
+					</label>
+				);
+			})}
+		</div>
+	);
 }
 
 export function ProvidersTab({
@@ -100,10 +290,18 @@ export function ProvidersTab({
 	const [isNew, setIsNew] = useState(false);
 	const nextDraftNumber = useRef(1);
 	const [draft, setDraft] = useState<ProviderForm>(() =>
-		firstProvider === undefined ? emptyForm() : formFromProvider(firstProvider),
+		firstProvider === undefined ? emptyForm() : formFromProvider(firstProvider, settings.config.reasoningEffort),
 	);
 	const [revealed, setRevealed] = useState<Record<string, string>>({});
 	const [modelEditor, setModelEditor] = useState<ModelEditorState | undefined>(undefined);
+	const [fetchedModels, setFetchedModels] = useState<readonly DiscoveredRow[]>([]);
+	const [selectedModelIds, setSelectedModelIds] = useState<ReadonlySet<string>>(new Set());
+	const [discoverOpen, setDiscoverOpen] = useState(false);
+	const [discoverState, setDiscoverState] = useState<"loading" | "ready" | "error">("loading");
+	const [discoverError, setDiscoverError] = useState("");
+	const [isSavingDiscovered, setIsSavingDiscovered] = useState(false);
+	const discoveryEpoch = useRef(0);
+	const metadataEpoch = useRef(0);
 	const [showKey, setShowKey] = useState(false);
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [editingName, setEditingName] = useState(false);
@@ -115,6 +313,37 @@ export function ProvidersTab({
 	const keyDisplay = selected === undefined ? "" : (revealed[selected] ?? current?.apiKey.display ?? "");
 	const isEditing = isNew || selected !== undefined;
 	const set = (patch: Partial<ProviderForm>): void => setDraft((previous) => ({ ...previous, ...patch }));
+	const updateModelEditor = (patch: Partial<ModelForm>): void => {
+		setModelEditor((previous) =>
+			previous === undefined ? undefined : { ...previous, model: { ...previous.model, ...patch } },
+		);
+	};
+	const toggleReasoningEffort = (value: ReasoningLevel): void => {
+		setModelEditor((previous) => {
+			if (previous === undefined) return undefined;
+			const selectedEfforts = new Set(previous.model.reasoningEfforts);
+			if (selectedEfforts.has(value)) selectedEfforts.delete(value);
+			else selectedEfforts.add(value);
+			return {
+				...previous,
+				model: {
+					...previous.model,
+					reasoningEfforts: REASONING_OPTIONS.filter((option) => selectedEfforts.has(option.value)).map(
+						(option) => option.value,
+					),
+				},
+			};
+		});
+	};
+	const resetDiscovery = (): void => {
+		discoveryEpoch.current += 1;
+		setDiscoverOpen(false);
+		setFetchedModels([]);
+		setSelectedModelIds(new Set());
+		setDiscoverState("loading");
+		setDiscoverError("");
+		setIsSavingDiscovered(false);
+	};
 
 	useEffect(() => {
 		if (!moreOpen) return;
@@ -126,9 +355,10 @@ export function ProvidersTab({
 	}, [moreOpen]);
 
 	const selectProvider = (provider: ProviderView): void => {
+		resetDiscovery();
 		setSelected(provider.name);
 		setIsNew(false);
-		setDraft(formFromProvider(provider));
+		setDraft(formFromProvider(provider, settings.config.reasoningEffort));
 		setRevealed({});
 		setShowKey(false);
 		setModelEditor(undefined);
@@ -137,6 +367,7 @@ export function ProvidersTab({
 	};
 
 	const clearSelection = (): void => {
+		resetDiscovery();
 		setSelected(undefined);
 		setIsNew(false);
 		setDraft(emptyForm());
@@ -154,6 +385,7 @@ export function ProvidersTab({
 			name = `新供应商-${nextDraftNumber.current}`;
 		}
 		nextDraftNumber.current += 1;
+		resetDiscovery();
 		setSelected(undefined);
 		setIsNew(true);
 		setDraft({ ...emptyForm(), name });
@@ -176,8 +408,10 @@ export function ProvidersTab({
 				...(model.name.trim().length === 0 ? {} : { name: model.name.trim() }),
 				maxTokens: Number(model.maxTokens),
 				...(model.contextWindow.trim().length === 0 ? {} : { contextWindow: Number(model.contextWindow) }),
-				reasoning: model.reasoning,
-				input: model.image ? (["text", "image"] as const) : (["text"] as const),
+				reasoning: model.reasoningEfforts.length > 0,
+				...(model.reasoningEfforts.length === 0 ? {} : { reasoningEfforts: model.reasoningEfforts }),
+				input: ensureInputTypes(model.input),
+				...(model.capabilities.length === 0 ? {} : { capabilities: model.capabilities }),
 			})),
 			...(form.apiKey.trim().length === 0 ? {} : { apiKey: form.apiKey.trim() }),
 		};
@@ -192,7 +426,6 @@ export function ProvidersTab({
 		} catch {
 			return false;
 		}
-		if (form.models.length === 0) return false;
 		for (const model of form.models) {
 			if (model.id.trim().length === 0) return false;
 			if (!Number.isInteger(Number(model.maxTokens)) || Number(model.maxTokens) <= 0) return false;
@@ -315,6 +548,8 @@ export function ProvidersTab({
 			name: model.name.trim(),
 			maxTokens: String(maxTokens),
 			contextWindow,
+			input: ensureInputTypes(model.input),
+			capabilities: ensureCapabilities(model.capabilities),
 		};
 		const nextModels =
 			index === undefined
@@ -330,6 +565,177 @@ export function ProvidersTab({
 		setDraft((previous) => ({ ...previous, models: nextModels }));
 		void autoSave({ models: nextModels });
 	};
+
+	const startAddModel = (): void => {
+		setModelEditor({ model: emptyModel() });
+	};
+
+	const editModel = (index: number, model: ModelForm): void => {
+		setModelEditor({ index, model: { ...model } });
+	};
+
+	const closeModelEditor = (): void => {
+		setModelEditor(undefined);
+	};
+
+	/** 从供应商 `/models` 读取可用模型，在弹窗中展示供勾选。 */
+	const discoverModels = async (): Promise<void> => {
+		const baseUrl = draft.baseUrl.trim();
+		if (!isHttpUrl(baseUrl)) {
+			onNotice("warn", "请先填写有效的 Base URL");
+			return;
+		}
+		const apiKey = draft.apiKey.trim();
+		const hasSavedKey = !isNew && current !== undefined && current.apiKey.source !== "empty";
+		if (apiKey.length === 0 && !hasSavedKey) {
+			onNotice("warn", "请先填写 API Key");
+			return;
+		}
+		const epoch = ++discoveryEpoch.current;
+		setModelEditor(undefined);
+		setFetchedModels([]);
+		setSelectedModelIds(new Set());
+		setDiscoverState("loading");
+		setDiscoverError("");
+		setDiscoverOpen(true);
+		try {
+			const models = await call(
+				window.moros.settingsDiscoverModels({
+					api: draft.api,
+					baseUrl,
+					...(apiKey.length === 0 ? {} : { apiKey }),
+					...(apiKey.length === 0 && selected !== undefined ? { providerName: selected } : {}),
+				}),
+			);
+			if (epoch !== discoveryEpoch.current) return;
+			const existing = new Set(draft.models.map((model) => model.id.trim()));
+			// 上游字段优先；仅在字段缺失时并发查 models.dev 快照补全。
+			const needFallback = models.filter(
+				(model) =>
+					model.contextWindow === undefined ||
+					model.maxTokens === undefined ||
+					(model.reasoning !== true && model.reasoningEfforts === undefined) ||
+					model.input === undefined,
+			);
+			const fallbacks = await Promise.all(needFallback.map((model) => lookupMetadata(model.id.trim())));
+			const fallbackById = new Map(needFallback.map((model, index) => [model.id.trim(), fallbacks[index]]));
+			if (epoch !== discoveryEpoch.current) return;
+			const rows = models.map((model) => ({
+				...mergeDiscoveredModel(model, fallbackById.get(model.id.trim()) ?? null),
+				added: existing.has(model.id.trim()),
+			}));
+			setFetchedModels(rows);
+			// 默认按当前列表勾选，用户可自由调整后保存同步。
+			setSelectedModelIds(new Set(rows.filter((row) => row.added).map((row) => row.id)));
+			setDiscoverState("ready");
+		} catch (error) {
+			if (epoch !== discoveryEpoch.current) return;
+			setDiscoverError(errorMessage(error));
+			setDiscoverState("error");
+		}
+	};
+
+	const toggleModelSelection = (id: string): void => {
+		setSelectedModelIds((previous) => {
+			const next = new Set(previous);
+			if (next.has(id)) next.delete(id);
+			else next.add(id);
+			return next;
+		});
+	};
+
+	const toggleAllModels = (): void => {
+		const allIds = fetchedModels.map((model) => model.id);
+		const allSelected = allIds.length > 0 && allIds.every((id) => selectedModelIds.has(id));
+		setSelectedModelIds(allSelected ? new Set() : new Set(allIds));
+	};
+
+	/** 按模型 ID 查 models.dev 元数据，用于回填表单默认字段；失败返回空元数据。 */
+	const lookupMetadata = async (id: string): Promise<ModelMetadata | null> => {
+		try {
+			return await call(window.moros.settingsLookupModelMetadata(id));
+		} catch {
+			return null;
+		}
+	};
+
+	/** 按模型 ID 查元数据并回填表单默认字段；失败静默（手动输入 ID 失焦时调用）。 */
+	const applyMetadataForModel = async (id: string): Promise<void> => {
+		const trimmed = id.trim();
+		if (trimmed.length === 0) return;
+		const epoch = ++metadataEpoch.current;
+		const metadata = await lookupMetadata(trimmed);
+		if (epoch !== metadataEpoch.current || metadata === null) return;
+		setModelEditor((previous) =>
+			previous === undefined
+				? undefined
+				: { ...previous, model: applyModelMetadata(previous.model, emptyModel(), metadata) },
+		);
+	};
+
+	/**
+	 * 按勾选状态同步供应商模型列表：勾选的写入/更新，取消勾选的移除。
+	 * 不在本次上游列表中的旧模型保持原样（弹窗里无法表达其取舍）。
+	 */
+	const saveDiscoveredModels = async (): Promise<void> => {
+		const upstreamIds = new Set(fetchedModels.map((model) => model.id));
+		// 保留与本次发现无关的模型（上游未返回，弹窗中不可见）。
+		const untouched = draft.models.filter((model) => !upstreamIds.has(model.id.trim()));
+		const chosen = fetchedModels.filter((model) => selectedModelIds.has(model.id));
+		const chosenIds = new Set(chosen.map((model) => model.id));
+		const toModelForm = (model: DiscoveredRow): ModelForm => ({
+			...emptyModel(),
+			id: model.id,
+			name: model.name,
+			contextWindow: model.contextWindow === undefined ? "" : String(model.contextWindow),
+			maxTokens: model.maxTokens === undefined ? "8192" : String(model.maxTokens),
+			input: ensureInputTypes(model.input),
+			reasoningEfforts: model.reasoning ? [...model.reasoningEfforts] : [],
+		});
+		// 已存在的勾选模型沿用原条目（保留用户自定义修正），仅新增的用上游数据构造。
+		const discoveredById = new Map(chosen.map((model) => [model.id, model]));
+		let hasCorrection = false;
+		const existingForms = draft.models
+			.filter((model) => chosenIds.has(model.id.trim()) && upstreamIds.has(model.id.trim()))
+			.map((form) => {
+				// 旧版本把 max_input_tokens 误当作输出上限，表现为它恰好等于上下文大小。
+				// 命中该特征且上游给出不同输出上限时，修正为真实的 max_output_tokens。
+				const discovered = discoveredById.get(form.id.trim());
+				if (
+					discovered?.maxTokens !== undefined &&
+					form.maxTokens === form.contextWindow &&
+					String(discovered.maxTokens) !== form.maxTokens
+				) {
+					hasCorrection = true;
+					return { ...form, maxTokens: String(discovered.maxTokens) };
+				}
+				return form;
+			});
+		const newForms = chosen.filter((model) => !existingForms.some((form) => form.id.trim() === model.id)).map(toModelForm);
+		const nextModels = [...untouched, ...existingForms, ...newForms];
+		const changed =
+			hasCorrection ||
+			nextModels.length !== draft.models.length ||
+			nextModels.some((model, index) => model.id !== draft.models[index]?.id);
+		if (!changed) {
+			resetDiscovery();
+			return;
+		}
+		setIsSavingDiscovered(true);
+		try {
+			setDraft((previous) => ({ ...previous, models: nextModels }));
+			resetDiscovery();
+			await autoSave({ models: nextModels });
+			onNotice("info", `已同步模型列表，共 ${nextModels.length} 个模型`);
+		} finally {
+			setIsSavingDiscovered(false);
+		}
+	};
+
+	const modelHeading = modelEditor === undefined ? "模型列表" : modelEditor.index === undefined ? "添加模型" : "编辑模型";
+	const showAddModelMenu = modelEditor === undefined;
+	const selectedCount = fetchedModels.filter((model) => selectedModelIds.has(model.id)).length;
+	const allModelsSelected = fetchedModels.length > 0 && selectedCount === fetchedModels.length;
 
 	return (
 		<div className="prov-page">
@@ -433,7 +839,7 @@ export function ProvidersTab({
 
 						<div className="prov-fields">
 							<label className="prov-field">
-								<span>Base URL</span>
+								<FieldLabel hint="供应商 API 的基础地址，通常以 /v1 结尾">Base URL</FieldLabel>
 								<input
 									className="prov-input"
 									value={draft.baseUrl}
@@ -443,7 +849,7 @@ export function ProvidersTab({
 								/>
 							</label>
 							<label className="prov-field">
-								<span>API 格式</span>
+								<FieldLabel hint="选择供应商兼容的请求协议，需要与 Base URL 匹配">API 格式</FieldLabel>
 								<Dropdown
 									value={draft.api}
 									options={API_OPTIONS.map(([value, label]) => ({ value, label }))}
@@ -455,7 +861,15 @@ export function ProvidersTab({
 								/>
 							</label>
 							<label className="prov-field">
-								<span>API Key</span>
+								<FieldLabel
+									hint={
+										isNew
+											? "访问供应商接口所需的密钥，支持 ${ENV} 与 !command 表达式"
+											: "留空保持当前密钥，输入新值会覆盖已保存的密钥"
+									}
+								>
+									API Key
+								</FieldLabel>
 								<span className="prov-key-wrap">
 									<input
 										className="prov-input"
@@ -481,13 +895,153 @@ export function ProvidersTab({
 
 						<div className="prov-models">
 							<div className="prov-models-head">
-								<h3>模型列表</h3>
-								<button className="ghost-button small" onClick={() => setModelEditor({ model: emptyModel() })}>
-									<PlusIcon size={13} />
-									添加模型
-								</button>
+								<h3>{modelHeading}</h3>
+								{showAddModelMenu ? (
+									<Dropdown
+										className="prov-model-add"
+										value=""
+										options={[]}
+										onChange={() => undefined}
+										title="模型来源"
+										trigger={
+											<>
+												<PlusIcon size={13} />
+												<span>添加模型</span>
+											</>
+										}
+										actions={[
+											{
+												label: "添加模型",
+												icon: <PlusIcon size={14} />,
+												onSelect: startAddModel,
+											},
+											{
+												label: "获取模型",
+												icon: <RefreshIcon size={14} />,
+												onSelect: () => void discoverModels(),
+											},
+										]}
+									/>
+								) : null}
 							</div>
-							{draft.models.length === 0 ? (
+						{modelEditor !== undefined ? (
+							<div className="prov-model-panel">
+								<div className="prov-model-fields">
+									<div className="prov-field">
+										<span id="model-id-label">模型 ID</span>
+										<input
+											className="prov-input"
+											aria-labelledby="model-id-label"
+											autoFocus
+											value={modelEditor.model.id}
+											placeholder="例如 claude-sonnet-4"
+											onChange={(event) => updateModelEditor({ id: event.target.value })}
+											onBlur={(event) => void applyMetadataForModel(event.target.value)}
+										/>
+									</div>
+										<label className="prov-field">
+											<span>模型名称</span>
+											<input
+												className="prov-input"
+												value={modelEditor.model.name}
+												placeholder="例如 Claude Sonnet 4"
+												onChange={(event) => updateModelEditor({ name: event.target.value })}
+											/>
+										</label>
+										<div className="prov-field">
+											<span id="model-context-window-label">上下文</span>
+											<input
+												className="prov-input"
+												aria-labelledby="model-context-window-label"
+												value={modelEditor.model.contextWindow}
+												placeholder="例如 200000"
+												onChange={(event) => updateModelEditor({ contextWindow: event.target.value })}
+											/>
+											<ModelPresetOptions
+												name="model-context-window"
+												ariaLabel="上下文预设"
+												value={modelEditor.model.contextWindow}
+												presets={CONTEXT_WINDOW_PRESETS}
+												onChange={(value) => updateModelEditor({ contextWindow: value })}
+											/>
+										</div>
+										<div className="prov-field">
+											<span id="model-max-tokens-label">最大输出Token</span>
+											<input
+												className="prov-input"
+												aria-labelledby="model-max-tokens-label"
+												value={modelEditor.model.maxTokens}
+												placeholder="例如 8192"
+												onChange={(event) => updateModelEditor({ maxTokens: event.target.value })}
+											/>
+											<ModelPresetOptions
+												name="model-max-tokens"
+												ariaLabel="最大输出Token预设"
+												value={modelEditor.model.maxTokens}
+												presets={MAX_TOKEN_PRESETS}
+												onChange={(value) => updateModelEditor({ maxTokens: value })}
+											/>
+										</div>
+										<div className="prov-field">
+											<span>输入类型</span>
+											<MultiSelect
+												ariaLabel="输入类型"
+												value={modelEditor.model.input}
+												options={MODEL_INPUT_OPTIONS}
+												placeholder="选择输入类型"
+												onChange={(values) => updateModelEditor({ input: ensureInputTypes(values) })}
+											/>
+										</div>
+										<div className="prov-field">
+											<span>模型能力</span>
+											<MultiSelect
+												ariaLabel="模型能力"
+												value={modelEditor.model.capabilities}
+												options={MODEL_CAPABILITY_OPTIONS}
+												placeholder="选择模型能力"
+												onChange={(values) => updateModelEditor({ capabilities: ensureCapabilities(values) })}
+											/>
+										</div>
+										<div className="prov-field prov-field-wide prov-reasoning">
+											<span>推理能力</span>
+											<div className="prov-checkbox-group" role="group" aria-label="推理能力">
+												<button
+													type="button"
+													className={`prov-checkbox-button ${modelEditor.model.reasoningEfforts.length === 0 ? "is-checked" : ""}`}
+													aria-pressed={modelEditor.model.reasoningEfforts.length === 0}
+													title="关闭并清空已选推理档位"
+													onClick={() => updateModelEditor({ reasoningEfforts: [] })}
+												>
+													关闭
+												</button>
+												{REASONING_OPTIONS.map((option) => {
+													const selected = modelEditor.model.reasoningEfforts.includes(option.value);
+													return (
+														<button
+															key={option.value}
+															type="button"
+															className={`prov-checkbox-button ${selected ? "is-checked" : ""}`}
+															aria-pressed={selected}
+															onClick={() => toggleReasoningEffort(option.value)}
+														>
+															{option.label}
+														</button>
+													);
+												})}
+											</div>
+										</div>
+									</div>
+									<div className="prov-model-panel-actions">
+										<button className="ghost-button" onClick={closeModelEditor}>
+											取消
+										</button>
+										<button className="primary-button" onClick={() => commitModel(modelEditor.model)}>
+											<CheckIcon size={14} />
+											保存模型
+										</button>
+									</div>
+								</div>
+							) : draft.models.length === 0 ? (
 								<div className="prov-empty">
 									<InfoIcon size={16} />
 									<span>当前没有配置模型，添加模型后可在聊天中使用。</span>
@@ -501,23 +1055,48 @@ export function ProvidersTab({
 													<strong>{model.id}</strong>
 													{model.name.trim().length > 0 ? <span>{model.name}</span> : null}
 												</div>
-												<div className="prov-model-meta">
-													<span>maxTokens {model.maxTokens}</span>
-													{model.contextWindow.trim().length > 0 ? <span>context {model.contextWindow}</span> : null}
-													{model.reasoning ? <span className="pill">reasoning</span> : null}
-													{model.image ? <span className="pill">image</span> : null}
+												<div className="prov-model-facts">
+													<span>
+														<span className="prov-fact-label">上下文</span>
+														<span className="prov-fact-value">
+															{model.contextWindow.trim().length > 0
+																? Number(model.contextWindow).toLocaleString()
+																: "—"}
+														</span>
+													</span>
+													<span>
+														<span className="prov-fact-label">最大输出</span>
+														<span className="prov-fact-value">{Number(model.maxTokens).toLocaleString()}</span>
+													</span>
+													<span>
+														<span className="prov-fact-label">输入类型</span>
+														<span className="prov-fact-value" title={model.input.map(inputTypeLabel).join(" / ")}>
+															{model.input.map(inputTypeLabel).join(" / ")}
+														</span>
+													</span>
+													<span>
+														<span className="prov-fact-label">推理</span>
+														<span
+															className="prov-fact-value"
+															title={
+																model.reasoningEfforts.length > 0
+																	? model.reasoningEfforts.map(reasoningLabel).join(" / ")
+																	: "不支持"
+															}
+														>
+															{model.reasoningEfforts.length > 0
+																? model.reasoningEfforts.map(reasoningLabel).join(" / ")
+																: "不支持"}
+														</span>
+													</span>
 												</div>
 											</div>
 											<div className="prov-model-actions">
-												<button
-													className="icon-button"
-													title="编辑模型"
-													onClick={() => setModelEditor({ index, model: { ...model } })}
-												>
-													<PencilIcon size={14} />
+												<button className="icon-button" title="编辑模型" onClick={() => editModel(index, model)}>
+													<PencilIcon size={18} />
 												</button>
 												<button className="icon-button danger" title="删除模型" onClick={() => deleteModel(index)}>
-													<TrashIcon size={14} />
+													<TrashIcon size={18} />
 												</button>
 											</div>
 										</div>
@@ -542,122 +1121,102 @@ export function ProvidersTab({
 					</section>
 				)}
 			</div>
-
-			{modelEditor !== undefined ? (
-				<div
-					className="modal-backdrop"
-					onMouseDown={(event) => {
-						if (event.target === event.currentTarget) setModelEditor(undefined);
-					}}
-				>
-					<div className="modal model-modal" role="dialog" aria-modal="true">
-						<div className="modal-head">
-							<h3>{modelEditor.index === undefined ? "添加模型" : "编辑模型"}</h3>
-							<button className="icon-button" aria-label="关闭" onClick={() => setModelEditor(undefined)}>
-								<XIcon size={16} />
-							</button>
-						</div>
-						<div className="field-grid">
-							<label className="field">
-								<span>模型 ID</span>
-								<input
-									value={modelEditor.model.id}
-									placeholder="例如 claude-sonnet-4"
-									onChange={(event) =>
-										setModelEditor((previous) =>
-											previous === undefined
-												? undefined
-												: { ...previous, model: { ...previous.model, id: event.target.value } },
-										)
-									}
-								/>
-							</label>
-							<label className="field">
-								<span>显示名称（可选）</span>
-								<input
-									value={modelEditor.model.name}
-									onChange={(event) =>
-										setModelEditor((previous) =>
-											previous === undefined
-												? undefined
-												: { ...previous, model: { ...previous.model, name: event.target.value } },
-										)
-									}
-								/>
-							</label>
-							<label className="field">
-								<span>maxTokens</span>
-								<input
-									value={modelEditor.model.maxTokens}
-									onChange={(event) =>
-										setModelEditor((previous) =>
-											previous === undefined
-												? undefined
-												: {
-														...previous,
-														model: { ...previous.model, maxTokens: event.target.value },
-													},
-										)
-									}
-								/>
-							</label>
-							<label className="field">
-								<span>contextWindow（可选）</span>
-								<input
-									value={modelEditor.model.contextWindow}
-									onChange={(event) =>
-										setModelEditor((previous) =>
-											previous === undefined
-												? undefined
-												: {
-														...previous,
-														model: { ...previous.model, contextWindow: event.target.value },
-													},
-										)
-									}
-								/>
-							</label>
-							<label className="check">
-								<input
-									type="checkbox"
-									checked={modelEditor.model.reasoning}
-									onChange={(event) =>
-										setModelEditor((previous) =>
-											previous === undefined
-												? undefined
-												: { ...previous, model: { ...previous.model, reasoning: event.target.checked } },
-										)
-									}
-								/>
-								reasoning
-							</label>
-							<label className="check">
-								<input
-									type="checkbox"
-									checked={modelEditor.model.image}
-									onChange={(event) =>
-										setModelEditor((previous) =>
-											previous === undefined
-												? undefined
-												: { ...previous, model: { ...previous.model, image: event.target.checked } },
-										)
-									}
-								/>
-								image
-							</label>
-						</div>
-						<div className="modal-actions">
-							<button className="ghost-button" onClick={() => setModelEditor(undefined)}>
-								取消
-							</button>
-							<button className="primary-button" onClick={() => commitModel(modelEditor.model)}>
-								<CheckIcon size={14} />
-								保存模型
-							</button>
-						</div>
-					</div>
-				</div>
-			) : null}
+			{discoverOpen
+				? createPortal(
+						<div className="modal-backdrop" onClick={() => { if (!isSavingDiscovered) resetDiscovery(); }}>
+							<div className="modal discover-modal" onClick={(event) => event.stopPropagation()}>
+								<div className="modal-head">
+									<h2>获取模型</h2>
+									<button
+										className="icon-button"
+										aria-label="关闭"
+										disabled={isSavingDiscovered}
+										onClick={resetDiscovery}
+									>
+										<XIcon size={16} />
+									</button>
+								</div>
+								{discoverState === "loading" ? (
+									<div className="discover-status">
+										<span className="spinner" />
+										<span>正在获取模型…</span>
+									</div>
+								) : discoverState === "error" ? (
+									<div className="discover-status">
+										<div className="inline-notice notice-error">{discoverError}</div>
+										<button className="ghost-button" onClick={() => void discoverModels()}>
+											重试
+										</button>
+									</div>
+								) : fetchedModels.length === 0 ? (
+									<div className="discover-status">没有发现新的模型</div>
+								) : (
+									<>
+										<div className="discover-hint">共 {fetchedModels.length} 个模型，勾选要保留的</div>
+										<div className="discover-table">
+											<div className="discover-row discover-row-head">
+												<span className="discover-check">
+													<input
+														type="checkbox"
+														aria-label="全选"
+														checked={allModelsSelected}
+														onChange={toggleAllModels}
+													/>
+												</span>
+												<span>模型 ID</span>
+												<span>模型名称</span>
+												<span className="discover-num">上下文大小</span>
+												<span className="discover-num">最大输出 Token</span>
+												<span>推理</span>
+											</div>
+											<div className="discover-list">
+												{fetchedModels.map((model) => (
+													<label key={model.id} className="discover-row discover-item">
+														<span className="discover-check">
+															<input
+																type="checkbox"
+																aria-label={model.id}
+																checked={selectedModelIds.has(model.id)}
+																onChange={() => toggleModelSelection(model.id)}
+															/>
+														</span>
+														<span className="discover-item-id" title={model.id}>{model.id}</span>
+														<span className="discover-item-name" title={model.name}>{model.name || "—"}</span>
+														<span className="discover-num">{model.contextWindow === undefined ? "—" : model.contextWindow.toLocaleString()}</span>
+														<span className="discover-num">{model.maxTokens === undefined ? "—" : model.maxTokens.toLocaleString()}</span>
+														<span className={model.reasoning ? "discover-yes" : "discover-no"}>
+															{model.reasoning ? "支持" : "不支持"}
+														</span>
+													</label>
+												))}
+											</div>
+										</div>
+									</>
+								)}
+								<div className="modal-actions">
+									<button className="ghost-button" disabled={isSavingDiscovered} onClick={resetDiscovery}>
+										取消
+									</button>
+									<button
+										className="primary-button"
+										disabled={discoverState !== "ready" || isSavingDiscovered}
+										onClick={() => void saveDiscoveredModels()}
+									>
+										{isSavingDiscovered ? (
+											<>
+												<span className="spinner small" />
+												保存中…
+											</>
+										) : (
+											<>保存（{selectedCount}）</>
+										)}
+									</button>
+								</div>
+							</div>
+						</div>,
+						document.body,
+					)
+				: null}
 		</div>
 	);
 }

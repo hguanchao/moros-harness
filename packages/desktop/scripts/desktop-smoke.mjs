@@ -181,7 +181,7 @@ await writeFile(
 							maxTokens: 1024,
 							contextWindow: 8192,
 							reasoning: false,
-							input: ["text"],
+							input: ["text", "image", "video", "pdf"],
 						},
 					],
 				},
@@ -375,6 +375,76 @@ try {
 	// 左侧导航：切到供应商分组应渲染真实内容，外观分组的主题/界面字号应真实生效
 	await page.getByRole("button", { name: "供应商", exact: true }).click();
 	await page.waitForSelector(".provider-card", { timeout: 10_000 });
+	await page.waitForSelector(".prov-model-card", { timeout: 10_000 });
+	const modelRow = await page.locator(".prov-model-card").evaluate((card) => {
+		const main = card.querySelector(".prov-model-main");
+		const facts = card.querySelector(".prov-model-facts");
+		return {
+			mainWidth: main?.getBoundingClientRect().width ?? 0,
+			factsWidth: facts?.getBoundingClientRect().width ?? 0,
+			labels: [...card.querySelectorAll(".prov-fact-label")].map((label) => label.textContent),
+			values: [...card.querySelectorAll(".prov-fact-value")].map((value) => ({
+				text: value.textContent,
+				title: value.getAttribute("title"),
+			})),
+			columns: [...(facts?.children ?? [])].map((column) => {
+				const rect = column.getBoundingClientRect();
+				return { width: rect.width, top: rect.top };
+			}),
+			buttons: [...card.querySelectorAll(".prov-model-actions button")].map((button) => {
+				const rect = button.getBoundingClientRect();
+				return {
+					width: rect.width,
+					height: rect.height,
+					iconWidth: button.querySelector("svg")?.getAttribute("width"),
+				};
+			}),
+		};
+	});
+	const expectedLabels = ["上下文", "最大输出", "输入类型", "推理"];
+	const inputTypes = "文本 / 图片 / 视频 / PDF";
+	if (
+		JSON.stringify(modelRow.labels) !== JSON.stringify(expectedLabels) ||
+		modelRow.values[2]?.text !== inputTypes ||
+		modelRow.values[2]?.title !== inputTypes ||
+		modelRow.values[3]?.text !== "不支持" ||
+		modelRow.mainWidth <= 0 ||
+		Math.abs(modelRow.factsWidth - modelRow.mainWidth) > 1 ||
+		modelRow.columns.length !== 4 ||
+		modelRow.columns.some(
+			(column) => Math.abs(column.width - modelRow.columns[0].width) > 1 || column.top !== modelRow.columns[0].top,
+		) ||
+		modelRow.buttons.length !== 2 ||
+		modelRow.buttons.some((button) => button.width !== 36 || button.height !== 36 || button.iconWidth !== "18")
+	) {
+		throw new Error(`provider model row: ${JSON.stringify(modelRow)}`);
+	}
+	process.stdout.write("provider model row: ordered facts, input types, equal-width columns and larger actions ok\n");
+	await page.screenshot({ path: join(shots, "07-provider-models.png") });
+	await page.locator(".prov-model-card").getByTitle("删除模型", { exact: true }).click();
+	// 先确认落盘，避免只验证前端乐观更新的空列表。
+	await page.waitForFunction(
+		async () => {
+			const result = await window.moros.settingsGet();
+			if (!result.ok) throw new Error(`settingsGet failed while waiting for model deletion: ${result.error.message}`);
+			return result.value.providers.find((provider) => provider.name === "mock")?.models.length === 0;
+		},
+		undefined,
+		{ polling: 100, timeout: 10_000 },
+	);
+	await page.getByRole("button", { name: "常规", exact: true }).click();
+	await page.waitForSelector(".prov-page", { state: "detached", timeout: 10_000 });
+	await page.getByRole("button", { name: "供应商", exact: true }).click();
+	await page.waitForSelector(".provider-card", { timeout: 10_000 });
+	await page.waitForSelector(".prov-models .prov-empty", { timeout: 10_000 });
+	const modelCountAfterReturn = await page.locator(".prov-model-card").count();
+	const emptyModelText = await page.locator(".prov-models .prov-empty").innerText();
+	if (modelCountAfterReturn !== 0 || emptyModelText !== "当前没有配置模型，添加模型后可在聊天中使用。") {
+		throw new Error(
+			`provider model deletion did not survive navigation: ${modelCountAfterReturn} model(s), ${emptyModelText}`,
+		);
+	}
+	process.stdout.write("provider model deletion: persisted empty list survives settings navigation\n");
 	await page.getByRole("button", { name: "外观", exact: true }).click();
 	await page.waitForSelector(".settings-stepper-input", { timeout: 10_000 });
 	const fontSizeInput = page.locator(".settings-stepper-input");

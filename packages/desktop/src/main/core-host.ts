@@ -18,6 +18,8 @@ import {
 	type ApprovalDecision,
 	type ApprovalMode,
 	type ApprovalRequest,
+	type DiscoveredModel,
+	type DiscoverModelsRequest,
 	type FileChangeDiff,
 	type McpStatus,
 	type ModelCatalog,
@@ -34,6 +36,7 @@ import {
 	type WorkspaceEntry,
 	type WorkspaceWatch,
 } from "@moros/core";
+import type { ModelMetadata as CatalogModelMetadata } from "@moros/core/config/model-catalog/metadata.ts";
 import type { EventRecord } from "@moros/core/events/schema.ts";
 import { normalizeProjectRoot } from "@moros/core/session/project-dir.ts";
 import { VERSION } from "@moros/core/version.ts";
@@ -715,6 +718,14 @@ export class DesktopHost {
 
 	async revealSecret(name: string): Promise<string> {
 		return this.#requiredCore().revealProviderSecret(name);
+	}
+
+	async discoverModels(input: DiscoverModelsRequest): Promise<readonly DiscoveredModel[]> {
+		return this.#requiredCore().discoverModels(input);
+	}
+
+	async lookupModelMetadata(id: string): Promise<CatalogModelMetadata | null> {
+		return this.#requiredCore().lookupModelMetadata(id);
 	}
 
 	async models(): Promise<ModelCatalog> {

@@ -283,7 +283,7 @@ function NumberStepper({
 	);
 }
 
-/** 外观页：界面设置（真实）+ 代码设置与代码预览（占位展示）。 */
+/** 外观页：颜色主题与字号（真实）+ 编辑器与配色预览（占位展示）。 */
 function AppearanceSettings({
 	settings,
 	onUpdate,
@@ -294,11 +294,11 @@ function AppearanceSettings({
 	const ui = settings.config.ui;
 	return (
 		<>
-			<SettingsSection title="界面设置" description="设置应用主题和界面文字大小。">
+			<SettingsSection title="外观与字体" description="调整界面配色、文字大小与渲染缩放。">
 				<SettingsCard>
 					<SettingsRow
-						label="界面主题"
-						description="选择浅色、深色或跟随系统主题。"
+						label="颜色主题"
+						description="选择浅色、深色，或随系统外观自动切换。"
 						control={
 							<Dropdown
 								value={ui.theme}
@@ -315,7 +315,7 @@ function AppearanceSettings({
 					/>
 					<SettingsRow
 						label="界面字号"
-						description="调整应用界面的文字大小，图标和布局尺寸不受影响。"
+						description="以像素为单位，仅缩放文字；图标与布局尺寸不变。"
 						control={
 							<NumberStepper
 								value={ui.fontSize}
@@ -329,31 +329,31 @@ function AppearanceSettings({
 				</SettingsCard>
 			</SettingsSection>
 
-			<SettingsSection title="代码设置" description="设置代码内容的主题、字号和显示方式，不受界面字号影响。">
+			<SettingsSection title="编辑器" description="代码区的配色与排版，独立于界面字号设置。">
 				<SettingsCard>
 					<SettingsRow
 						label="浅色代码主题"
-						description="浅色界面下代码内容使用的主题。"
+						description="浅色外观下代码与语法高亮采用的配色。"
 						control={<DisabledSelect label="GitHub Light" />}
 					/>
 					<SettingsRow
 						label="深色代码主题"
-						description="深色界面下代码内容使用的主题。"
+						description="深色外观下代码与语法高亮采用的配色。"
 						control={<DisabledSelect label="GitHub Dark" />}
 					/>
 					<SettingsRow
 						label="显示行号"
-						description="在代码内容和差异视图中显示行号。"
+						description="在代码内容与差异视图中显示行号。"
 						control={<Toggle checked disabled />}
 					/>
 					<SettingsRow
-						label="长行自动换行"
-						description="代码内容过长时自动换行。"
+						label="自动换行"
+						description="超出可视宽度的代码行自动折行。"
 						control={<Toggle checked={false} disabled />}
 					/>
 					<SettingsRow
 						label="代码字号"
-						description="调整代码块、文件预览和差异视图的默认字号。"
+						description="代码块、文件预览与差异视图的默认字号。"
 						control={
 							<span className="settings-number is-disabled">
 								<span>12</span>
@@ -365,12 +365,12 @@ function AppearanceSettings({
 			</SettingsSection>
 
 			<SettingsSection
-				title="代码预览"
-				description="同时预览浅色与深色代码主题，当前界面使用的主题会标记为「当前生效」。"
+				title="主题预览"
+				description="并排预览浅色与深色代码主题，当前生效的主题会标注出来。"
 			>
 				<div className="code-preview-grid">
 					<CodePreview title="浅色预览" theme="GitHub Light" current badge="当前生效" />
-					<CodePreview title="深色预览" theme="GitHub Dark" badge="预留" />
+					<CodePreview title="深色预览" theme="GitHub Dark" badge="备选" />
 				</div>
 			</SettingsSection>
 		</>

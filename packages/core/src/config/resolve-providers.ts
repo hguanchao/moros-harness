@@ -1,4 +1,4 @@
-import type { AppConfig, ProviderConfig, ProvidersFile } from "./schema.ts";
+import type { AppConfig, ModelInputType, ProviderConfig, ProvidersFile } from "./schema.ts";
 import { resolveSecret } from "./secrets.ts";
 
 export interface ResolvedProvider {
@@ -12,7 +12,7 @@ export interface ResolvedProvider {
 	readonly maxTokens: number;
 	readonly contextWindow: number;
 	readonly reasoning: boolean;
-	readonly input: readonly ("text" | "image")[];
+	readonly input: readonly ModelInputType[];
 }
 
 export interface ProviderResolutionOptions {

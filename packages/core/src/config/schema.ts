@@ -5,13 +5,21 @@ import type { McpServerConfig } from "../mcp/types.ts";
 
 const SecretValueSchema = z.string();
 
+export const ModelInputTypeSchema = z.enum(["text", "image", "video", "pdf"]);
+
+export const ModelCapabilitySchema = z.enum(["structured-output", "web-search", "mid-conversation-system"]);
+
 export const ModelSchema = z.object({
 	id: z.string().min(1),
 	name: z.string().optional(),
 	contextWindow: z.number().int().positive().optional(),
 	maxTokens: z.number().int().positive(),
 	reasoning: z.boolean(),
-	input: z.array(z.enum(["text", "image"])).default(["text"]),
+	/** 旧版单档位字段；新配置使用 reasoningEfforts。 */
+	reasoningEffort: z.enum(["off", "minimal", "low", "medium", "high", "max"]).optional(),
+	reasoningEfforts: z.array(z.enum(["minimal", "low", "medium", "high", "max"])).optional(),
+	input: z.array(ModelInputTypeSchema).default(["text"]),
+	capabilities: z.array(ModelCapabilitySchema).optional(),
 	cost: z
 		.object({
 			input: z.number().nonnegative(),
@@ -31,7 +39,8 @@ export const ProviderSchema = z.object({
 	apiKey: SecretValueSchema.default(""),
 	headers: z.record(z.string(), z.string()).optional(),
 	timeoutMs: z.number().int().positive().default(120_000),
-	models: z.array(ModelSchema).min(1),
+	/** 允许暂不配置模型，保留供应商供设置页继续编辑。 */
+	models: z.array(ModelSchema),
 });
 
 export const ProvidersFileSchema = z.object({
@@ -84,6 +93,8 @@ const ConfigSchema = z.object({
 	trusts: z.record(z.string(), z.boolean()).optional(),
 });
 
+export type ModelInputType = z.infer<typeof ModelInputTypeSchema>;
+export type ModelCapability = z.infer<typeof ModelCapabilitySchema>;
 export type ProviderConfig = z.infer<typeof ProviderSchema>;
 export type ProvidersFile = z.infer<typeof ProvidersFileSchema>;
 /** 应用配置；MCP server 表由 `[mcp_servers]` 单独解析，校验失败的条目只跳过自己。 */
@@ -123,6 +134,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * 一个坏条目只跳过它自己并记入 skipped，好条目照常进注册表——手写一个不合规条目
  * 不再把整个注册表（连同 /model 的自助修复入口）拖死。容错粒度两级：供应商骨架
  * 与其下每个模型各自独立校验；模型 ID 在供应商内唯一，冲突时保留首个、后续跳过。
+ * 明确的空模型数组保留供应商；非空数组中的模型全部无效时仍跳过供应商。
  * 条目里的未知字段剥离（不记录）。
  * @param value 从 JSON 文件或其他外部来源读取的值。
  * @returns 通过校验的注册表与被跳过条目的清单。
@@ -140,8 +152,8 @@ export function parseProvidersFile(value: unknown): ParsedProvidersFile {
 			skipped.push({ path: `providers.${providerId}`, reason: firstIssueReason(base.error) });
 			continue;
 		}
-		const rawModels = isRecord(raw) && Array.isArray(raw.models) ? raw.models : [];
-		if (rawModels.length === 0) {
+		const rawModels = isRecord(raw) ? raw.models : undefined;
+		if (!Array.isArray(rawModels)) {
 			skipped.push({ path: `providers.${providerId}`, reason: "No valid models" });
 			continue;
 		}
@@ -164,7 +176,7 @@ export function parseProvidersFile(value: unknown): ParsedProvidersFile {
 			ids.add(model.data.id);
 			models.push(model.data);
 		}
-		if (models.length === 0) {
+		if (rawModels.length > 0 && models.length === 0) {
 			// 整供应商跳过时模型级 skip 是冗余细节，只留条目级一条
 			skipped.push({ path: `providers.${providerId}`, reason: "All models invalid" });
 			continue;

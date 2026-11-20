@@ -1,6 +1,7 @@
 export * from "./bootstrap.ts";
 export * from "./keys.ts";
 export * from "./loader.ts";
+export * from "./model-discovery.ts";
 export * from "./resolve-providers.ts";
 export * from "./schema.ts";
 export * from "./secrets.ts";
