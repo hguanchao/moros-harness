@@ -5,11 +5,11 @@ import { TRANSCRIPT } from "../copy/index.ts";
 export const PROMPT_BG = THEME.surface;
 /** 用户提示与回复正文统一使用主文字色。 */
 export const MESSAGE_TEXT_COLOR = THEME.textPrimary;
-/** 思考摘要比正文弱一档：它是过程的痕迹，不是要读的内容。 */
+/** 推理摘要比正文弱一档：它是过程的痕迹，不是要读的内容。 */
 export const THINKING_COLOR = THEME.textSubtle;
 /** 展开后标题标签的提亮色：主文字色 #e6e9ed。 */
 export const THINKING_ACTIVE_COLOR = THEME.textPrimary;
-/** 思考区块的底色：与用户提示块共用浮起表面，和普通正文分开。 */
+/** 推理区块的底色：与用户提示块共用浮起表面，和普通正文分开。 */
 export const THINKING_BG = THEME.surface;
 /** 工具名与标记比正文弱一档，参数才是要读的内容。 */
 export const TOOL_NAME_COLOR = THEME.textSubtle;
@@ -34,7 +34,7 @@ export const PROMPT_PREFIX = " › ";
 export const PROMPT_INDENT = "   ";
 /** 模型回复的缩进。 */
 export const RESPONSE_INDENT = "  ";
-/** 运行时收起状态下显示的最后几行思考正文。 */
+/** 运行时收起状态下显示的最后几行推理正文。 */
 export const THINKING_TAIL_LINES = 5;
 /** 成功工具结果默认最多展开多少行。 */
 export const TOOL_RESULT_PREVIEW_LINES = 20;
@@ -45,14 +45,14 @@ export const TOOL_RESULT_PREVIEW_LINES = 20;
  * 内容挤出屏幕。只截显示不截数据：全文仍留在 tool.fullDetail 里。
  */
 export const DETAIL_BAND_MAX_LINES = 60;
-/** 思考标题的标记：单列火花，与工具行的 ›、失败行的 × 区分。 */
+/** 推理标题的标记：单列火花，与工具行的 ›、失败行的 × 区分。 */
 const THINKING_MARKER = "✻";
-/** 展开后的菱形标记：工具组头和思考块共用。 */
+/** 展开后的菱形标记：工具组头和推理块共用。 */
 const EXPANDED_DIAMOND = "◈";
-/** 思考标题的缩进；正文缩进到与 Think…/Thought… 的首字对齐。 */
+/** 推理标题的缩进；正文缩进到与 Think…/Thought… 的首字对齐。 */
 export const THINKING_PREFIX = `${RESPONSE_INDENT}${THINKING_MARKER} `;
 export const THINKING_EXPANDED_PREFIX = `${RESPONSE_INDENT}${EXPANDED_DIAMOND} `;
-/** 思考正文的左右内边距。 */
+/** 推理正文的左右内边距。 */
 export const THINKING_PADDING = 1;
 /** 工具调用沿用用户提示的标记，两类条目在同一列起头。 */
 export const TOOL_MARKER = "›";

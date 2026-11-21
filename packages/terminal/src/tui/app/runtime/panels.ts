@@ -21,7 +21,7 @@ import type { TuiHost, TuiState } from "./types.ts";
 /**
  * 输入框上方的选择面板。
  *
- * 模型、思考等级、会话三种面板是模态的，命令补全与文件补全只跟着输入过滤。五种面板互斥，
+ * 模型、推理等级、会话三种面板是模态的，命令补全与文件补全只跟着输入过滤。五种面板互斥，
  * 移动、确认、补全与取消各只有一份实现，作用于当前打开的那一个；写回配置、切换会话这类
  * 差异点留在各自的 select 函数里，公共的滚动窗口规则在 panel 目录里。
  */
@@ -205,7 +205,7 @@ export function openEffortMenu(host: TuiHost): void {
 	host.render();
 }
 
-/** 写回思考等级；菜单回车确认与 `/effort <level>` 共用同一条路径。 */
+/** 写回推理等级；菜单回车确认与 `/effort <level>` 共用同一条路径。 */
 export function selectEffort(host: TuiHost, level: ThinkingLevel): void {
 	const source = host.options.effortMenu;
 	if (source === undefined) return;
@@ -350,7 +350,7 @@ export function updateCommandMenu(host: TuiHost): void {
 /**
  * 命令补全项：把选中命令补进输入框。
  *
- * Tab 补全时顺带打开有二级面板的命令（模型、思考等级、会话），使用者不必再按一次
+ * Tab 补全时顺带打开有二级面板的命令（模型、推理等级、会话），使用者不必再按一次
  * 回车；鼠标点击只回填、不执行，避免点一下就把面板弹出来。其余命令补完后仍由回车执行。
  */
 export function completeCommandMenu(host: TuiHost, openSubmenu = false): void {

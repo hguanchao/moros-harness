@@ -89,7 +89,7 @@ interface AdapterState {
 	host?: TuiHost;
 	/** 当前会话是否处于暂停态；只用于 Ctrl+P 的切换方向。 */
 	paused: boolean;
-	/** 每个会话各自的模型/推理档位选择，切换会话时同步恢复页脚。 */
+	/** 每个会话各自的模型/推理强度选择，切换会话时同步恢复页脚。 */
 	readonly sessionSelections: Map<string, SessionSelection>;
 	metas: SessionMeta[];
 	currentSessionId: string;

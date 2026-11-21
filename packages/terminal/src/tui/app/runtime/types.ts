@@ -44,9 +44,9 @@ export interface ActiveTurn {
 	readonly lines: TranscriptLine[];
 	/** 当前正在流式写入的 Markdown 文本块；遇到工具、系统行或回合结束时关闭 */
 	textBlock: TranscriptMarkdown | undefined;
-	/** 当前这段思考是什么时候开始的；没有思考在进行时为空 */
+	/** 当前这段推理是什么时候开始的；没有推理在进行时为空 */
 	thinkingStartedAt: number | undefined;
-	/** 当前正在写入的思考区块；结束后仍留在 lines 里供双击展开 */
+	/** 当前正在写入的推理区块；结束后仍留在 lines 里供双击展开 */
 	thinkingBlock: TranscriptThinking | undefined;
 	/** 本轮已经产生的 token 消耗；每次请求回报后累加，压缩请求不计入 */
 	tokensUsed: number;

@@ -153,7 +153,7 @@ export function handleTranscriptInput(
 				return;
 			}
 
-			// 双击思考标题、工具组、任务卡或子代理组，展开或收起
+			// 双击推理标题、工具组、任务卡或子代理组，展开或收起
 			const doubleClick = trackClick(state, event);
 			if (doubleClick && host.toggleTranscriptAt(event.row, event.column, mainHeight, width)) {
 				return;
@@ -381,7 +381,7 @@ export function handleTranscriptInput(
 		focusChanged = true;
 	};
 
-	// Ctrl+G：把最近一块长内容（工具输出/详情、思考、提示）打开成整屏页
+	// Ctrl+G：把最近一块长内容（工具输出/详情、推理、提示）打开成整屏页
 	if (
 		withoutMouse === "\x07" &&
 		!pasting &&

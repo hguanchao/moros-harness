@@ -68,7 +68,7 @@ export function handleScrollKey(host: TuiHost, state: TuiState, text: string, ma
 }
 
 /**
- * Ctrl+E 展开/收起最后一块思考或工具组。
+ * Ctrl+E 展开/收起最后一块推理或工具组。
  *
  * 返回是否消费了这次按键；没有可展开目标时也消费，避免按键漏进输入框成为正文。
  */

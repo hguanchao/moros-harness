@@ -95,7 +95,7 @@ export function startRun(
 			host.syncTurnFull(active);
 			state.activeTurn = undefined;
 			stopSpinner(state);
-			// 这一轮期间切过的模型/思考等级，现在落到对话流末尾
+			// 这一轮期间切过的模型/推理等级，现在落到对话流末尾
 			if (state.pendingCommandTurns.length > 0) {
 				state.turns.push(...state.pendingCommandTurns);
 				state.pendingCommandTurns.length = 0;

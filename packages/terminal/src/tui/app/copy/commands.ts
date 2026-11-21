@@ -32,7 +32,7 @@ export const COMMAND_COPY: Readonly<Record<string, { readonly description: strin
 	},
 	help: { description: "Show the commands and keys", unavailable: NOT_AVAILABLE },
 	undo: {
-		description: "Undo file changes from the last turn",
+		description: "Revert file changes from the last turn",
 		unavailable: STATUS.checkpointsUnavailable,
 	},
 	skills: { description: "List the skills found on disk", unavailable: NOT_AVAILABLE },

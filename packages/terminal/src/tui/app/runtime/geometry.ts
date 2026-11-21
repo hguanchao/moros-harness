@@ -119,7 +119,7 @@ export function menuOpen(state: TuiState): boolean {
 	return state.approvalPrompt !== undefined || activePanel(state) !== undefined;
 }
 
-/** 抢输入焦点的面板:命令补全不抢(输入还在打字),模型/思考等级/会话面板是模态的。 */
+/** 抢输入焦点的面板:命令补全不抢(输入还在打字),模型/推理等级/会话面板是模态的。 */
 export function modalMenuOpen(state: TuiState): boolean {
 	return PANEL_RULES.some((rule) => rule.modal === true && rule.active(state));
 }

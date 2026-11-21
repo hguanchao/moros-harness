@@ -31,7 +31,7 @@ function anchoredBlock(tool: TranscriptTool): ViewerContent | undefined {
 	return tool.detail.length === 0 ? undefined : { title: toolDetailsTitle(tool.name), text: tool.detail };
 }
 
-/** 回退路径：优先工具结果/详情，其次思考，最后是最近一条提示；普通回复本来就在对话流里。 */
+/** 回退路径：优先工具结果/详情，其次推理，最后是最近一条提示；普通回复本来就在对话流里。 */
 function latestViewerBlock(turns: readonly TranscriptTurn[]): ViewerContent | undefined {
 	for (let turnIndex = turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
 		const turn = turns[turnIndex];

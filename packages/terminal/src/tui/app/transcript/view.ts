@@ -311,7 +311,7 @@ export function thinkingHeaderInView(
 	return index === undefined ? undefined : view.thinkingHeaders.find((header) => header.start === index)?.block;
 }
 
-/** 命中整个思考区块：标题与展开后的正文都算。 */
+/** 命中整个推理区块：标题与展开后的正文都算。 */
 export function thinkingBlockInView(
 	view: TranscriptView,
 	height: number,
@@ -426,8 +426,8 @@ function responseBlockKind(line: TranscriptLine): ResponseBlockKind {
 /**
  * 相邻两条内容之间是否需要空行。
  *
- * 思考摘要与它所解释的工具调用成对紧凑（思考在工具正上方）；一对结束之后，新一轮
- * 思考另起一块——长批次（叙述规则引入后常见十几行）不留呼吸会连成一堵墙（ADR-15
+ * 推理摘要与它所解释的工具调用成对紧凑（推理在工具正上方）；一对结束之后，新一轮
+ * 推理另起一块——长批次（叙述规则引入后常见十几行）不留呼吸会连成一堵墙（ADR-15
  * 真实使用反馈）。正文、失败、警告各自独立成块。工具调用的失败原因紧跟在调用行
  * 之后，是同一件事的两半，不能被空行拆开。
  */
@@ -438,15 +438,15 @@ function needsBlockGap(previous: TranscriptLine, current: TranscriptLine): boole
 	const previousKind = responseBlockKind(previous);
 	const currentKind = responseBlockKind(current);
 	if (previousKind !== currentKind) {
-		// 思考→工具成对紧凑；工具→思考是新一轮单元的开始，留空行呼吸
+		// 推理→工具成对紧凑；工具→推理是新一轮单元的开始，留空行呼吸
 		const pair = `${previousKind}/${currentKind}`;
 		return pair !== "thinking/tools";
 	}
-	// 思考、任务卡、计划卡与失败、警告各自独立成块：即使前后同类也要分开
+	// 推理、任务卡、计划卡与失败、警告各自独立成块：即使前后同类也要分开
 	return currentKind === "thinking" || currentKind === "todo" || currentKind === "plan" || currentKind === "notice";
 }
 
-/** 这一行是否已经展开：思考全文、工具详情/结果、展开的组都算。 */
+/** 这一行是否已经展开：推理全文、工具详情/结果、展开的组都算。 */
 function isExpandedBlock(line: TranscriptLine): boolean {
 	if (typeof line === "string") return false;
 	if (line.kind === "thinkingBlock") return line.expanded;
@@ -694,9 +694,9 @@ function build(
  * 正文里的缩进当成行号。
  */
 /**
- * 有底色但没有行号列的行（提示块、思考正文、工具结果预览）的内容起点。
+ * 有底色但没有行号列的行（提示块、推理正文、工具结果预览）的内容起点。
  *
- * 提示块整行都是底色，正文固定缩进三列（` › ` 与 `   `）；思考正文与工具结果是
+ * 提示块整行都是底色，正文固定缩进三列（` › ` 与 `   `）；推理正文与工具结果是
  * 「左侧留白 + 色带 + 一列内边距」，色带起点就是排版前缀的宽度。两种前缀都是排版，
  * 不属于内容，复制时跳过；行内真正的缩进（代码、列表）留在内容里。
  */
@@ -709,7 +709,7 @@ function plainRowContentStart(line: string): number {
 /**
  * 正文类行的内容起点：所有块都从正文缩进起排，再往里的空格属于内容。
  *
- * 思考标题、工具行、列表项、代码块都以两列缩进开头，那是排版；列表的第二层、
+ * 推理标题、工具行、列表项、代码块都以两列缩进开头，那是排版；列表的第二层、
  * 代码自己的缩进则要保留，所以这里只剥掉公共的两列。
  */
 function bodyContentStart(line: string): number {
@@ -742,7 +742,7 @@ function buildLineMeta(
 	let diffBand = initial.diffBand;
 	for (let index = 0; index < lines.length; index += 1) {
 		const line = lines[index] ?? "";
-		// 提示块、思考正文与工具结果预览也用同一个底色，但它们没有行号列：
+		// 提示块、推理正文与工具结果预览也用同一个底色，但它们没有行号列：
 		// 一旦按「数字+两个空格」误判，复制时会把正文开头的数字吃掉并接错行
 		if (plainRows.has(index + offset)) {
 			meta.push({ contentStart: plainRowContentStart(line), softWrap: false });
@@ -843,11 +843,11 @@ function planTitle(text: string): string {
 }
 
 /**
- * 思考区块的屏幕行。
+ * 推理区块的屏幕行。
  *
  * 标题带符号、不铺底色；正文上下各留一行色带，左侧与工具详情保持同样的留白。
  * 运行时收起只留最后五行屏幕行，结束后收起只留标题；Ctrl+E 或双击展开时给全文，
- * 展开状态在思考结束后保留。
+ * 展开状态在推理结束后保留。
  */
 function thinkingBlockLines(block: TranscriptThinking, width: number): readonly string[] {
 	const visible = block.expanded
@@ -862,7 +862,7 @@ function thinkingBlockLines(block: TranscriptThinking, width: number): readonly 
 	return [...header, thinkingBlankLine(width), ...visible, thinkingBlankLine(width)];
 }
 
-/** 收起的运行中思考只排版末尾附近的内容，避免每帧重排已经隐藏的长正文。 */
+/** 收起的运行中推理只排版末尾附近的内容，避免每帧重排已经隐藏的长正文。 */
 function thinkingTailLines(block: TranscriptThinking, width: number): readonly string[] {
 	const remainingText = Math.max(64, width * (THINKING_TAIL_LINES + 2) * 4);
 	let budget = remainingText;
@@ -885,7 +885,7 @@ function thinkingTailLines(block: TranscriptThinking, width: number): readonly s
 }
 
 /**
- * 思考区块的标题行。
+ * 推理区块的标题行。
  *
  * 收起时用 ✻；展开后用工具组头同款的 ◈，并提亮可点击的标签。耗时继续用弱化色。
  */
@@ -920,7 +920,7 @@ function thinkingHeaderText(block: TranscriptThinking): string {
 	return `Thinking… ${formatDuration(Math.max(0, Date.now() - block.startedAt))}`;
 }
 
-/** 思考正文的一行：色带在标题符号右侧留出与工具详情相同的列数，带内留一列内边距。 */
+/** 推理正文的一行：色带在标题符号右侧留出与工具详情相同的列数，带内留一列内边距。 */
 function thinkingBodyLines(text: string, width: number): readonly string[] {
 	const start = displayWidth(RESPONSE_INDENT) + DETAIL_BAND_LEFT;
 	const lead = " ".repeat(start);
@@ -944,7 +944,7 @@ function thinkingBodyLines(text: string, width: number): readonly string[] {
 	});
 }
 
-/** 思考正文的上下内边距：整条色带，不写内容。 */
+/** 推理正文的上下内边距：整条色带，不写内容。 */
 function thinkingBlankLine(width: number): string {
 	const start = displayWidth(RESPONSE_INDENT) + DETAIL_BAND_LEFT;
 	return `${" ".repeat(start)}${THINKING_BG}${" ".repeat(Math.max(0, width - start))}${RESET}`;

@@ -74,7 +74,7 @@ export function stopSpinner(state: TuiState): void {
 /**
  * 启动刷新帧。
  *
- * 帧推进转圈与扫光，并让运行中的思考标题和子代理组头按整秒失效；耗时本身不在这里
+ * 帧推进转圈与扫光，并让运行中的推理标题和子代理组头按整秒失效；耗时本身不在这里
  * 累加，由渲染按各自的时间戳现算。
  */
 export function startSpinner(state: TuiState, render: () => void, syncApprovalPrompt: () => void): void {
@@ -91,7 +91,7 @@ export function startSpinner(state: TuiState, render: () => void, syncApprovalPr
 	}, SPINNER_INTERVAL_MS);
 }
 
-/** 刷新帧里属于「当前这一轮」的部分：思考标题、任务卡与运行中的工具、子代理。 */
+/** 刷新帧里属于「当前这一轮」的部分：推理标题、任务卡与运行中的工具、子代理。 */
 function tickActiveStatus(state: TuiState, active: ActiveTurn, syncApprovalPrompt: () => void): void {
 	syncApprovalPrompt();
 

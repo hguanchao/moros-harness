@@ -125,7 +125,7 @@ interface ReviewSource {
 }
 
 interface EffortMenuSource {
-	/** 当前配置里的思考等级；切换后重新读取 */
+	/** 当前配置里的推理等级；切换后重新读取 */
 	readonly current: () => ThinkingLevel;
 	/** 确认选择；失败时抛错，由界面显示原因 */
 	readonly select: (level: ThinkingLevel) => void;
@@ -158,7 +158,7 @@ interface PlanModeSource {
 }
 
 /**
- * 检查点与撤销的数据来源。
+ * 检查点与回滚的数据来源。
  *
  * 列表是同步的（索引已在内存），预览与恢复会跑 git，所以返回 Promise。界面只负责
  * 展示与确认，真正的快照与恢复由宿主服务完成。
@@ -235,7 +235,7 @@ interface ClipboardSource {
 
 export interface TuiOptions {
 	readonly version: string;
-	/** 输入框下方常驻信息：项目、分支、模型、思考强度、上下文与缓存命中率 */
+	/** 输入框下方常驻信息：项目、分支、模型、推理强度、上下文与缓存命中率 */
 	readonly info: FooterInfo | (() => FooterInfo);
 	/**
 	 * 终端窗口/标签标题（OSC 0）。每次请求重绘都会读一次，只有值变化才真正写序列；
@@ -271,7 +271,7 @@ export interface TuiOptions {
 	readonly approvalMode?: ApprovalModeSource;
 	/** Plan 模式的数据来源；不提供时 /plan 不可用、页脚也不显示 PLAN */
 	readonly planMode?: PlanModeSource;
-	/** 检查点与撤销；不提供时 /undo 不可用 */
+	/** 检查点与回滚；不提供时 /undo 不可用 */
 	readonly checkpoints?: CheckpointSource;
 	/** /model 菜单的数据来源；不提供时 /model 按普通输入处理 */
 	readonly modelMenu?: ModelMenuSource;

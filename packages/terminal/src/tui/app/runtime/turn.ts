@@ -22,8 +22,8 @@ import type { ActiveTurn, TuiHost, TuiState } from "./types.ts";
 /**
  * 一轮进行中的事件处理。
  *
- * 模型文本、思考、工具与压缩进度都在这里转成对话流里的行；状态行只描述「现在在做什么」。
- * 除文本与思考增量外，每个事件处理完都会立即重绘——增量由刷新帧统一绘制。
+ * 模型文本、推理、工具与压缩进度都在这里转成对话流里的行；状态行只描述「现在在做什么」。
+ * 除文本与推理增量外，每个事件处理完都会立即重绘——增量由刷新帧统一绘制。
  */
 
 export function closeText(active: ActiveTurn): void {
@@ -46,7 +46,7 @@ function appendAssistantText(host: TuiHost, active: ActiveTurn, delta: string): 
 	host.syncTurn(active);
 }
 
-/** 思考正文按行实时写入当前区块；最后一段未换行的内容作为临时行显示。 */
+/** 推理正文按行实时写入当前区块；最后一段未换行的内容作为临时行显示。 */
 function appendThinkingText(host: TuiHost, active: ActiveTurn, delta: string): void {
 	const block = active.thinkingBlock;
 	if (block === undefined) return;
@@ -58,7 +58,7 @@ function appendThinkingText(host: TuiHost, active: ActiveTurn, delta: string): v
 }
 
 /**
- * 一段思考结束。
+ * 一段推理结束。
  *
  * 正文保留在区块里，但默认收起：运行中显示最后五行，结束后只显示标题。双击标题可在
  * 全文和默认状态之间切换。
@@ -77,7 +77,7 @@ export function closeThinking(host: TuiHost, active: ActiveTurn): void {
 		}
 		block.header = `Thought for ${formatDuration(Date.now() - startedAt)}`;
 		block.running = false;
-		// 展开状态原样保留：使用者按 Ctrl+E 展开后，思考结束不能自己收回去。
+		// 展开状态原样保留：使用者按 Ctrl+E 展开后，推理结束不能自己收回去。
 		// 没人动过的块默认就是收起态，结束后仍只留标题。
 	}
 	host.syncTurn(active);
@@ -221,11 +221,11 @@ export function createEventTarget(host: TuiHost): (event: AgentEvent) => void {
 				host.setStatus(STATUS.writingResponse);
 				break;
 			case "reasoning_delta":
-				// 思考开始：插入区块；正文实时写入，运行时默认只显示最后五行。
-				// 不关闭当前文本块：同一条 assistant 消息的文本继续写回原来的块，思考块单独插在
-				// 它后面。这样迟到的思考片段不会把一句话切成两段。
+				// 推理开始：插入区块；正文实时写入，运行时默认只显示最后五行。
+				// 不关闭当前文本块：同一条 assistant 消息的文本继续写回原来的块，推理块单独插在
+				// 它后面。这样迟到的推理片段不会把一句话切成两段。
 				if (active.thinkingBlock === undefined && event.text.trim().length === 0) {
-					// 纯空白的思考没有可显示内容，不建一个只有标题的空块
+					// 纯空白的推理没有可显示内容，不建一个只有标题的空块
 					host.setStatus(STATUS.thinking);
 					break;
 				}
@@ -346,7 +346,7 @@ export function createEventTarget(host: TuiHost): (event: AgentEvent) => void {
 				state.statusTokens = active.tokensUsed;
 				break;
 			case "retrying": {
-				// 流中断后旧的增量已作废：先收尾当前文本块与思考块，新响应另起一块，避免拼接出重复内容。
+				// 流中断后旧的增量已作废：先收尾当前文本块与推理块，新响应另起一块，避免拼接出重复内容。
 				closeText(active);
 				closeThinking(host, active);
 				// 原因用 `·` 接在动作后面：一行里先说在做什么，再补一句为什么
@@ -369,7 +369,7 @@ export function createEventTarget(host: TuiHost): (event: AgentEvent) => void {
 				host.clearStatus();
 				break;
 			case "turn_end":
-				// 只思考、没产出正文也没调工具的一次请求，摘要行也要落下
+				// 只推理、没产出正文也没调工具的一次请求，摘要行也要落下
 				closeThinking(host, active);
 				closeText(active);
 				break;

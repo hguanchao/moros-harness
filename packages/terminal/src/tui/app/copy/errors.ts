@@ -16,7 +16,7 @@ export function unknownModel(target: string): string {
 	return `Error: unknown model: ${target} · run /model to choose from the list`;
 }
 
-/** 未知思考等级：顺带列出可选值。 */
+/** 未知推理等级：顺带列出可选值。 */
 export function unknownEffort(target: string, levels: readonly string[]): string {
 	return `Error: unknown effort: ${target} · available: ${levels.join(", ")}`;
 }

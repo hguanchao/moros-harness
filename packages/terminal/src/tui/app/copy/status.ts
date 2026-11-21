@@ -145,7 +145,7 @@ export function modelSwitched(target: string): string {
 	return `Model switched to ${target} · applies from the next turn`;
 }
 
-/** 思考等级已设置。 */
+/** 推理等级已设置。 */
 export function effortSet(level: string, fromNextTurn: boolean): string {
 	return `Effort set to ${level}${fromNextTurn ? " · applies from the next turn" : ""}`;
 }

@@ -224,7 +224,7 @@ export function takeToolForFailure(lines: TranscriptLine[], callId: string): Tra
 	return undefined;
 }
 
-/** Ctrl+E：展开或收起最近一个思考区块、工具组、任务卡或子代理组。 */
+/** Ctrl+E：展开或收起最近一个推理区块、工具组、任务卡或子代理组。 */
 export function toggleLastExpandable(turns: readonly TranscriptTurn[]): boolean {
 	for (let turnIndex = turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
 		const response = turns[turnIndex]?.response ?? [];

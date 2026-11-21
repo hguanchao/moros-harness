@@ -16,7 +16,7 @@ interface LlmThinkingBlock {
 	/**
 	 * provider 要求的校验签名。
 	 *
-	 * 开启思考的模型在多轮工具调用里要求把思考块连同签名原样带回，缺了签名后续请求会被拒。
+	 * 开启推理的模型在多轮工具调用里要求把推理块连同签名原样带回，缺了签名后续请求会被拒。
 	 * 不需要签名的端点这里为空。
 	 */
 	readonly signature?: string;
@@ -32,10 +32,10 @@ interface LlmToolCallBlock {
 }
 
 /**
- * 被安全策略加密的思考块。
+ * 被安全策略加密的推理块。
  *
- * Anthropic 在命中安全过滤时把思考内容整体加密后返回；带思考的多轮工具调用里必须把它
- * 原样回传，否则后续请求会被拒或丢失思考上下文。内容对我们是不可读的，只能原样搬运。
+ * Anthropic 在命中安全过滤时把推理内容整体加密后返回；带推理的多轮工具调用里必须把它
+ * 原样回传，否则后续请求会被拒或丢失推理上下文。内容对我们是不可读的，只能原样搬运。
  */
 interface LlmRedactedThinkingBlock {
 	readonly type: "redactedThinking";

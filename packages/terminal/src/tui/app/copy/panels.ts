@@ -55,7 +55,7 @@ export function forkOf(source: string): string {
 /** 会话标题为空时的占位。 */
 export const UNTITLED_SESSION = "Untitled session";
 
-/** 思考等级说明：光看 low/high 判断不了该选哪档。 */
+/** 推理等级说明：光看 low/high 判断不了该选哪档。 */
 export const EFFORT_DESCRIPTIONS: Readonly<Record<string, string>> = {
 	off: "No reasoning; fastest responses",
 	low: "Quick tasks where you review each result",
