@@ -60,6 +60,9 @@ importers:
 
   packages/desktop:
     dependencies:
+      '@mixmark-io/domino':
+        specifier: ^2.2.0
+        version: 2.2.0
       '@moros/core':
         specifier: workspace:*
         version: link:../core
