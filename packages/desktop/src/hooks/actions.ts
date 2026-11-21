@@ -56,7 +56,7 @@ export function useDesktopActions(): DesktopActions {
 					call(window.moros.chatLive(view.meta.id)),
 				]);
 				if (epoch !== navigationEpoch) return;
-				dispatch({ type: "events", sessionId: view.meta.id, events, mode: "replace" });
+				dispatch({ type: "events", sessionId: view.meta.id, events });
 				dispatch({ type: "live-snapshot", sessionId: view.meta.id, live: live.live, queued: live.queued });
 			} catch (error) {
 				if (epoch === navigationEpoch) throw error;

@@ -67,8 +67,8 @@ export function Dropdown({
 	readonly disabled?: boolean;
 	/** 选项之后、分割线下方展示的操作项。 */
 	readonly actions?: readonly DropdownAction[];
-	/** 选择选项后保持菜单开启，供两级菜单的第一级切换内容使用。 */
-	readonly keepOpenOnSelect?: boolean;
+	/** 选择选项后保持菜单开启；布尔或按选项值判断——两级菜单里「选模型保持开启、选档位收尾」用后者。 */
+	readonly keepOpenOnSelect?: boolean | ((value: string) => boolean);
 	/** 菜单开关状态变化通知；关闭后可用于重置内部层级。 */
 	readonly onOpenChange?: (open: boolean) => void;
 	/** 菜单顶部自定义内容，例如返回上一级的按钮。 */
@@ -150,7 +150,9 @@ export function Dropdown({
 										disabled={option.disabled === true}
 										onClick={() => {
 											onChange(option.value);
-											if (!keepOpenOnSelect) {
+											const keep =
+												typeof keepOpenOnSelect === "function" ? keepOpenOnSelect(option.value) : keepOpenOnSelect;
+											if (!keep) {
 												setOpen(false);
 												onOpenChange?.(false);
 											}

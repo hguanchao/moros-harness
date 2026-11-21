@@ -6,6 +6,7 @@ import type { ProjectRef, WorkspaceTarget } from "../shared/contract.ts";
 import { useDesktopActions } from "../hooks/actions.ts";
 import { call, errorMessage } from "../api/api.ts";
 import {
+	AlertIcon,
 	ArchiveIcon,
 	CopyIcon,
 	FolderIcon,
@@ -22,6 +23,7 @@ import {
 	TrashIcon,
 	XIcon,
 } from "./Icons.tsx";
+import { useConfirm } from "./ConfirmDialog.tsx";
 import { useApp } from "../store/state.tsx";
 import { relativeTime } from "../utils/format.ts";
 import { workspaceRootsMatch } from "../utils/workspace.ts";
@@ -37,6 +39,7 @@ interface RowTarget {
 /** 侧栏：新任务草稿、未关联项目的任务与项目会话；设置固定在底部。 */
 export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 	const { state, dispatch } = useApp();
+	const { confirm } = useConfirm();
 	const actions = useDesktopActions();
 	const [expanded, setExpanded] = useState<Readonly<Record<string, boolean>>>({});
 	const [openMenu, setOpenMenu] = useState<MenuKey | undefined>(undefined);
@@ -107,15 +110,27 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 			state.current?.meta.id === meta.id &&
 			workspaceRootsMatch(state.current.meta.projectRoot, meta.projectRoot, platform);
 		const isPinned = pinned.includes(meta.id);
+		// 行内活状态按优先级：执行中 > 等待审批 > 置顶标记
+		const runState = state.runStates[meta.id];
+		const isRunning = runState === "running";
+		const isPaused = runState === "paused";
+		const slotStatus = isRunning ? "运行中" : isPaused ? "等待审批" : isPinned ? "已置顶" : undefined;
 		return (
 			<div className={`sidebar-row ${selected ? "is-selected" : ""}`} key={meta.id}>
 				<button className="row-main session-row" onClick={() => select(meta.id)}>
+					{/* 单一图标槽：执行中转圈 / 待审批警示 / 置顶图钉，标题列始终对齐 */}
 					<span
-						className="row-icon-slot"
-						aria-hidden={!isPinned}
-						{...(isPinned ? { "aria-label": "已置顶", title: "已置顶" } : {})}
+						className={`row-icon-slot ${isRunning ? "session-running" : ""} ${isPaused ? "session-paused" : ""}`}
+						aria-hidden={slotStatus === undefined}
+						{...(slotStatus === undefined ? {} : { role: "status", "aria-label": slotStatus, title: slotStatus })}
 					>
-						{isPinned ? <PinIcon size={14} /> : null}
+						{isRunning ? (
+							<span className="spinner small" />
+						) : isPaused ? (
+							<AlertIcon size={14} />
+						) : isPinned ? (
+							<PinIcon size={14} />
+						) : null}
 					</span>
 					<MarqueeTitle title={meta.title} />
 				</button>
@@ -166,9 +181,15 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 							icon={<TrashIcon size={14} />}
 							label="删除"
 							danger
-							onClick={() => {
+							onClick={async () => {
 								setOpenMenu(undefined);
-								if (!window.confirm(`删除会话「${meta.title}」？该操作不可恢复。`)) return;
+								const confirmed = await confirm({
+									title: "删除会话",
+									message: `删除会话「${meta.title}」？该操作不可恢复。`,
+									confirmLabel: "删除",
+									danger: true,
+								});
+								if (!confirmed) return;
 								void mutate(() => call(window.moros.sessionsDeleteInTarget([meta.id], rowTarget.target)), "会话已删除");
 							}}
 						/>
@@ -251,6 +272,14 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 									<span className="project-name">{project.name}</span>
 								</button>
 								<button
+									className="project-add"
+									aria-label={`在 ${project.name} 中新建任务`}
+									title="在项目中新建任务"
+									onClick={() => actions.newTaskInProject(projectRef)}
+								>
+									<MessagePlusIcon size={14} />
+								</button>
+								<button
 									className="row-menu-trigger"
 									aria-label={`${project.name} 操作`}
 									aria-haspopup="menu"
@@ -263,14 +292,6 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 								</button>
 								{openMenu === menuKey ? (
 									<RowMenu>
-										<MenuItem
-											icon={<MessagePlusIcon size={14} />}
-											label="在项目中新建任务"
-											onClick={() => {
-												setOpenMenu(undefined);
-												actions.newTaskInProject(projectRef);
-											}}
-										/>
 										<MenuItem
 											icon={<FolderOpenIcon size={14} />}
 											label="打开文件夹"

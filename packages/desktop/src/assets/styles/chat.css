@@ -136,3 +136,13 @@
 	margin-top: 10px;
 	color: var(--danger);
 }
+
+/* 回合运行中且尚无流式输出时的轻量占位（正在推理） */
+.turn-hint {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 4px 0;
+	color: var(--text-faint);
+	font-size: var(--text-small);
+}

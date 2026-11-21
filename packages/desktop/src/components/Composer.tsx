@@ -24,7 +24,7 @@ import {
 	XIcon,
 } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
-import { availableModel, configuredModel } from "../utils/model.ts";
+import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -53,6 +53,10 @@ export function Composer(): JSX.Element {
 	const readOnly = current?.readOnly === true;
 	const running =
 		current?.running === true || (current !== undefined && state.runStates[current.meta.id] === "running");
+	// 回合挂起在审批断点上也必须能停止：此时合并按钮切到停止态，作为「放弃等待」的出口
+	const awaitingApproval =
+		current !== undefined && state.runStates[current.meta.id] === "paused" && current.running !== true;
+	const stoppable = running || awaitingApproval;
 	const disabled = !state.ready || state.isNavigating || readOnly || trustBlocked;
 	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
@@ -203,9 +207,18 @@ export function Composer(): JSX.Element {
 			report(new Error("所选模型已不可用，请重新选择"));
 			return;
 		}
+		// 新模型可能不支持当前推理强度（如 Max 遇到只到 High 的模型），钳到最近档位保持与菜单一致
+		const nextEffort = clampEffortToModel(state.models, selected, effort);
 		try {
-			if (current === undefined) dispatch({ type: "draft-options", options: { model: selected } });
-			else await call(window.moros.sessionSelectModel(selected.provider, selected.model));
+			if (current === undefined) {
+				dispatch({
+					type: "draft-options",
+					options: nextEffort === effort ? { model: selected } : { model: selected, effort: nextEffort },
+				});
+				return;
+			}
+			await call(window.moros.sessionSelectModel(selected.provider, selected.model));
+			if (nextEffort !== effort) await call(window.moros.sessionSelectEffort(nextEffort));
 		} catch (error) {
 			report(error);
 		}
@@ -409,24 +422,20 @@ export function Composer(): JSX.Element {
 							onModelChange={changeModel}
 							onEffortChange={(value) => void changeEffort(value)}
 						/>
-						{running ? (
-							<button
-								className="stop-button"
-								title="停止当前回合"
-								onClick={() => {
-									void call(window.moros.chatAbort()).catch(report);
-								}}
-							>
-								<StopIcon size={16} />
-							</button>
-						) : null}
 						<button
-							className={`send-button ${canSend ? "is-ready" : ""}`}
-							title={running ? "加入队列" : "发送"}
-							disabled={disabled || isSending}
-							onClick={() => void send()}
+							className={`send-button ${stoppable ? "is-stop" : canSend ? "is-ready" : ""}`}
+							title={stoppable ? "停止当前回合" : "发送"}
+							aria-label={stoppable ? "停止当前回合" : "发送"}
+							disabled={!stoppable && (disabled || isSending || !canSend)}
+							onClick={() => {
+								if (stoppable) {
+									void call(window.moros.chatAbort()).catch(report);
+									return;
+								}
+								void send();
+							}}
 						>
-							<ArrowUpIcon size={19} />
+							{stoppable ? <StopIcon size={16} /> : <ArrowUpIcon size={19} />}
 						</button>
 					</div>
 				</div>
@@ -525,8 +534,8 @@ const EFFORT_OPTIONS: readonly { readonly value: SessionView["effort"]; readonly
 ];
 
 /**
- * 模型与思考强度合并菜单：第一级选供应商，第二级选模型与思考强度。
- * 第二级分两组，选择模型或强度后关闭菜单；重新打开总是从供应商列表开始。
+ * 模型与推理强度合并菜单：第一级选供应商，第二级选模型与推理强度。
+ * 第二级分两组：选供应商或模型保持菜单开启（选完模型可继续选强度），选强度后关闭；重新打开总是从供应商列表开始。
  */
 function ModelEffortPicker({
 	model,
@@ -548,18 +557,18 @@ function ModelEffortPicker({
 	const providers = state.models.providers;
 	const provider = providerName === undefined ? undefined : providers.find((item) => item.name === providerName);
 	const selectedValue = model === undefined ? "" : JSON.stringify([model.provider, model.model]);
-	const modelLabel =
+	const selectedEntry =
 		model === undefined
-			? "选择模型"
-			: (providers.find((item) => item.name === model.provider)?.models.find((entry) => entry.id === model.model)
-					?.name ?? model.model);
-	const label = model === undefined ? "选择模型 · 思考" : `${modelLabel} · ${effortLabel(effort)}`;
+			? undefined
+			: providers.find((item) => item.name === model.provider)?.models.find((entry) => entry.id === model.model);
+	// 触发器显示模型名称（无名称回退 ID）；下拉列表里才显示 ID，ID 是供应商间的唯一标识。
+	const modelLabel = model === undefined ? "选择模型" : (selectedEntry?.name ?? model.model);
 	const title =
 		providers.length === 0
 			? "暂无可用供应商，请先在设置中添加"
 			: isDraft
-				? "模型与思考强度（未选择时使用工作区默认）"
-				: "切换模型与思考强度（同时写入全局默认）";
+				? "模型与推理强度（未选择时使用工作区默认）"
+				: "切换当前会话的模型与推理强度，不影响其他会话；新会话使用默认设置";
 
 	useEffect(() => {
 		if (providerName === undefined) return;
@@ -582,17 +591,29 @@ function ModelEffortPicker({
 						const value = JSON.stringify([provider.name, entry.id]);
 						return {
 							value,
-							label: entry.name ?? entry.id,
+							label: entry.id,
 							group: "模型",
 							selected: value === selectedValue,
 						};
 					});
 
-	const effortOptions: DropdownOption[] = EFFORT_OPTIONS.map((option) => ({
-		value: option.value,
-		label: option.label,
-		group: "思考强度",
-		selected: option.value === effort,
+	// 推理档位严格按模型配置列出，判断顺序固定：显式关闭（reasoning=false）→ 只有 Off；
+	// 配置了档位就只列这些；档位为空数组 → 只有 Off；未配置档位（旧版配置）→ 全档位可选。
+	const effortValues: readonly SessionView["effort"][] =
+		selectedEntry === undefined
+			? EFFORT_OPTIONS.map((option) => option.value)
+			: selectedEntry.reasoning === false
+				? ["off"]
+				: selectedEntry.reasoningEfforts === undefined
+					? EFFORT_OPTIONS.map((option) => option.value)
+					: selectedEntry.reasoningEfforts.length === 0
+						? ["off"]
+						: selectedEntry.reasoningEfforts;
+	const effortOptions: DropdownOption[] = effortValues.map((value) => ({
+		value,
+		label: effortLabel(value),
+		group: "推理强度",
+		selected: value === effort,
 	}));
 
 	return (
@@ -612,7 +633,7 @@ function ModelEffortPicker({
 					</div>
 				) : undefined
 			}
-			keepOpenOnSelect={provider === undefined}
+			keepOpenOnSelect={(value) => !EFFORT_OPTIONS.some((option) => option.value === value)}
 			onOpenChange={(open) => {
 				if (!open) setProviderName(undefined);
 			}}
@@ -629,7 +650,16 @@ function ModelEffortPicker({
 					</button>
 				)
 			}
-			trigger={<span>{label}</span>}
+			trigger={
+				model === undefined ? (
+					<span>选择模型 · 推理</span>
+				) : (
+					<>
+						<span className="model-picker-model">{modelLabel}</span>
+						<span className="model-picker-effort">{` · ${effortLabel(effort)}`}</span>
+					</>
+				)
+			}
 			onChange={(value) => {
 				if (provider === undefined) {
 					setProviderName(value);
@@ -670,13 +700,13 @@ function ApprovalPicker({
 			options={[
 				{
 					value: "ask",
-					label: "每次确认",
+					label: "每次询问",
 					description: "每次操作前都询问你",
 					icon: <PointerIcon size={14} />,
 				},
 				{
 					value: "auto",
-					label: "自动审批",
+					label: "自动批准",
 					description: "低中风险自动放行高风险先审查",
 					icon: <ShieldCheckIcon size={14} />,
 				},
@@ -710,8 +740,8 @@ function ApprovalPicker({
 }
 
 function approvalLabel(mode: SessionView["approval"]): string {
-	if (mode === "ask") return "每次确认";
-	if (mode === "auto") return "自动审批";
+	if (mode === "ask") return "每次询问";
+	if (mode === "auto") return "自动批准";
 	return "完全访问";
 }
 

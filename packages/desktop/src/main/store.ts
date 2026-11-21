@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { basename, join } from "node:path";
 
 import { z } from "zod";
@@ -63,6 +63,17 @@ export class DesktopStore {
 	}
 
 	static async open(userDataDir: string): Promise<DesktopStore> {
+		// 清扫上次进程硬退出残留的原子写临时文件（atomicWriteFile 只在捕获到错误时清理）
+		try {
+			const prefix = `${join(userDataDir, "desktop-state.json")}.`;
+			for (const entry of await readdir(userDataDir)) {
+				if (entry.startsWith(prefix) && entry.endsWith(".tmp")) {
+					await rm(join(userDataDir, entry), { force: true });
+				}
+			}
+		} catch {
+			// 清扫失败不阻塞启动；残留文件无害，只是占磁盘
+		}
 		const store = new DesktopStore(join(userDataDir, "desktop-state.json"));
 		await store.#load();
 		return store;

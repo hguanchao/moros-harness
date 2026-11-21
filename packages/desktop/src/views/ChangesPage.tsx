@@ -7,10 +7,12 @@ import { call, errorMessage } from "../api/api.ts";
 import { displayPath, relativeTime } from "../utils/format.ts";
 import { PageHeader } from "../components/PageHeader.tsx";
 import { AlertIcon, CheckIcon, DiffIcon, RefreshIcon, XIcon } from "../components/Icons.tsx";
+import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { useApp } from "../store/state.tsx";
 
 export function ChangesPage(): JSX.Element {
 	const { state, dispatch } = useApp();
+	const { confirm } = useConfirm();
 	const current = state.current;
 	const [changes, setChanges] = useState<readonly FileChangeSummary[]>([]);
 	const [selected, setSelected] = useState<number | undefined>(undefined);
@@ -96,21 +98,25 @@ export function ChangesPage(): JSX.Element {
 						{checkpoint !== null ? (
 							<button
 								className="ghost-button"
-								onClick={() => {
-									if (!window.confirm("恢复到最近检查点？当前工作区中该检查点涉及的文件会被写回。")) return;
-									void (async () => {
-										try {
-											const result = await call(window.moros.sessionsRestore(checkpoint.id));
-											dispatch({
-												type: "notice",
-												level: "info",
-												message: `已恢复 ${result.restored} 个文件，删除 ${result.removed} 个`,
-											});
-											setVersion((value) => value + 1);
-										} catch (restoreError) {
-											dispatch({ type: "notice", level: "error", message: errorMessage(restoreError) });
-										}
-									})();
+								onClick={async () => {
+									const confirmed = await confirm({
+										title: "恢复检查点",
+										message: "恢复到最近检查点？当前工作区中该检查点涉及的文件会被写回。",
+										confirmLabel: "恢复",
+										danger: true,
+									});
+									if (!confirmed) return;
+									try {
+										const result = await call(window.moros.sessionsRestore(checkpoint.id));
+										dispatch({
+											type: "notice",
+											level: "info",
+											message: `已恢复 ${result.restored} 个文件，删除 ${result.removed} 个`,
+										});
+										setVersion((value) => value + 1);
+									} catch (restoreError) {
+										dispatch({ type: "notice", level: "error", message: errorMessage(restoreError) });
+									}
 								}}
 							>
 								<CheckIcon size={14} />
@@ -119,21 +125,25 @@ export function ChangesPage(): JSX.Element {
 						) : null}
 						<button
 							className="danger-button"
-							onClick={() => {
-								if (!window.confirm("撤销最近一次文件改动？")) return;
-								void (async () => {
-									try {
-										await call(window.moros.sessionsRollback());
-										dispatch({ type: "notice", level: "info", message: "已撤销最近一步改动" });
-										setVersion((value) => value + 1);
-									} catch (rollbackError) {
-										dispatch({ type: "notice", level: "error", message: errorMessage(rollbackError) });
-									}
-								})();
+							onClick={async () => {
+								const confirmed = await confirm({
+									title: "回滚改动",
+									message: "回滚最近一次文件改动？该操作不可恢复。",
+									confirmLabel: "回滚",
+									danger: true,
+								});
+								if (!confirmed) return;
+								try {
+									await call(window.moros.sessionsRollback());
+									dispatch({ type: "notice", level: "info", message: "已回滚最近一步改动" });
+									setVersion((value) => value + 1);
+								} catch (rollbackError) {
+									dispatch({ type: "notice", level: "error", message: errorMessage(rollbackError) });
+								}
 							}}
 						>
 							<XIcon size={14} />
-							撤销最近一步
+							回滚最近一步
 						</button>
 					</>
 				}

@@ -1,4 +1,4 @@
-import { useEffect, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX } from "react";
 
 import type { EventRecord } from "@moros/core/events/schema.ts";
 import type { LiveState } from "../shared/contract.ts";
@@ -38,6 +38,8 @@ export interface ToolBlock {
 export interface AssistantBlock {
 	readonly kind: "assistant";
 	readonly text: string;
+	/** 落盘的模型推理链；缺省（旧事件/供应商未回传）时不渲染推理块。 */
+	readonly reasoning?: string;
 }
 
 export interface LiveBlock {
@@ -109,8 +111,12 @@ export function buildTimeline(
 				break;
 			}
 			case "llm.response": {
-				if (event.payload.text.length > 0) {
-					ensureCurrent().blocks.push({ kind: "assistant", text: event.payload.text });
+				if (event.payload.text.length > 0 || event.payload.reasoning !== undefined) {
+					ensureCurrent().blocks.push({
+						kind: "assistant",
+						text: event.payload.text,
+						...(event.payload.reasoning === undefined ? {} : { reasoning: event.payload.reasoning }),
+					});
 				}
 				break;
 			}
@@ -327,7 +333,7 @@ export function Transcript({ turns, planning, running, onApprovePlan, onRevisePl
 	}
 	return (
 		<div className="turns">
-			{turns.map((turn) => (
+			{turns.map((turn, index) => (
 				<div className="turn" key={turn.key}>
 					{turn.prompt.length > 0 || turn.images > 0 ? (
 						<div className="user-message">
@@ -342,6 +348,7 @@ export function Transcript({ turns, planning, running, onApprovePlan, onRevisePl
 							blocks={turn.blocks}
 							planning={planning}
 							running={running}
+							runningHint={running && index === turns.length - 1}
 							onApprovePlan={onApprovePlan}
 							onRevisePlan={onRevisePlan}
 						/>
@@ -356,18 +363,24 @@ function BlockList({
 	blocks,
 	planning,
 	running,
+	runningHint = false,
 	onApprovePlan,
 	onRevisePlan,
 }: {
 	readonly blocks: readonly Block[];
 	readonly planning: boolean;
 	readonly running: boolean;
+	/** 仅最后一个回合显示：运行中且尚无流式输出时给出「正在推理」占位。 */
+	readonly runningHint?: boolean;
 	readonly onApprovePlan: (plan: string) => void;
 	readonly onRevisePlan: () => void;
 }): JSX.Element {
 	const rendered: JSX.Element[] = [];
 	let toolBuffer: ToolBlock[] = [];
 	let key = 0;
+	let hasLive = false;
+	// 流式推理默认展开；用户手动收起后不再被增量重渲染强行打开
+	const [liveCollapsed, setLiveCollapsed] = useState(false);
 
 	const flushTools = (): void => {
 		if (toolBuffer.length === 0) return;
@@ -383,16 +396,33 @@ function BlockList({
 		flushTools();
 		switch (block.kind) {
 			case "assistant":
+				if (block.reasoning !== undefined && block.reasoning.length > 0) {
+					rendered.push(
+						<details className="thinking" key={`think-${key++}`}>
+							<summary>
+								<SparklesIcon size={13} />
+								<span>推理过程</span>
+								<ChevronDownIcon size={13} />
+							</summary>
+							<div className="thinking-text">{block.reasoning}</div>
+						</details>,
+					);
+				}
 				rendered.push(<Markdown key={`md-${key++}`} text={block.text} />);
 				break;
 			case "live":
+				hasLive = true;
 				rendered.push(
 					<div className="live-block" key={`live-${key++}`}>
 						{block.reasoning.length > 0 ? (
-							<details className="thinking">
+							<details
+								className="thinking"
+								open={!liveCollapsed}
+								onToggle={(event) => setLiveCollapsed(!(event.currentTarget as HTMLDetailsElement).open)}
+							>
 								<summary>
-									<SparklesIcon size={13} />
-									<span>思考过程</span>
+									<SparklesIcon size={13} className="thinking-live-icon" />
+									<span className="thinking-live-label">推理过程</span>
 									<ChevronDownIcon size={13} />
 								</summary>
 								<div className="thinking-text">{block.reasoning}</div>
@@ -434,6 +464,18 @@ function BlockList({
 		}
 	}
 	flushTools();
+	// 运行中但还没有任何可见输出（首 token 延迟、工具结果后的下一次生成间隙）：
+	// 最后一块不是仍在执行的工具时，给出轻量的推理占位，避免界面看起来像没反应。
+	const lastBlock = blocks.at(-1);
+	const toolRunning = lastBlock?.kind === "tool" && lastBlock.result === undefined;
+	if (runningHint && !hasLive && !toolRunning) {
+		rendered.push(
+			<div className="turn-hint" key="running-hint">
+				<span className="spinner small" />
+				<span>正在推理…</span>
+			</div>,
+		);
+	}
 	return <>{rendered}</>;
 }
 
@@ -466,9 +508,24 @@ function ToolGroup({ blocks }: { readonly blocks: readonly ToolBlock[] }): JSX.E
 
 function ToolRow({ block }: { readonly block: ToolBlock }): JSX.Element {
 	const [open, setOpen] = useState(false);
+	const resultRef = useRef<HTMLPreElement | null>(null);
 	const status = block.result === undefined ? "running" : block.isError === true ? "error" : "ok";
 	const detail = describeTool(block);
 	const result = block.output ?? block.result;
+	const streaming = status === "running" && result !== undefined;
+
+	// 结果框滚动策略：流式期间跟随输出尾部（仅当视口已在底部附近，不打扰向上翻阅）；
+	// 结果落定后回到顶部，从开头阅读完整输出，避免停在半截看起来像被截断。
+	useEffect(() => {
+		const pre = resultRef.current;
+		if (pre === null) return;
+		if (streaming) {
+			const nearBottom = pre.scrollHeight - pre.scrollTop - pre.clientHeight < 24;
+			if (nearBottom) pre.scrollTop = pre.scrollHeight;
+			return;
+		}
+		pre.scrollTop = 0;
+	}, [streaming, result, open]);
 	return (
 		<div className={`tool-row status-${status}`}>
 			<button className="tool-row-main" onClick={() => setOpen(!open)}>
@@ -499,7 +556,9 @@ function ToolRow({ block }: { readonly block: ToolBlock }): JSX.Element {
 					{result !== undefined ? (
 						<>
 							<div className="detail-label">{block.isError === true ? "错误" : "结果"}</div>
-							<pre className={block.isError === true ? "is-error" : ""}>{truncateText(result, 6_000)}</pre>
+							<pre ref={resultRef} className={block.isError === true ? "is-error" : ""}>
+								{truncateText(result, 6_000)}
+							</pre>
 						</>
 					) : null}
 				</div>

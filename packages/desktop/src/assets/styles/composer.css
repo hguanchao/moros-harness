@@ -229,11 +229,17 @@
 	max-width: 280px;
 }
 
-.model-picker .dropdown-trigger > span {
+/* 模型名过长时省略模型部分；推理强度是独立 span，不参与收缩，始终完整可见 */
+.model-picker .dropdown-trigger > .model-picker-model {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	max-width: 210px;
+	min-width: 0;
+}
+
+.model-picker .dropdown-trigger > .model-picker-effort {
+	flex: none;
+	white-space: nowrap;
 }
 
 /* 合并菜单位于输入框右侧，右对齐以免弹层溢出窗口；模型较多时滚动 */
@@ -326,16 +332,15 @@
 	opacity: 0.88;
 }
 
-.stop-button {
-	width: 28px;
-	height: 28px;
-	border: none;
-	border-radius: 50%;
+/* 合并后的停止态：与发送同尺寸同位置，仅颜色切换 */
+.send-button.is-stop {
 	background: var(--fill-soft);
 	color: var(--danger);
-	display: grid;
-	place-items: center;
-	flex: none;
+}
+
+.send-button.is-stop:hover:not(:disabled) {
+	background: var(--fill-strong);
+	color: var(--danger);
 }
 
 /* 旧的条形控件不再使用；保留类名避免页面回归时丢失样式 */

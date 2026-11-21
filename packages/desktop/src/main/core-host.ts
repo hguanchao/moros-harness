@@ -140,7 +140,9 @@ export class DesktopHost {
 	readonly #pushMessage: (message: PushMessage) => void;
 	readonly #homeDir: string | undefined;
 	readonly #taskRoot: string;
-	readonly #broker: ApprovalBroker = createApprovalBroker({ timeoutMs: 120_000 });
+	// 桌面端是交互式界面：审批卡等待用户决定，不设自动拒绝超时（0 = 关闭）；
+	// 放弃等待的出口是「停止回合」——中止信号会让挂起的审批按取消收尾。
+	readonly #broker: ApprovalBroker = createApprovalBroker({ timeoutMs: 0 });
 	#workspaceOperation: Promise<void> = Promise.resolve();
 
 	#core: Core | undefined;
@@ -699,7 +701,9 @@ export class DesktopHost {
 		const sessionId = this.#current?.meta.id ?? "";
 		this.#push({ type: "review", sessionId, runId, state: "running" });
 		try {
-			const result = await core.reviewSession(root, prompt);
+			const result = await core.reviewSession(root, prompt, {
+				...(normalizeProjectRoot(root) === normalizeProjectRoot(this.#taskRoot) ? { internalWorkspace: true } : {}),
+			});
 			this.#push({ type: "review", sessionId, runId, state: "done", report: result.report });
 			return result;
 		} catch (error) {
@@ -882,8 +886,8 @@ export class DesktopHost {
 		if (!providerEntry?.models.some((entry) => entry.id === model)) {
 			throw new Error(`Unknown model: ${provider}/${model}`);
 		}
+		// 只改当前会话的进程内选择；不动全局默认，避免一个会话的切换扩散到所有会话。
 		await core.selectModel(session, provider, model);
-		await core.setDefaultModel(provider, model);
 		await this.#refreshCatalog();
 		await this.#pushViewIfCurrent(session.meta.id);
 	}
@@ -891,8 +895,8 @@ export class DesktopHost {
 	async selectEffort(effort: ReasoningEffort): Promise<void> {
 		const core = this.#requiredCore();
 		const session = this.#requireCurrent();
+		// 同 selectModel：推理强度仅覆盖当前会话，全局默认由配置文件/设置管理。
 		core.selectEffort(session, effort);
-		await core.setDefaultEffort(effort);
 		await this.#pushViewIfCurrent(session.meta.id);
 	}
 
@@ -1340,10 +1344,13 @@ export class DesktopHost {
 		const core = this.#requiredCore();
 		const sessionId = session.meta.id;
 		const live = this.#liveFor(sessionId);
+		// 内部任务工作区的会话不向模型披露路径；项目会话照常注入 ## Workspace
+		const isTaskSession = normalizeProjectRoot(session.meta.projectRoot) === normalizeProjectRoot(this.#taskRoot);
 		let outcome: "ok" | "aborted" | "error" = "ok";
 		try {
 			await core.runSession(session, entry.text, {
 				signal: controller.signal,
+				...(isTaskSession ? { internalWorkspace: true } : {}),
 				...(entry.images.length > 0 ? { images: entry.images } : {}),
 				onText: (delta) => {
 					live.text += delta;

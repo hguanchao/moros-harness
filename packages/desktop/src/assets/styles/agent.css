@@ -1,4 +1,4 @@
-/* ---------- 思考 / 工具 / 计划 ---------- */
+/* ---------- 推理 / 工具 / 计划 ---------- */
 
 .thinking {
 	margin: 2px 0 8px;
@@ -481,8 +481,7 @@ pre.is-error {
 	min-width: 0;
 }
 
-.send-button,
-.stop-button {
+.send-button {
 	width: 30px;
 	height: 30px;
 	display: grid;
@@ -494,10 +493,6 @@ pre.is-error {
 
 .send-button:hover:not(:disabled) {
 	opacity: 0.86;
-}
-
-.stop-button:hover {
-	background: var(--danger-soft);
 }
 
 .running-text {
@@ -528,4 +523,51 @@ pre.is-error {
 	position: fixed;
 	inset: 0;
 	z-index: 30;
+}
+
+/* 流式中的推理条目：图标呼吸 + 文字流光；落盘后的推理块保持静态 */
+.thinking[open] .thinking-live-icon {
+	animation: thinking-pulse 1.6s ease-in-out infinite;
+}
+
+.thinking-live-label {
+	background: linear-gradient(90deg, var(--text-faint) 35%, var(--text-primary) 50%, var(--text-faint) 65%);
+	background-size: 200% 100%;
+	-webkit-background-clip: text;
+	background-clip: text;
+	-webkit-text-fill-color: transparent;
+	color: transparent;
+	animation: thinking-shimmer 2.4s linear infinite;
+}
+
+@keyframes thinking-pulse {
+	0%,
+	100% {
+		opacity: 0.45;
+		transform: scale(0.92);
+	}
+
+	50% {
+		opacity: 1;
+		transform: scale(1.06);
+	}
+}
+
+@keyframes thinking-shimmer {
+	0% {
+		background-position: 200% 0;
+	}
+
+	100% {
+		background-position: -200% 0;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.thinking[open] .thinking-live-icon,
+	.thinking-live-label {
+		animation: none;
+		-webkit-text-fill-color: currentcolor;
+		color: var(--text-faint);
+	}
 }

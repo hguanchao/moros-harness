@@ -263,6 +263,13 @@ html.is-resizing-sidebar .sidebar > * {
 	margin-top: 16px;
 }
 
+/* 与 .project-tasks 一致：任务行之间保留 2px 间隔 */
+.task-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
 .task-list .session-row {
 	padding-left: 8px;
 }
@@ -406,7 +413,8 @@ html.is-resizing-sidebar .sidebar > * {
 	margin-right: 0;
 }
 
-.sidebar-row .row-menu-trigger {
+.sidebar-row .row-menu-trigger,
+.sidebar-row .project-add {
 	position: absolute;
 	right: 4px;
 	top: 50%;
@@ -429,13 +437,27 @@ html.is-resizing-sidebar .sidebar > * {
 
 .sidebar-row:hover .row-menu-trigger,
 .sidebar-row .row-menu-trigger:focus,
-.sidebar-row .row-menu-trigger[aria-expanded="true"] {
+.sidebar-row .row-menu-trigger[aria-expanded="true"],
+.sidebar-row:hover .project-add,
+.sidebar-row .project-add:focus,
+.sidebar-row:has(.row-menu-trigger[aria-expanded="true"]) .project-add {
 	opacity: 1;
 }
 
-.sidebar-row .row-menu-trigger:hover {
+.sidebar-row .row-menu-trigger:hover,
+.sidebar-row .project-add:hover {
 	background: var(--fill-hover);
 	color: var(--text-primary);
+}
+
+/* 项目行：悬停时「在项目中新建任务」位于更多按钮左侧，两者同时显形 */
+.project-line .project-add {
+	right: 28px;
+}
+
+.project-line:hover .row-main,
+.project-line:has(.row-menu-trigger[aria-expanded="true"]) .row-main {
+	padding-right: 54px;
 }
 
 /* 时间：静态时在流内靠右显示；悬停时绝对定位并淡出，不占据宽度。 */
@@ -542,6 +564,16 @@ html.is-resizing-sidebar .sidebar > * {
 	width: 16px;
 	height: 16px;
 	color: var(--text-dim);
+}
+
+/* 会话行运行中指示：转圈用主题色，与置顶标记同槽位对齐 */
+.session-running .spinner {
+	border-top-color: var(--accent);
+}
+
+/* 会话行等待审批指示：警示色 */
+.session-paused {
+	color: var(--warn);
 }
 
 .side-empty {

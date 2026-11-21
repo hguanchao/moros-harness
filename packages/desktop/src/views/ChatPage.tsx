@@ -19,7 +19,6 @@ export function ChatPage(): JSX.Element {
 	const project = state.project;
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const stickToBottom = useRef(true);
-	const [loadingOlder, setLoadingOlder] = useState(false);
 
 	const events = current === undefined ? [] : (state.events[current.meta.id] ?? []);
 	const live = current === undefined ? undefined : (state.live[current.meta.id] ?? current.live);
@@ -59,19 +58,6 @@ export function ChatPage(): JSX.Element {
 
 	const report = (error: unknown): void => {
 		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
-	};
-
-	const loadOlder = async (): Promise<void> => {
-		if (current === undefined || events.length === 0) return;
-		setLoadingOlder(true);
-		try {
-			const page = await call(window.moros.sessionsEvents(current.meta.id, events[0]?.seq, 200));
-			dispatch({ type: "events", sessionId: current.meta.id, events: page, mode: "prepend" });
-		} catch (error) {
-			report(error);
-		} finally {
-			setLoadingOlder(false);
-		}
 	};
 
 	const approvePlan = (plan: string): void => {
@@ -128,11 +114,6 @@ export function ChatPage(): JSX.Element {
 						}}
 					>
 						<div className="transcript">
-							{events.length > 0 && (events[0]?.seq ?? 1) > 1 ? (
-								<button className="load-older" disabled={loadingOlder} onClick={() => void loadOlder()}>
-									{loadingOlder ? "加载中…" : "加载更早消息"}
-								</button>
-							) : null}
 							{state.loadError !== undefined ? (
 								<div className="load-error">
 									<AlertIcon size={16} />
@@ -207,8 +188,13 @@ function ApprovalPanel({
 					允许一次
 				</button>
 				{card.saveShort !== undefined ? (
-					<button className="ghost-button" disabled={busy} onClick={() => void respond("allow-session")}>
-						本会话允许 {card.saveShort}
+					<button
+						className="ghost-button"
+						disabled={busy}
+						title={`本会话允许 ${card.saveShort}`}
+						onClick={() => void respond("allow-session")}
+					>
+						本会话允许
 					</button>
 				) : null}
 				<button className="danger-button" disabled={busy} onClick={() => void respond("deny")}>

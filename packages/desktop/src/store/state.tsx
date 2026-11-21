@@ -132,12 +132,7 @@ export type Action =
 	| { readonly type: "pinned-sessions"; readonly ids: readonly string[] }
 	| { readonly type: "recent-projects"; readonly projects: readonly RecentProject[] }
 	| { readonly type: "session"; readonly view: SessionView }
-	| {
-			readonly type: "events";
-			readonly sessionId: string;
-			readonly events: readonly EventRecord[];
-			readonly mode: "replace" | "prepend";
-	  }
+	| { readonly type: "events"; readonly sessionId: string; readonly events: readonly EventRecord[] }
 	| {
 			readonly type: "live-snapshot";
 			readonly sessionId: string;
@@ -657,6 +652,9 @@ function sameHistoryEntry(left: HistoryEntry, right: HistoryEntry): boolean {
 }
 
 function newTaskState(state: AppState): AppState {
+	// 新任务草稿沿用上一会话的模型与推理强度，避免每次新建都回退到全局默认；
+	// 审批档位与计划模式仍回默认，不隐式带入上一会话的高危设置。
+	const seed = state.current === undefined ? {} : { model: state.current.model, effort: state.current.effort };
 	return {
 		...state,
 		current: undefined,
@@ -664,7 +662,7 @@ function newTaskState(state: AppState): AppState {
 		loadError: undefined,
 		isNavigating: false,
 		review: undefined,
-		draft: createTaskDraft(),
+		draft: createTaskDraft(seed),
 		draftGeneration: state.draftGeneration + 1,
 		draftRevision: 0,
 		draftWorkspace: undefined,

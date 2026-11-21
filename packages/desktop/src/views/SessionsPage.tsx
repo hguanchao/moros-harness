@@ -15,10 +15,12 @@ import {
 	TrashIcon,
 	XIcon,
 } from "../components/Icons.tsx";
+import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { useApp } from "../store/state.tsx";
 
 export function SessionsPage(): JSX.Element {
 	const { state, dispatch } = useApp();
+	const { confirm } = useConfirm();
 	const actions = useDesktopActions();
 	const [items, setItems] = useState<readonly SessionMeta[]>([]);
 	const [query, setQuery] = useState("");
@@ -206,8 +208,14 @@ export function SessionsPage(): JSX.Element {
 							<button
 								className="icon-button danger"
 								title="删除"
-								onClick={() => {
-									if (!window.confirm(`删除会话「${meta.title}」？该操作不可恢复。`)) return;
+								onClick={async () => {
+									const confirmed = await confirm({
+										title: "删除会话",
+										message: `删除会话「${meta.title}」？该操作不可恢复。`,
+										confirmLabel: "删除",
+										danger: true,
+									});
+									if (!confirmed) return;
 									void mutate(() => call(window.moros.sessionsDelete([meta.id])), "会话已删除");
 								}}
 							>

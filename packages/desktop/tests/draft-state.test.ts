@@ -114,7 +114,7 @@ describe("renderer task draft state", () => {
 		expect(next.ready).toBe(true);
 	});
 
-	it("new-task 离开项目会话，重置未关联草稿但保留全局 sessions", () => {
+	it("new-task 离开项目会话，重置未关联草稿但沿用该会话的模型与思考强度", () => {
 		const before: AppState = {
 			...activeState(),
 			page: "settings",
@@ -134,12 +134,13 @@ describe("renderer task draft state", () => {
 		};
 		const next = reducer(before, { type: "new-task" });
 
+		// 模型与思考强度取自上一会话的当前选择，而非旧草稿残留值；审批档位与计划模式不继承
 		expect(next.draft).toEqual({
 			text: "",
 			images: [],
 			project: null,
-			model: undefined,
-			effort: undefined,
+			model: SESSION.model,
+			effort: SESSION.effort,
 			approval: undefined,
 			plan: false,
 		});
@@ -153,6 +154,13 @@ describe("renderer task draft state", () => {
 		});
 		expect(next.sessions).toBe(before.sessions);
 		expect(next.project).toBe(before.project);
+	});
+
+	it("new-task 无上一会话时不携带模型与思考强度", () => {
+		const before = { ...activeState(), current: undefined };
+		const next = reducer(before, { type: "new-task" });
+		expect(next.draft.model).toBeUndefined();
+		expect(next.draft.effort).toBeUndefined();
 	});
 
 	it("会话恢复、进入草稿与创建任务时维护顶栏导航历史", () => {
@@ -486,7 +494,7 @@ describe("renderer task draft state", () => {
 		expect(pushed.draftGeneration).toBe(draft.draftGeneration);
 	});
 
-	it("session-cleared 删除最后一个当前会话后回到空的新任务", () => {
+	it("session-cleared 删除最后一个当前会话后回到新任务并沿用其模型选择", () => {
 		const before: AppState = {
 			...activeState(),
 			sessions: [SESSION.meta],
@@ -501,7 +509,8 @@ describe("renderer task draft state", () => {
 
 		expect(next.sessions).toEqual([]);
 		expect(next.current).toBeUndefined();
-		expect(next.draft).toEqual(initialState.draft);
+		// 新草稿清空输入，但沿用被删会话的模型与思考强度
+		expect(next.draft).toEqual({ ...initialState.draft, model: SESSION.model, effort: SESSION.effort });
 		expect(next.draftGeneration).toBe(before.draftGeneration + 1);
 		expect(next.draftRevision).toBe(0);
 		expect(next.draftWorkspace).toBeUndefined();

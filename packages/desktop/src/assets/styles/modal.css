@@ -232,3 +232,15 @@ label.yolo-confirm-check {
 	color: var(--text-secondary);
 	font-size: var(--text-small);
 }
+
+/* 确认弹窗：窄卡片，正文单段说明 */
+.confirm-modal {
+	width: min(400px, 100%);
+}
+
+.confirm-message {
+	margin: 0 0 18px;
+	color: var(--text-secondary);
+	font-size: var(--text-body);
+	line-height: 1.6;
+}

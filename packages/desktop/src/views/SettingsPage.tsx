@@ -25,6 +25,7 @@ import {
 	TrashIcon,
 	XIcon,
 } from "../components/Icons.tsx";
+import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { useApp } from "../store/state.tsx";
 
 const API_OPTIONS: ReadonlyArray<readonly [ProviderView["api"], string]> = [
@@ -283,6 +284,7 @@ export function ProvidersTab({
 	readonly onRefresh: () => Promise<void>;
 	readonly onNotice: (level: "info" | "warn" | "error", message: string) => void;
 }): JSX.Element {
+	const { confirm } = useConfirm();
 	const firstProvider = settings.providers[0];
 	const [selected, setSelected] = useState<string | undefined>(() => firstProvider?.name);
 	const [isNew, setIsNew] = useState(false);
@@ -481,7 +483,13 @@ export function ProvidersTab({
 	const remove = async (): Promise<void> => {
 		if (isNew || current === undefined || selected === undefined) return;
 		setMoreOpen(false);
-		if (!window.confirm(`删除供应商 ${selected}？`)) return;
+		const confirmed = await confirm({
+			title: "删除供应商",
+			message: `删除供应商「${selected}」？该供应商的模型与密钥配置将被移除。`,
+			confirmLabel: "删除",
+			danger: true,
+		});
+		if (!confirmed) return;
 		try {
 			await call(window.moros.settingsDeleteProvider(selected));
 			await onRefresh();
@@ -1004,8 +1012,8 @@ export function ProvidersTab({
 											/>
 										</div>
 										<div className="prov-field prov-field-wide prov-reasoning">
-											<span>推理能力</span>
-											<div className="prov-checkbox-group" role="group" aria-label="推理能力">
+											<span>推理强度</span>
+											<div className="prov-checkbox-group" role="group" aria-label="推理强度">
 												<button
 													type="button"
 													className={`prov-checkbox-button ${modelEditor.model.reasoningEfforts.length === 0 ? "is-checked" : ""}`}
@@ -1076,7 +1084,7 @@ export function ProvidersTab({
 														</span>
 													</span>
 													<span>
-														<span className="prov-fact-label">推理</span>
+														<span className="prov-fact-label">推理强度</span>
 														<span
 															className="prov-fact-value"
 															title={
@@ -1173,7 +1181,7 @@ export function ProvidersTab({
 												<span>模型名称</span>
 												<span className="discover-num">上下文大小</span>
 												<span className="discover-num">最大输出 Token</span>
-												<span>推理</span>
+												<span>推理强度</span>
 											</div>
 											<div className="discover-list">
 												{fetchedModels.map((model) => (
