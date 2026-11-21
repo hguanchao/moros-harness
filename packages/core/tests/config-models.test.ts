@@ -39,6 +39,27 @@ describe("辅助模型配置", () => {
 	});
 });
 
+describe("外观配置键别名", () => {
+	it("font_family 与 review_timeout_sec 归一为 camelCase", () => {
+		expect(
+			normalizeConfigKeys({
+				limits: { review_timeout_sec: 120 },
+				ui: { font_family: "maple", font_size: 16 },
+			}),
+		).toEqual({
+			limits: { reviewTimeoutSec: 120 },
+			ui: { fontFamily: "maple", fontSize: 16 },
+		});
+	});
+
+	it("[ui] 补写的 font_family 读回时生效，不按未知键剥离", () => {
+		const { config, skipped } = parseConfig(normalizeConfigKeys({ ui: { font_family: "maple" } }));
+
+		expect(config.ui.fontFamily).toBe("maple");
+		expect(skipped).toEqual([]);
+	});
+});
+
 describe("模型输入类型与能力", () => {
 	it("接受视频、PDF 输入与能力标记", () => {
 		const model = ModelSchema.parse({

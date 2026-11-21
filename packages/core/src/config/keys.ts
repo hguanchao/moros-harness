@@ -5,6 +5,7 @@ const KEY_ALIASES: Readonly<Record<string, string>> = {
 	max_turns: "maxTurns",
 	spill_threshold: "spillThreshold",
 	stream_idle_timeout_sec: "streamIdleTimeoutSec",
+	review_timeout_sec: "reviewTimeoutSec",
 	max_retries: "maxRetries",
 	max_delay_ms: "maxDelayMs",
 	compact_at: "compactAt",
@@ -13,6 +14,7 @@ const KEY_ALIASES: Readonly<Record<string, string>> = {
 	compact_model: "compactModel",
 	review_model: "reviewModel",
 	font_size: "fontSize",
+	font_family: "fontFamily",
 	mcp_servers: "mcpServers",
 };
 
