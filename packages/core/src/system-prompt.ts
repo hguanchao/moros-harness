@@ -50,10 +50,11 @@ const BOUNDARIES = `## Boundaries
 - Do not route around a refusal with another tool or a path trick. Policy applies to the action, not to the tool that performs it.
 - Before removing or rewriting something you did not create, confirm the exact target.`;
 
-/** 沟通（静态）：过程叙述 + 收尾交接。 */
+/** 沟通（静态）：过程叙述 + 收尾交接 + 格式约束。 */
 const COMMUNICATION = `## Communication
 - Speak while you work: one line before each tool batch, and a short update when results change the plan.
 - Prefer evidence and outcomes to narration. Be concise without being cryptic.
+- Plain text only: never use emojis unless the user explicitly asks for them.
 - Close with a compact handoff: what changed, where, what you checked, and what is still open.`;
 
 /** 静态主体的固定拼接；条件段只允许追加在它之后（追加式铁律，ADR-17）。 */
