@@ -752,7 +752,7 @@ export function ProvidersTab({
 		<div className="prov-page">
 			<div className="prov-page-head">
 				<div>
-					<h1 className="prov-page-title">模型设置</h1>
+					<h1 className="prov-page-title">供应商</h1>
 					<p className="prov-page-desc">管理自定义模型供应商，配置后可在聊天时选择使用。</p>
 				</div>
 				<div className="prov-page-actions">
@@ -1102,10 +1102,10 @@ export function ProvidersTab({
 											</div>
 											<div className="prov-model-actions">
 												<button className="icon-button" title="编辑模型" onClick={() => editModel(index, model)}>
-													<PencilIcon size={18} />
+													<PencilIcon size={14} />
 												</button>
 												<button className="icon-button danger" title="删除模型" onClick={() => deleteModel(index)}>
-													<TrashIcon size={18} />
+													<TrashIcon size={14} />
 												</button>
 											</div>
 										</div>

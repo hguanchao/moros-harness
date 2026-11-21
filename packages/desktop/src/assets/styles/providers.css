@@ -1,5 +1,5 @@
 /* ============================================================
-   模型设置（供应商）页：页头 + 左侧供应商列表 + 右侧详情面板
+   供应商（模型设置）页：页头 + 左侧供应商列表 + 右侧详情面板
    仅覆盖本页元素，不改动其他设置分组复用的通用样式。
    ============================================================ */
 
@@ -46,7 +46,9 @@
 .prov-workspace {
 	display: grid;
 	grid-template-columns: 240px minmax(0, 1fr);
-	min-height: max(480px, calc(100vh - 300px));
+	/* 高度锁定在一屏内：超出部分交给右侧模型列表 / 左侧供应商列表内部滚动 */
+	height: max(480px, calc(100vh - 300px));
+	grid-template-rows: minmax(0, 1fr);
 	border: 1px solid var(--line);
 	border-radius: 14px;
 	background: var(--surface-chrome);
@@ -73,6 +75,12 @@
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+	/* 工作区高度固定后，供应商过多时列表内部滚动 */
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	/* 列表项与滚动条之间留出间隙 */
+	padding-right: 6px;
 }
 
 .prov-sidebar .provider-card.prov-item {
@@ -135,6 +143,7 @@
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
+	min-height: 0;
 	padding: 22px 24px 24px;
 }
 
@@ -773,9 +782,12 @@
 	color: var(--text-secondary);
 }
 
-/* 模型列表 */
+/* 模型列表：标题行固定，内容区（卡片列表 / 编辑面板）内部滚动 */
 .prov-models {
 	flex: 1;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
 }
 
 .prov-models-head {
@@ -784,6 +796,7 @@
 	justify-content: space-between;
 	gap: 12px;
 	margin-bottom: 10px;
+	flex: none;
 }
 
 .prov-models-head h3 {
@@ -832,6 +845,10 @@
 	border: 1px solid var(--line-strong);
 	border-radius: var(--r-xl);
 	background: var(--surface-main);
+	/* 工作区高度固定后，长表单（短窗口）内部滚动，保存按钮始终可达 */
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
 }
 
 .prov-model-fields {
@@ -1310,6 +1327,12 @@
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	/* 模型卡片过多时列表内部滚动，供应商表头与表单保持可见 */
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	/* 卡片与滚动条之间留出间隙，避免贴边 */
+	padding-right: 10px;
 }
 
 .prov-model-card {
@@ -1389,8 +1412,8 @@
 }
 
 .prov-model-actions .icon-button {
-	width: 36px;
-	height: 36px;
+	width: 28px;
+	height: 28px;
 }
 
 .prov-detail-actions {
