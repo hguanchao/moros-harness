@@ -84,6 +84,7 @@ export const SettingsPatchSchema = z
 				theme: z.enum(["auto", "light", "dark"]).optional(),
 				notify: z.enum(["auto", "bell", "desktop", "off"]).optional(),
 				fontSize: z.number().int().min(12).max(20).optional(),
+				fontFamily: z.enum(["system", "wenkai", "maple"]).optional(),
 			})
 			.optional(),
 	})

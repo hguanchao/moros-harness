@@ -89,8 +89,10 @@ const ConfigSchema = z.object({
 			notify: z.enum(["auto", "bell", "desktop", "off"]).default("auto"),
 			/** 界面文字基准字号（px）；图标与布局尺寸不受影响。 */
 			fontSize: z.number().int().min(12).max(20).default(14),
+			/** 界面字体：system 用平台栈；wenkai/maple 使用应用内置的web字体。 */
+			fontFamily: z.enum(["system", "wenkai", "maple"]).default("system"),
 		})
-		.default({ theme: "auto", notify: "auto", fontSize: 14 }),
+		.default({ theme: "auto", notify: "auto", fontSize: 14, fontFamily: "system" }),
 	/** 按项目路径记录的工作区信任决定；键为归一化路径（win32 小写）。 */
 	trusts: z.record(z.string(), z.boolean()).optional(),
 });
@@ -229,7 +231,7 @@ export function parseConfig(
 		["limits", ["maxTurns", "spillThreshold", "streamIdleTimeoutSec", "reviewTimeoutSec"]],
 		["retry", ["maxRetries", "maxDelayMs"]],
 		["compaction", ["compactAt", "keepRecent", "summaryTimeoutSec"]],
-		["ui", ["theme", "notify", "fontSize"]],
+		["ui", ["theme", "notify", "fontSize", "fontFamily"]],
 	];
 	for (const [group, keys] of groups) {
 		const raw = isRecord(source[group]) ? source[group] : {};

@@ -95,6 +95,11 @@ export function App(): JSX.Element {
 		document.documentElement.style.setProperty("--ui-scale", String(state.uiFontSize / 14));
 	}, [state.uiFontSize]);
 
+	// 界面字体：外观设置选择，写到 html[data-font]，CSS 据此覆盖 --font-ui
+	useEffect(() => {
+		document.documentElement.dataset.font = state.settings?.config.ui.fontFamily ?? "system";
+	}, [state.settings]);
+
 	useEffect(() => {
 		const onKeyDown = (event: KeyboardEvent): void => {
 			const modifier = isMac ? event.metaKey : event.ctrlKey;

@@ -335,6 +335,23 @@ function AppearanceSettings({
 							/>
 						}
 					/>
+					<SettingsRow
+						label="界面字体"
+						description="内置霞鹜文楷与 Maple Mono CN（分包加载）；系统默认使用平台字体栈。"
+						control={
+							<Dropdown
+								value={ui.fontFamily}
+								options={[
+									{ value: "system", label: "系统默认" },
+									{ value: "wenkai", label: "霞鹜文楷" },
+									{ value: "maple", label: "Maple Mono CN" },
+								]}
+								onChange={(fontFamily) => {
+									void onUpdate({ ui: { fontFamily: fontFamily as "system" | "wenkai" | "maple" } }, "字体已更新");
+								}}
+							/>
+						}
+					/>
 				</SettingsCard>
 			</SettingsSection>
 

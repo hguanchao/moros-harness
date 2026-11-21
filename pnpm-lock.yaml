@@ -63,6 +63,9 @@ importers:
       '@mixmark-io/domino':
         specifier: ^2.2.0
         version: 2.2.0
+      '@mogeko/maple-mono-cn':
+        specifier: ^7.9.0
+        version: 7.9.0
       '@moros/core':
         specifier: workspace:*
         version: link:../core
@@ -78,6 +81,9 @@ importers:
       lucide-react:
         specifier: ^1.76.0
         version: 1.76.0(@types/react@19.3.0)(react@19.3.1)
+      lxgw-wenkai-screen-webfont:
+        specifier: ^1.7.0
+        version: 1.7.0
       marked:
         specifier: 18.1.1
         version: 18.1.1
@@ -623,6 +629,9 @@ packages:
 
   '@mixmark-io/domino@2.2.0':
     resolution: {integrity: sha512-Y28PR25bHXUg88kCV7nivXrP2Nj2RueZ3/l/jdx6J9f8J4nsEGcgX0Qe6lt7Pa+J79+kPiJU3LguR6O/6zrLOw==}
+
+  '@mogeko/maple-mono-cn@7.9.0':
+    resolution: {integrity: sha512-NZls63+8Q4+17saZqhN5sFB9UqIfyI73q+NNyXNQFmdzivzSYAKLCuo2yvheyEm95kuH8VEhwTl4YvbMoqIbFw==}
 
   '@noble/hashes@1.8.0':
     resolution: {integrity: sha512-jCs9ldd7NwzpgXDIf6P3+NrHh9/sD6CQdxHyjQI+h/6rDNo88ypBxxz45UDuZHz9r3tNz7N/VInSVoVdtXEI4A==}
@@ -1550,6 +1559,9 @@ packages:
     peerDependenciesMeta:
       '@types/react':
         optional: true
+
+  lxgw-wenkai-screen-webfont@1.7.0:
+    resolution: {integrity: sha512-xvfF4V26Mb335xKg3uxljz+V2nq4F5ek0ku9pmyKgT0Dzo/d2rHi7WpnqgvM9mlXAcAKOrxrcDmUZiIs/ZQ9bQ==}
 
   magic-string@0.30.21:
     resolution: {integrity: sha512-vd2F4YUyEXKGcLHoq+TEyCjxueSeHnFxyyjNp80yg0XV4vUhnDer/lvvlqM/arB5bXQN5K2/3oinyCRyx8T2CQ==}
@@ -2612,6 +2624,8 @@ snapshots:
 
   '@mixmark-io/domino@2.2.0': {}
 
+  '@mogeko/maple-mono-cn@7.9.0': {}
+
   '@noble/hashes@1.8.0': {}
 
   '@peculiar/asn1-schema@2.11.1':
@@ -3634,6 +3648,8 @@ snapshots:
       react: 19.3.1
     optionalDependencies:
       '@types/react': 19.3.0
+
+  lxgw-wenkai-screen-webfont@1.7.0: {}
 
   magic-string@0.30.21:
     dependencies:
