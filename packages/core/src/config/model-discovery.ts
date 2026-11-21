@@ -195,8 +195,9 @@ function extractEfforts(candidate: Record<string, unknown>): readonly Exclude<Re
 			found.add(value as Exclude<ReasoningEffort, "off">);
 		}
 	}
-	return REASONING_EFFORTS.filter((effort) => effort !== "off" && found.has(effort as Exclude<ReasoningEffort, "off">)) as
-		readonly Exclude<ReasoningEffort, "off">[];
+	return REASONING_EFFORTS.filter(
+		(effort) => effort !== "off" && found.has(effort as Exclude<ReasoningEffort, "off">),
+	) as readonly Exclude<ReasoningEffort, "off">[];
 }
 
 /** 提取供应商错误消息；避免把整段响应或凭据带进界面。 */
