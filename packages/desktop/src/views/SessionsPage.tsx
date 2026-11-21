@@ -16,6 +16,7 @@ import {
 	XIcon,
 } from "../components/Icons.tsx";
 import { useConfirm } from "../components/ConfirmDialog.tsx";
+import { SkeletonLine } from "../components/Skeleton.tsx";
 import { useApp } from "../store/state.tsx";
 
 export function SessionsPage(): JSX.Element {
@@ -95,14 +96,15 @@ export function SessionsPage(): JSX.Element {
 				subtitle="归档、回放、分叉与导出；与 TUI 共享同一份会话目录。"
 				actions={
 					<button
-						className="ghost-button"
+						className="icon-button"
+						title="刷新"
+						aria-label="刷新"
 						onClick={() => {
 							void actions.refreshSessions();
 							dispatch({ type: "sessions-changed" });
 						}}
 					>
-						<RefreshIcon size={14} />
-						刷新
+						<RefreshIcon size={16} />
 					</button>
 				}
 			/>
@@ -130,6 +132,7 @@ export function SessionsPage(): JSX.Element {
 					<span>状态</span>
 					<span>操作</span>
 				</div>
+				{items.length === 0 && loading ? <SessionTableSkeleton /> : null}
 				{items.length === 0 && !loading ? <div className="side-empty">没有匹配的会话</div> : null}
 				{items.map((meta) => (
 					<div className={`session-table-row ${state.current?.meta.id === meta.id ? "is-current" : ""}`} key={meta.id}>
@@ -279,6 +282,25 @@ export function SessionsPage(): JSX.Element {
 					</div>
 				</Modal>
 			) : null}
+		</div>
+	);
+}
+
+/** 会话表格加载占位：沿用表格列布局，避免加载完成时列宽跳变。 */
+function SessionTableSkeleton(): JSX.Element {
+	return (
+		<div className="session-skeleton" aria-hidden="true" aria-busy="true">
+			{Array.from({ length: 5 }, (_, index) => (
+				<div className="session-table-row session-skeleton-row" key={index}>
+					<div className="session-skeleton-cell">
+						<SkeletonLine width="62%" height={13} />
+						<SkeletonLine width="34%" height={10} />
+					</div>
+					<SkeletonLine width="70%" height={11} />
+					<SkeletonLine width="52%" height={11} />
+					<SkeletonLine width="80%" height={11} />
+				</div>
+			))}
 		</div>
 	);
 }

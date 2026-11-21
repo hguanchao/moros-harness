@@ -32,6 +32,26 @@
 	animation: toast-in 0.18s ease-out;
 }
 
+/* Toast 槽位：离场时高度收起 + 淡出，栈内其余消息平滑下移 */
+.toast-slot {
+	display: grid;
+	grid-template-rows: 1fr;
+	overflow: hidden;
+	transition:
+		grid-template-rows 160ms var(--ease-standard),
+		opacity 160ms var(--ease-standard);
+}
+
+.toast-slot.is-leaving {
+	grid-template-rows: 0fr;
+	opacity: 0;
+}
+
+.toast-slot-inner {
+	min-height: 0;
+	overflow: hidden;
+}
+
 .toast-icon {
 	flex: none;
 	display: flex;
@@ -181,6 +201,28 @@
 	to {
 		opacity: 1;
 		transform: translateY(0);
+	}
+}
+
+/* 方向不固定的浮层菜单（按视口空间自动选上下）：用中性缩放淡入，不带方向位移 */
+@keyframes menu-pop-in {
+	from {
+		opacity: 0;
+		transform: scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: scale(1);
+	}
+}
+
+/* 骨架屏流光：背景条左右移动，暗示内容正在加载 */
+@keyframes skeleton-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
 	}
 }
 

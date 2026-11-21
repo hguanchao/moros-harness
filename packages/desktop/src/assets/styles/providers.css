@@ -210,6 +210,7 @@
 	border-radius: 9px;
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
+	animation: menu-down-in var(--duration-fast) var(--ease-out);
 }
 
 .prov-more-menu button {
@@ -1101,6 +1102,7 @@
 	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
+	animation: menu-pop-in var(--duration-fast) var(--ease-out);
 }
 
 .multi-select-option {
@@ -1229,6 +1231,7 @@
 	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
+	animation: menu-pop-in var(--duration-fast) var(--ease-out);
 }
 
 .search-select-options {

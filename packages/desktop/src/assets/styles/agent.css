@@ -38,6 +38,36 @@
 	margin: 8px 0;
 }
 
+/* 组头状态图标：运行 spinner ↔ 完成勾 交叉淡入，替代瞬间替换 */
+.tool-state {
+	position: relative;
+	display: grid;
+	place-items: center;
+	width: 13px;
+	height: 13px;
+	flex: none;
+}
+
+.tool-state > * {
+	grid-area: 1 / 1;
+	transition:
+		opacity var(--duration-fast) var(--ease-standard),
+		transform var(--duration-fast) var(--ease-standard);
+}
+
+.tool-state .state-running {
+	opacity: 0;
+}
+
+.tool-group.is-running .state-running {
+	opacity: 1;
+}
+
+.tool-group.is-running .state-done {
+	opacity: 0;
+	transform: scale(0.5);
+}
+
 .tool-group-head {
 	display: inline-flex;
 	align-items: center;
@@ -72,6 +102,31 @@
 	margin: 2px 0 4px 8px;
 	padding-left: 10px;
 	border-left: 1px solid var(--line);
+	animation: tool-rows-in var(--duration-normal) var(--ease-out);
+}
+
+@keyframes tool-rows-in {
+	from {
+		opacity: 0;
+		transform: translateY(-3px);
+	}
+}
+
+/* 参数/结果面板展开收起：grid-rows 折叠，内容常驻挂载 */
+.tool-detail-wrap {
+	display: grid;
+	grid-template-rows: 0fr;
+	overflow: hidden;
+	transition: grid-template-rows var(--duration-fast) var(--ease-standard);
+}
+
+.tool-detail-wrap.is-open {
+	grid-template-rows: 1fr;
+}
+
+.tool-detail-wrap > .tool-detail-panel {
+	min-height: 0;
+	overflow: hidden;
 }
 
 .tool-row {
@@ -133,6 +188,7 @@
 	color: var(--text-faint);
 	font-size: var(--text-micro);
 	flex: none;
+	font-variant-numeric: tabular-nums;
 }
 
 .tool-status-error {
@@ -304,6 +360,27 @@ pre.is-error {
 }
 
 /* ---------- 审批 ---------- */
+
+/* 卡片槽位：入场 0fr→1fr 展开、离场收起，配合卡片的 approval-in 淡入 */
+.approval-slot {
+	display: grid;
+	grid-template-rows: 1fr;
+	overflow: hidden;
+	transition:
+		grid-template-rows var(--duration-fast) var(--ease-standard),
+		opacity var(--duration-fast) var(--ease-standard);
+}
+
+.approval-slot.is-entering,
+.approval-slot.is-leaving {
+	grid-template-rows: 0fr;
+	opacity: 0;
+}
+
+.approval-slot-inner {
+	min-height: 0;
+	overflow: hidden;
+}
 
 .approval-card {
 	border: 1px solid var(--line-strong);
@@ -569,5 +646,13 @@ pre.is-error {
 		animation: none;
 		-webkit-text-fill-color: currentcolor;
 		color: var(--text-faint);
+	}
+
+	.approval-slot,
+	.tool-state > *,
+	.tool-rows,
+	.tool-detail-wrap {
+		transition: none;
+		animation: none;
 	}
 }

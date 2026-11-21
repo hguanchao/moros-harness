@@ -8,6 +8,7 @@ import { call, errorMessage } from "../api/api.ts";
 import {
 	AlertIcon,
 	ArchiveIcon,
+	CheckIcon,
 	CopyIcon,
 	FolderIcon,
 	FolderOpenIcon,
@@ -43,6 +44,8 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 	const actions = useDesktopActions();
 	const [expanded, setExpanded] = useState<Readonly<Record<string, boolean>>>({});
 	const [openMenu, setOpenMenu] = useState<MenuKey | undefined>(undefined);
+	const [copiedRoot, setCopiedRoot] = useState<string | undefined>(undefined);
+	const copyTimer = useRef<number | undefined>(undefined);
 	const [renaming, setRenaming] = useState<{ meta: SessionMeta; target: WorkspaceTarget; title: string } | undefined>(
 		undefined,
 	);
@@ -67,6 +70,8 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 		for (const project of projects) nextExpanded[project.root] = next;
 		setExpanded(nextExpanded);
 	};
+
+	useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
 	useEffect(() => {
 		if (openMenu === undefined) return;
@@ -301,11 +306,17 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 											}}
 										/>
 										<MenuItem
-											icon={<CopyIcon size={14} />}
-											label="复制路径"
+											icon={copiedRoot === project.root ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+											label={copiedRoot === project.root ? "已复制" : "复制路径"}
 											onClick={() => {
-												setOpenMenu(undefined);
-												void mutate(() => call(window.moros.copyProjectPath(project.root)));
+												void call(window.moros.copyProjectPath(project.root)).then(() => {
+													setCopiedRoot(project.root);
+													window.clearTimeout(copyTimer.current);
+													copyTimer.current = window.setTimeout(() => {
+														setCopiedRoot(undefined);
+														setOpenMenu(undefined);
+													}, 900);
+												}, report);
 											}}
 										/>
 										<MenuItem
@@ -323,11 +334,12 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 									</RowMenu>
 								) : null}
 							</div>
-							<div className="project-tasks">
-								{isExpanded && items.length === 0 ? <div className="side-empty">暂无任务</div> : null}
-								{isExpanded
-									? items.map((meta) => sessionRow(meta, { target, project: projectRef }, `project:${project.root}`))
-									: null}
+							<div className={`project-tasks ${isExpanded ? "is-expanded" : ""}`}>
+								{/* 内容常驻挂载（折叠时 visibility 隐藏），grid-rows 过渡才有高度动画 */}
+								<div className="project-tasks-inner">
+									{items.length === 0 ? <div className="side-empty">暂无任务</div> : null}
+									{items.map((meta) => sessionRow(meta, { target, project: projectRef }, `project:${project.root}`))}
+								</div>
 							</div>
 						</div>
 					);

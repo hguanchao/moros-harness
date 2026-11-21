@@ -34,8 +34,8 @@
 	--shadow: 0 24px 72px rgba(0, 0, 0, 0.32);
 	--shadow-soft: rgba(0, 0, 0, 0.1);
 	--code-bg: #0f0f0f;
-	--diff-add: rgba(63, 185, 80, 0.14);
-	--diff-remove: rgba(248, 81, 73, 0.13);
+	--diff-add: rgba(63, 185, 80, 0.18);
+	--diff-remove: rgba(248, 81, 73, 0.17);
 	--diff-add-text: #7ee787;
 	--diff-remove-text: #ffa198;
 	--scrollbar: rgba(255, 255, 255, 0.14);
@@ -114,8 +114,8 @@
 	--shadow: 0 24px 72px rgba(0, 0, 0, 0.14);
 	--shadow-soft: rgba(0, 0, 0, 0.08);
 	--code-bg: #f7f7f7;
-	--diff-add: rgba(31, 138, 76, 0.12);
-	--diff-remove: rgba(201, 60, 55, 0.1);
+	--diff-add: rgba(31, 138, 76, 0.16);
+	--diff-remove: rgba(201, 60, 55, 0.14);
 	--diff-add-text: #176b3b;
 	--diff-remove-text: #a02a25;
 	--scrollbar: rgba(0, 0, 0, 0.15);
@@ -298,6 +298,11 @@ textarea {
 	color: inherit;
 }
 
+/* 等宽数字：token/耗时/行数/字节等会实时跳动的数字用等宽字形，避免宽度抖动 */
+.tabular-nums {
+	font-variant-numeric: tabular-nums;
+}
+
 button {
 	cursor: pointer;
 	border: 0;
@@ -315,4 +320,25 @@ button:disabled {
 	display: flex;
 	flex-direction: column;
 	background: var(--surface-sidebar);
+}
+
+/* ---------- 主题切换：View Transitions 圆形扩散（不支持时由 JS 直接应用，无过渡） ---------- */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+::view-transition-new(root) {
+	animation: theme-reveal var(--duration-slow) var(--ease-out);
+}
+
+@keyframes theme-reveal {
+	from {
+		clip-path: circle(0% at 50% 0%);
+	}
+	to {
+		clip-path: circle(150% at 50% 0%);
+	}
 }

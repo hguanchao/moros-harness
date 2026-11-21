@@ -5,6 +5,7 @@ import { call, errorMessage } from "../api/api.ts";
 import { Composer } from "../components/Composer.tsx";
 import { EmptyBrand } from "../components/EmptyBrand.tsx";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
+import { useExitingItems } from "../hooks/use-exiting.ts";
 import { AlertIcon, CheckIcon, ChevronDownIcon, SparklesIcon, XIcon } from "../components/Icons.tsx";
 import { Markdown } from "../components/Markdown.tsx";
 import { useApp } from "../store/state.tsx";
@@ -32,6 +33,11 @@ export function ChatPage(): JSX.Element {
 		const rightCurrent = current !== undefined && right.sessionId === current.meta.id ? 0 : 1;
 		return leftCurrent - rightCurrent;
 	});
+	const exitingApprovals = useExitingItems(state.approvals, approvalKey);
+	const approvalSlots = [
+		...state.approvals.map((card) => ({ card, leaving: false })),
+		...exitingApprovals.map((card) => ({ card, leaving: true })),
+	];
 	const isDraftPrepared =
 		state.draftWorkspace !== undefined &&
 		workspaceTargetsMatch(state.draftWorkspace, workspaceTarget(state.draft.project), state.app?.platform ?? "win32");
@@ -79,8 +85,13 @@ export function ChatPage(): JSX.Element {
 
 	const dock = (
 		<div className="composer-dock">
-			{approvals.map((card) => (
-				<ApprovalPanel key={card.id} card={card} currentSessionId={current?.meta.id} />
+			{approvalSlots.map((slot) => (
+				<ApprovalSlot
+					key={slot.card.id}
+					card={slot.card}
+					leaving={slot.leaving}
+					currentSessionId={current?.meta.id}
+				/>
 			))}
 			<Composer />
 			{state.review !== undefined ? <ReviewModal /> : null}
@@ -100,19 +111,29 @@ export function ChatPage(): JSX.Element {
 
 			{current === undefined ? (
 				<div className="new-task-stage">
-					<EmptyBrand />
+					<EmptyBrand
+						onExample={(text) => {
+							dispatch({ type: "draft-text", text });
+							document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+						}}
+					/>
 					{dock}
 				</div>
 			) : (
 				<>
-					<div
-						className="conversation"
-						ref={scrollRef}
-						onScroll={(event) => {
-							const element = event.currentTarget;
-							stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
-						}}
-					>
+					<div className="conversation-shell">
+						<span
+							className={`turn-lifeline ${live?.running === true ? "is-running" : ""}`}
+							aria-hidden="true"
+						/>
+						<div
+							className="conversation"
+							ref={scrollRef}
+							onScroll={(event) => {
+								const element = event.currentTarget;
+								stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+							}}
+						>
 						<div className="transcript">
 							{state.loadError !== undefined ? (
 								<div className="load-error">
@@ -132,6 +153,7 @@ export function ChatPage(): JSX.Element {
 							/>
 						</div>
 					</div>
+					</div>
 					{dock}
 				</>
 			)}
@@ -142,6 +164,32 @@ export function ChatPage(): JSX.Element {
 					正在打开会话…
 				</div>
 			) : null}
+		</div>
+	);
+}
+
+const approvalKey = (card: ApprovalCard): string => card.id;
+
+/** 审批卡槽位：入场/离场用 grid-rows 折叠过渡，卡片出现与消失时 dock 内容不跳变。 */
+function ApprovalSlot({
+	card,
+	leaving,
+	currentSessionId,
+}: {
+	readonly card: ApprovalCard;
+	readonly leaving: boolean;
+	readonly currentSessionId: string | undefined;
+}): JSX.Element {
+	const [entered, setEntered] = useState(false);
+	useEffect(() => {
+		const frame = requestAnimationFrame(() => setEntered(true));
+		return () => cancelAnimationFrame(frame);
+	}, []);
+	return (
+		<div className={`approval-slot ${leaving ? "is-leaving" : entered ? "" : "is-entering"}`}>
+			<div className="approval-slot-inner">
+				<ApprovalPanel card={card} currentSessionId={currentSessionId} />
+			</div>
 		</div>
 	);
 }

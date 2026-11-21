@@ -343,6 +343,41 @@
 	color: var(--danger);
 }
 
+/* 发送 ↔ 停止 图标交叉淡入：两个图标叠放，随状态缩放切换 */
+.send-glyph {
+	position: relative;
+	display: grid;
+	place-items: center;
+}
+
+.send-glyph svg {
+	grid-area: 1 / 1;
+	transition:
+		opacity var(--duration-fast) var(--ease-standard),
+		transform var(--duration-fast) var(--ease-standard);
+}
+
+.send-glyph .glyph-stop {
+	opacity: 0;
+	transform: scale(0.4) rotate(90deg);
+}
+
+.send-button.is-stop .glyph-arrow {
+	opacity: 0;
+	transform: scale(0.4);
+}
+
+.send-button.is-stop .glyph-stop {
+	opacity: 1;
+	transform: scale(1) rotate(0deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.send-glyph svg {
+		transition: none;
+	}
+}
+
 /* 旧的条形控件不再使用；保留类名避免页面回归时丢失样式 */
 
 .attachments {

@@ -488,9 +488,12 @@ function ToolGroup({ blocks }: { readonly blocks: readonly ToolBlock[] }): JSX.E
 	}, [hasRunning]);
 	const label = hasRunning ? `正在调用 ${blocks.length} 个工具` : `已调用 ${blocks.length} 个工具`;
 	return (
-		<div className="tool-group">
+		<div className={`tool-group ${hasRunning ? "is-running" : ""}`}>
 			<button className={`tool-group-head ${hasError ? "has-error" : ""}`} onClick={() => setOpen(!open)}>
-				{hasRunning ? <span className="spinner small" /> : <CheckIcon size={13} />}
+				<span className="tool-state">
+					<CheckIcon size={13} className="state-done" />
+					{hasRunning ? <span className="spinner small state-running" /> : null}
+				</span>
 				<span>{label}</span>
 				{hasError ? <span className="tool-error-count">有失败</span> : null}
 				{open ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
@@ -549,7 +552,8 @@ function ToolRow({ block }: { readonly block: ToolBlock }): JSX.Element {
 					) : null}
 				</div>
 			) : null}
-			{open ? (
+			{/* 面板常驻挂载，grid-rows 折叠过渡展开/收起 */}
+			<div className={`tool-detail-wrap ${open ? "is-open" : ""}`}>
 				<div className="tool-detail-panel">
 					<div className="detail-label">参数</div>
 					<pre>{formatArgs(block.args)}</pre>
@@ -562,7 +566,7 @@ function ToolRow({ block }: { readonly block: ToolBlock }): JSX.Element {
 						</>
 					) : null}
 				</div>
-			) : null}
+			</div>
 		</div>
 	);
 }

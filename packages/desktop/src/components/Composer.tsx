@@ -435,7 +435,10 @@ export function Composer(): JSX.Element {
 								void send();
 							}}
 						>
-							{stoppable ? <StopIcon size={16} /> : <ArrowUpIcon size={19} />}
+							<span className="send-glyph">
+								<ArrowUpIcon size={19} className="glyph-arrow" />
+								<StopIcon size={15} className="glyph-stop" />
+							</span>
 						</button>
 					</div>
 				</div>

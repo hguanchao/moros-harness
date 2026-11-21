@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type Dispatch, type JSX, type PointerEvent as ReactPointerEvent } from "react";
 
 import { currentNavigationEpoch, useDesktopActions } from "./hooks/actions.ts";
+import { useExitingItems } from "./hooks/use-exiting.ts";
 import { call, errorMessage } from "./api/api.ts";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "./shared/contract.ts";
 import { ChangesPage } from "./views/ChangesPage.tsx";
@@ -59,8 +60,18 @@ export function App(): JSX.Element {
 		const query = window.matchMedia("(prefers-color-scheme: dark)");
 		const apply = (): void => {
 			const resolved = state.theme === "auto" ? (query.matches ? "dark" : "light") : state.theme;
-			document.documentElement.dataset.theme = resolved;
-			document.documentElement.dataset.themeChoice = state.theme;
+			const commit = (): void => {
+				document.documentElement.dataset.theme = resolved;
+				document.documentElement.dataset.themeChoice = state.theme;
+			};
+			// 主题切换用 View Transitions 圆形扩散；不支持或用户偏好减少动效时直接应用
+			const doc = document as Document & { startViewTransition?: (update: () => void) => void };
+			const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+			if (typeof doc.startViewTransition === "function" && !reducedMotion) {
+				doc.startViewTransition(commit);
+			} else {
+				commit();
+			}
 			dispatch({ type: "resolved-theme", theme: resolved });
 			void window.moros.windowSetTheme(resolved === "dark");
 		};
@@ -224,16 +235,24 @@ function SidebarResizeHandle({
 
 function Toasts(): JSX.Element {
 	const { state, dispatch } = useApp();
+	const exiting = useExitingItems(state.notices, (notice) => String(notice.id));
+	const slots = [
+		...state.notices.map((notice) => ({ notice, leaving: false })),
+		...exiting.map((notice) => ({ notice, leaving: true })),
+	];
 	return (
 		<div className="toasts">
-			{state.notices.map((notice) => (
-				<Toast
-					key={notice.id}
-					id={notice.id}
-					level={notice.level}
-					message={notice.message}
-					onDismiss={() => dispatch({ type: "dismiss-notice", id: notice.id })}
-				/>
+			{slots.map((slot) => (
+				<div key={slot.notice.id} className={`toast-slot ${slot.leaving ? "is-leaving" : ""}`}>
+					<div className="toast-slot-inner">
+						<Toast
+							id={slot.notice.id}
+							level={slot.notice.level}
+							message={slot.notice.message}
+							onDismiss={() => dispatch({ type: "dismiss-notice", id: slot.notice.id })}
+						/>
+					</div>
+				</div>
 			))}
 		</div>
 	);

@@ -73,9 +73,13 @@ export function TracePage(): JSX.Element {
 						<span className="trace-stats">
 							{turns.length} 回合 · {turns.reduce((sum, turn) => sum + turn.steps.length, 0)} 步
 						</span>
-						<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
-							<RefreshIcon size={14} />
-							刷新
+						<button
+							className="icon-button"
+							title="刷新"
+							aria-label="刷新"
+							onClick={() => setVersion((value) => value + 1)}
+						>
+							<RefreshIcon size={16} />
 						</button>
 					</>
 				}

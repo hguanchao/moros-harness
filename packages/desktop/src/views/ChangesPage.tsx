@@ -6,7 +6,7 @@ import type { CheckpointView, FileChangeSummary } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { displayPath, relativeTime } from "../utils/format.ts";
 import { PageHeader } from "../components/PageHeader.tsx";
-import { AlertIcon, CheckIcon, DiffIcon, RefreshIcon, XIcon } from "../components/Icons.tsx";
+import { AlertIcon, ArrowLeftIcon, DiffIcon, RefreshIcon, RestoreIcon } from "../components/Icons.tsx";
 import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { useApp } from "../store/state.tsx";
 
@@ -91,13 +91,19 @@ export function ChangesPage(): JSX.Element {
 				subtitle="文件工具产生的快照；shell 改动由审批与审计兜底。"
 				actions={
 					<>
-						<button className="ghost-button" onClick={() => setVersion((value) => value + 1)}>
-							<RefreshIcon size={14} />
-							刷新
+						<button
+							className="icon-button"
+							title="刷新"
+							aria-label="刷新"
+							onClick={() => setVersion((value) => value + 1)}
+						>
+							<RefreshIcon size={16} />
 						</button>
 						{checkpoint !== null ? (
 							<button
-								className="ghost-button"
+								className="icon-button"
+								title="恢复检查点"
+								aria-label="恢复检查点"
 								onClick={async () => {
 									const confirmed = await confirm({
 										title: "恢复检查点",
@@ -119,12 +125,13 @@ export function ChangesPage(): JSX.Element {
 									}
 								}}
 							>
-								<CheckIcon size={14} />
-								恢复检查点
+								<RestoreIcon size={16} />
 							</button>
 						) : null}
 						<button
-							className="danger-button"
+							className="icon-button danger"
+							title="回滚最近一步"
+							aria-label="回滚最近一步"
 							onClick={async () => {
 								const confirmed = await confirm({
 									title: "回滚改动",
@@ -142,8 +149,7 @@ export function ChangesPage(): JSX.Element {
 								}
 							}}
 						>
-							<XIcon size={14} />
-							回滚最近一步
+							<ArrowLeftIcon size={16} />
 						</button>
 					</>
 				}

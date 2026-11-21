@@ -5,6 +5,7 @@ import { useDesktopActions } from "../hooks/actions.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { formatBytes } from "../utils/format.ts";
 import { PageHeader } from "../components/PageHeader.tsx";
+import { SkeletonLine } from "../components/Skeleton.tsx";
 import {
 	ChevronDownIcon,
 	ChevronRightIcon,
@@ -95,9 +96,13 @@ export function FilesPage(): JSX.Element {
 				title="文件"
 				subtitle={project.root}
 				actions={
-					<button className="ghost-button" onClick={() => setLocalVersion((value) => value + 1)}>
-						<RefreshIcon size={14} />
-						刷新
+					<button
+						className="icon-button"
+						title="刷新"
+						aria-label="刷新"
+						onClick={() => setLocalVersion((value) => value + 1)}
+					>
+						<RefreshIcon size={16} />
 					</button>
 				}
 			/>
@@ -218,6 +223,13 @@ function DirectoryNode({
 				<span>{name}</span>
 				{loading ? <span className="spinner small" /> : null}
 			</button>
+			{open && entries === undefined ? (
+				<div className="tree-skeleton" style={{ paddingLeft: 24 + depth * 14 }} aria-hidden="true">
+					<SkeletonLine width="58%" height={11} />
+					<SkeletonLine width="72%" height={11} />
+					<SkeletonLine width="46%" height={11} />
+				</div>
+			) : null}
 			{open && entries !== undefined ? (
 				<div>
 					{entries.map((entry) =>

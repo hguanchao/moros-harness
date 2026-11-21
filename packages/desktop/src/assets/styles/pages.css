@@ -1,5 +1,19 @@
 /* ---------- 页面通用 ---------- */
 
+/* 骨架占位条：微光从右往左扫，宽度由内联 style 控制以模拟文本行 */
+.skeleton-line {
+	display: block;
+	border-radius: var(--r-sm);
+	background: linear-gradient(
+		90deg,
+		var(--fill-soft) 25%,
+		var(--fill-strong) 37%,
+		var(--fill-soft) 63%
+	);
+	background-size: 400% 100%;
+	animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
 .page-empty {
 	flex: 1;
 	display: flex;
@@ -112,6 +126,17 @@
 	font-size: var(--text-micro);
 	color: var(--text-faint);
 	flex: none;
+	font-variant-numeric: tabular-nums;
+}
+
+/* 目录树加载骨架：与 tree-row 等高对齐，避免加载完成时树结构跳动 */
+.tree-skeleton {
+	display: flex;
+	flex-direction: column;
+	gap: 9px;
+	padding-top: 8px;
+	padding-right: 8px;
+	padding-bottom: 4px;
 }
 
 .tree-empty {
@@ -148,6 +173,7 @@
 	color: var(--text-faint);
 	font-size: var(--text-micro);
 	margin-top: 1px;
+	font-variant-numeric: tabular-nums;
 }
 
 .file-preview-content {
@@ -179,12 +205,15 @@
 }
 
 .line-number {
-	width: 50px;
+	/* 与 diff 行号列 .diff-number 统一为 44px；6px 右内边距留出与正文的呼吸间距 */
+	width: 44px;
 	flex: none;
-	padding-right: 12px;
+	padding-right: 6px;
 	text-align: right;
 	color: var(--text-faint);
 	user-select: none;
+	font-variant-numeric: tabular-nums;
+	box-shadow: inset -1px 0 var(--line);
 }
 
 .line-text {
@@ -267,6 +296,7 @@
 	display: flex;
 	gap: 8px;
 	font-size: var(--text-caption);
+	font-variant-numeric: tabular-nums;
 }
 
 .diff-stats .added {
@@ -320,6 +350,7 @@
 	text-align: right;
 	color: var(--text-faint);
 	user-select: none;
+	font-variant-numeric: tabular-nums;
 }
 
 .diff-marker {
@@ -490,6 +521,7 @@
 .trace-step small {
 	font-size: var(--text-micro);
 	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
 }
 
 .trace-detail {
@@ -542,6 +574,7 @@
 	border-bottom: 1px solid var(--line);
 	color: var(--text-faint);
 	font-size: var(--text-caption);
+	font-variant-numeric: tabular-nums;
 }
 
 /* ---------- 会话 ---------- */
@@ -624,6 +657,19 @@
 
 .session-table-row.is-current {
 	background: var(--row-selected);
+}
+
+/* 会话表格骨架：列宽沿用 .session-table-row，首列两行模拟标题 + id */
+.session-skeleton-row {
+	display: grid;
+	pointer-events: none;
+}
+
+.session-skeleton-cell {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 0;
 }
 
 .session-table-title {
