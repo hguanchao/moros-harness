@@ -13,6 +13,7 @@ import {
 	DEFAULT_SESSION_TITLE,
 	firstLine,
 	firstUserTextFromLines,
+	isUnnamedSessionTitle,
 	resolveSessionTitle,
 	sanitizeSessionTitle,
 } from "./session-title.ts";
@@ -164,6 +165,36 @@ export class SessionManager {
 		if (clean.length === 0) throw new Error("Session title must not be empty");
 		await session.append({ type: "session.renamed", payload: { title: clean } });
 		await this.#writeState(session.directory, { title: clean });
+	}
+
+	/**
+	 * 会话是否可被 LLM 自动命名：无显式命名投影（state.title）且 created 标题是
+	 * 「未命名」哨兵。用户改名与后台生成都会写入 state.title；fork（Fork of …）、
+	 * Code review、Subagent task 等创建即命名的会话由 created 标题排除。
+	 * 后台标题任务在调度与写回前各检查一次；写回前的复查即改名竞态的 CAS。
+	 */
+	async isAutoTitleable(session: Session): Promise<boolean> {
+		const state = await this.#readState(session.directory);
+		if (state.title !== undefined) return false;
+		const createdTitle = await this.#readCreatedTitle(session.directory);
+		return createdTitle !== undefined && isUnnamedSessionTitle(createdTitle);
+	}
+
+	/** 只读流首行取 created 标题；缺失或损坏时返回 undefined（宁可跳过命名也不误接管）。 */
+	async #readCreatedTitle(directory: string): Promise<string | undefined> {
+		try {
+			const handle = await open(join(directory, STREAM_FILENAME), "r");
+			try {
+				const head = await handle.read(Buffer.alloc(HEAD_WINDOW_BYTES), 0, HEAD_WINDOW_BYTES, 0);
+				const firstLineText = head.buffer.subarray(0, head.bytesRead).toString("utf8").split("\n", 1)[0] ?? "";
+				const event = EventSchema.parse(JSON.parse(firstLineText));
+				return event.type === "session.created" ? event.payload.title : undefined;
+			} finally {
+				await handle.close();
+			}
+		} catch {
+			return undefined;
+		}
 	}
 
 	/**

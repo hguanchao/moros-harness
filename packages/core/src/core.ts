@@ -64,6 +64,7 @@ import { AttachmentStore } from "./session/attachment-store.ts";
 import { prepareImageBuffer, prepareImageFile, type SessionImageInput } from "./session/image-file.ts";
 import { prepareImageUrl as prepareImageFromUrl } from "./session/image-url.ts";
 import { renderSessionExport, type SessionExportFormat, type SessionExportResult } from "./session/session-export.ts";
+import { createTitleGenerator } from "./session/title-generator.ts";
 import { resolveSandboxPath } from "./harness/path-sandbox.ts";
 import { createCommandReviewer } from "./review.ts";
 export type { SessionExportFormat, SessionExportResult } from "./session/session-export.ts";
@@ -297,6 +298,8 @@ export class Core {
 	readonly #loadedConfigs = new Map<string, LoadedConfig>();
 	readonly #sessionLoops = new Map<string, AgentLoop>();
 	readonly #sessionSignals = new Map<string, AbortController>();
+	/** 在飞的会话标题任务（按会话 ID 去重）；后台锦上添花，绝不阻塞主回合。 */
+	readonly #titleTasks = new Map<string, Promise<void>>();
 	/** 会话内 `/model` 切换产生的内存级模型选择；仅影响后续 runSession，不写入配置文件。 */
 	readonly #sessionModels = new Map<string, { provider: string; model: string }>();
 	/** 会话内 `/effort` 切换的推理强度；覆盖后续请求的 reasoning_effort，不写配置文件。 */
@@ -1303,6 +1306,8 @@ export class Core {
 		const signal = options.signal;
 		const abortLoop = () => loop.abort(signal?.reason);
 		try {
+			// 标题后台生成（opencode 模式）：输入可见即并行发起，不 await、不阻塞主请求
+			if (text.length > 0) this.#scheduleTitleGeneration(session, llm, request, text);
 			const running = loop.run(text, imageAttachments);
 			if (signal) {
 				if (signal.aborted) abortLoop();
@@ -1313,6 +1318,47 @@ export class Core {
 			signal?.removeEventListener("abort", abortLoop);
 			if (this.#sessionLoops.get(sessionId) === loop) this.#sessionLoops.delete(sessionId);
 		}
+	}
+
+	/**
+	 * 调度后台会话标题生成（fire-and-forget）。
+	 *
+	 * 仅当会话仍无显式命名（`isAutoTitleable`）时接管；生成与写回全部后台完成，
+	 * 失败只经 onWarning 留诊断痕迹，绝不影响主回合。写回前在租约内复查接管条件——
+	 * 用户在生成期间手动改名则放弃写入，等价于对改名竞态的 CAS。在飞按会话去重；
+	 * 任务 settle 后移除条目，会话仍未命名时下回合自然重试。
+	 */
+	#scheduleTitleGeneration(
+		session: Session,
+		llm: LlmClient,
+		request: Omit<ModelRequest, "messages">,
+		text: string,
+	): void {
+		const sessionId = session.meta.id;
+		if (this.#titleTasks.has(sessionId)) return;
+		const generateTitle = createTitleGenerator({
+			llm,
+			request,
+			...(this.#options.onWarning === undefined ? {} : { onWarning: this.#options.onWarning }),
+		});
+		const task = (async () => {
+			if (!(await this.#sessions.isAutoTitleable(session))) return;
+			const title = await generateTitle(text);
+			if (title === undefined) return;
+			await this.#withSessionLease(session, async () => {
+				if (!(await this.#sessions.isAutoTitleable(session))) return;
+				await this.#sessions.rename(session, title);
+			});
+		})()
+			.catch((error) => {
+				// 生成器内部错误已走 onWarning；这里兜底的是租约忙（跨进程）等周边错误
+				const message = error instanceof Error ? error.message : String(error);
+				this.#options.onWarning?.(`Session title generation failed: ${message}`);
+			})
+			.finally(() => {
+				if (this.#titleTasks.get(sessionId) === task) this.#titleTasks.delete(sessionId);
+			});
+		this.#titleTasks.set(sessionId, task);
 	}
 
 	/**

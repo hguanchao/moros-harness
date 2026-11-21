@@ -74,10 +74,18 @@ describe("Core 会话使用 MCP 工具", () => {
 			}),
 		);
 
-		const requests: Record<string, unknown>[] = [];
+		// 后台标题请求（不带 tools）与主回合请求并发到达，按内容分发而不是按顺序
+		const mainRequests: Record<string, unknown>[] = [];
 		const fetchImpl: typeof fetch = async (_input, init) => {
-			requests.push(JSON.parse(String(init?.body)) as Record<string, unknown>);
-			if (requests.length === 1) {
+			const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+			if (!("tools" in body)) {
+				return sse([
+					{ choices: [{ delta: { content: "MCP 会话验证" } }] },
+					{ choices: [{ delta: {}, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1 } },
+				]);
+			}
+			mainRequests.push(body);
+			if (mainRequests.length === 1) {
 				return sse([
 					{
 						choices: [
@@ -111,9 +119,9 @@ describe("Core 会话使用 MCP 工具", () => {
 			const session = await core.createSession(projectRoot, { mode: "creator" });
 			const result = await core.runSession(session, "echo hi");
 
-			const tools = requests[0]?.["tools"] as Array<{ function: { name: string } }>;
+			const tools = mainRequests[0]?.["tools"] as Array<{ function: { name: string } }>;
 			expect(tools.map((tool) => tool.function.name)).toContain("mcp__fixture__echo");
-			const messages = requests[1]?.["messages"] as Array<{ role: string; content: string }>;
+			const messages = mainRequests[1]?.["messages"] as Array<{ role: string; content: string }>;
 			expect(messages).toContainEqual(expect.objectContaining({ role: "tool", content: "echo:hi" }));
 			expect(result.messages.at(-1)).toMatchObject({ role: "assistant", content: "done" });
 		} finally {

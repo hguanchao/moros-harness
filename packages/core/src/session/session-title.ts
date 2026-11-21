@@ -68,3 +68,14 @@ export function resolveSessionTitle(createdTitle: string, firstUserText: string 
 	}
 	return UNTITLED_SESSION_TITLE;
 }
+
+/**
+ * 判断 created 标题是否只是「未命名」哨兵。
+ *
+ * LLM 自动命名只接管这种会话：fork（`Fork of …`）、Code review、Subagent task 等
+ * 创建时就带显式标题的会话一律不算未命名，避免后台命名覆盖创建方的语义命名。
+ */
+export function isUnnamedSessionTitle(createdTitle: string): boolean {
+	const sanitized = sanitizeSessionTitle(createdTitle);
+	return sanitized.length === 0 || sanitized === DEFAULT_SESSION_TITLE;
+}
