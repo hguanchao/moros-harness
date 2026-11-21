@@ -45,7 +45,15 @@ export const EventSchema = z.discriminatedUnion("type", [
 	}),
 	EventBaseSchema.extend({
 		type: z.literal("llm.request"),
-		payload: z.object({ endpoint: z.string(), model: z.string(), messageCount: z.number().int().nonnegative() }),
+		payload: z.object({
+			endpoint: z.string(),
+			model: z.string(),
+			/** 发起请求的路由供应商。旧事件缺失；会话重开时据此折叠恢复会话级模型选择。 */
+			provider: z.string().optional(),
+			/** 请求使用的推理档位。缺失（旧事件或未配置）时不恢复会话级档位覆盖。 */
+			reasoningEffort: z.enum(["off", "minimal", "low", "medium", "high", "max"]).optional(),
+			messageCount: z.number().int().nonnegative(),
+		}),
 	}),
 	EventBaseSchema.extend({
 		type: z.literal("llm.response"),

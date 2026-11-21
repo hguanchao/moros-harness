@@ -380,7 +380,33 @@ export class Core {
 	 * 带候选列表的错误，不会擅自选一个会话。
 	 */
 	async openSession(sessionId: string): Promise<Session> {
-		return this.#sessions.open(await this.#sessions.resolveId(sessionId));
+		const session = await this.#sessions.open(await this.#sessions.resolveId(sessionId));
+		await this.#restoreSessionRuntime(session);
+		return session;
+	}
+
+	/**
+	 * 从事件流折叠最近一次真实请求的路由，恢复会话级模型与推理档位覆盖。
+	 *
+	 * ZCode / DeepSeek Harness 语义：持久事实是「实际发出的请求」（llm.request 事件），
+	 * 而不是 UI 选择本身——选过但从未使用的覆盖在重启后回落全局默认。旧格式事件没有
+	 * provider 字段（更早的历史也不会有），向后折叠到它即止，保持全局默认。
+	 */
+	async #restoreSessionRuntime(session: Session): Promise<void> {
+		const sessionId = session.meta.id;
+		if (this.#sessionModels.has(sessionId) && this.#sessionEfforts.has(sessionId)) return;
+		const events = await session.events.read();
+		for (let index = events.length - 1; index >= 0; index -= 1) {
+			const event = events[index];
+			if (event === undefined || event.type !== "llm.request") continue;
+			const { provider, model, reasoningEffort } = event.payload;
+			if (provider === undefined) break;
+			if (!this.#sessionModels.has(sessionId)) this.#sessionModels.set(sessionId, { provider, model });
+			if (!this.#sessionEfforts.has(sessionId) && reasoningEffort !== undefined) {
+				this.#sessionEfforts.set(sessionId, reasoningEffort);
+			}
+			return;
+		}
 	}
 
 	/**

@@ -164,7 +164,14 @@ export class AgentLoop {
 			await events.append({
 				type: "llm.request",
 				corr,
-				payload: { endpoint: request.api, model: request.model, messageCount: inputMessages.length },
+				payload: {
+					endpoint: request.api,
+					model: request.model,
+					// 路由与档位随真实请求落流（DeepSeek Harness 语义）：会话重开时据此恢复选择
+					provider: request.provider,
+					...(request.reasoningEffort === undefined ? {} : { reasoningEffort: request.reasoningEffort }),
+					messageCount: inputMessages.length,
+				},
 			});
 
 			let response: ModelResponse;
