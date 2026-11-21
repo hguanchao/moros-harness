@@ -352,7 +352,12 @@ export class ToolPipeline {
 		};
 		await this.#options.events.append({ type: "approval.requested", corr, payload: request });
 		const startedAt = this.#now();
-		const decision = await requestApprovalWithTimeout(this.#options.requestApproval, request, signal);
+		const decision = await requestApprovalWithTimeout(
+			this.#options.requestApproval,
+			this.#options.sessionId,
+			request,
+			signal,
+		);
 		const sessionApproved = decision === "allow-session";
 		if (sessionApproved) this.#sessionApproved.add(scopeKey);
 		const approved = sessionApproved || decision === "allow";
@@ -554,6 +559,7 @@ export class ToolPipeline {
 
 async function requestApprovalWithTimeout(
 	requestApproval: PipelineOptions["requestApproval"],
+	sessionId: string,
 	request: ApprovalRequest,
 	signal?: AbortSignal,
 ): Promise<ApprovalDecision> {
@@ -571,7 +577,7 @@ async function requestApprovalWithTimeout(
 		const abort = () => finish("deny");
 		const timeout = setTimeout(() => finish("deny"), 120_000);
 		signal?.addEventListener("abort", abort, { once: true });
-		requestApproval(request, signal).then(finish, () => finish("deny"));
+		requestApproval(request, sessionId, signal).then(finish, () => finish("deny"));
 	});
 }
 

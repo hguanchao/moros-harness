@@ -672,23 +672,14 @@ function newTaskState(state: AppState): AppState {
 // 工作区信息与会话选择分离；配置推送不得覆盖用户正在编辑的新任务。
 function updateWorkspace(state: AppState, project: ProjectSnapshot): AppState {
 	const rootChanged = state.project?.root !== project.root;
+	// 并行模型下 per-session 状态（events/live/queue/runStates/approvals）跨工作区共存，
+	// 根切换不再清空：审批卡与后台任务的实时流必须跨视图保留（events 按 seq 合并）。
 	return {
 		...state,
 		project,
 		models: project.models,
 		app: appWithRecentProjects(state.app, project.recentProjects),
-		...(rootChanged
-			? {
-					events: {},
-					live: {},
-					queue: {},
-					subagents: {},
-					approvals: [],
-					runStates: {},
-					review: undefined,
-					workspaceVersion: state.workspaceVersion + 1,
-				}
-			: {}),
+		...(rootChanged ? { workspaceVersion: state.workspaceVersion + 1 } : {}),
 	};
 }
 

@@ -157,15 +157,16 @@ export class DesktopHost {
 	#warnings: string[] = [];
 
 	#watcher: WorkspaceWatch | undefined;
-	#activeRun: ActiveRun | undefined;
-	#activeRunPromise: Promise<void> | undefined;
-	#queue: QueuedEntry[] = [];
+	/** 每会话一个运行槽位：会话是并发的最小单位（对齐 DSH/opencode 的 per-session 调度）。 */
+	#runs = new Map<string, ActiveRun>();
+	#runPromises = new Map<string, Promise<void>>();
+	#starting = new Set<string>();
+	#queues = new Map<string, QueuedEntry[]>();
 	#live = new Map<string, MutableLive>();
 	#streams = new Map<string, PendingStream>();
 	#preparedImages = new Map<string, { image: SessionImageInput; preview: PreparedImage; createdAt: number }>();
 	#viewVersion = 0;
 	#reviewing = false;
-	#startingRun = false;
 	#disposed = false;
 
 	private constructor(store: DesktopStore, taskRoot: string, options: DesktopHostOptions) {
@@ -324,15 +325,8 @@ export class DesktopHost {
 	 */
 	async checkoutBranch(root: string, branch: string): Promise<GitCheckoutResult> {
 		const projectRoot = await this.#knownProjectRoot(root);
-		const activeRoot = this.#projectRoot;
-		const busy =
-			activeRoot !== undefined &&
-			normalizeProjectRoot(activeRoot) === normalizeProjectRoot(projectRoot) &&
-			(this.#activeRun !== undefined ||
-				this.#activeRunPromise !== undefined ||
-				this.#startingRun ||
-				this.#queue.length > 0);
-		if (busy) {
+		// 分支切换会改写该工作区的文件树：只要这个根里有任务在跑（无论是否正在查看它）就拒绝
+		if (this.#hasWorkInRoot(projectRoot)) {
 			throw new DesktopWorkspaceError("workspace-busy", "当前工作区正在执行任务，暂时无法切换分支");
 		}
 		return checkoutGitBranch(projectRoot, branch);
@@ -473,16 +467,14 @@ export class DesktopHost {
 		if (deletedSet.size > 0) await this.#store.unpinSessions(result.deleted);
 		const currentId = this.#current?.meta.id;
 		const clearedId = currentId !== undefined && deletedSet.has(currentId) ? currentId : undefined;
-		if (result.deleted.length > 0) {
-			const deleted = deletedSet;
-			this.#queue = this.#queue.filter((entry) => !deleted.has(entry.sessionId));
-		}
 		for (const id of result.deleted) {
+			this.#queues.delete(id);
 			this.#sessions.delete(id);
 			this.#readOnlyIds.delete(id);
 			this.#createdSessionIds.delete(id);
 			this.#live.delete(id);
 			this.#dropSubscription(id);
+			this.#pushQueue(id);
 			if (this.#current?.meta.id === id) this.#current = undefined;
 		}
 		await this.#refreshMetas();
@@ -538,10 +530,7 @@ export class DesktopHost {
 		for (const id of ids) {
 			try {
 				const session = await this.#sessionForTarget(id, target);
-				if (
-					this.#activeRun?.sessionId === session.meta.id ||
-					this.#queue.some((e) => e.sessionId === session.meta.id)
-				) {
+				if (this.#hasPendingWork(session.meta.id)) {
 					throw new Error("Session is running or has queued messages");
 				}
 				allowed.push(id);
@@ -593,7 +582,7 @@ export class DesktopHost {
 
 	async forkSession(id: string, uptoSeq?: number): Promise<SessionView> {
 		const core = this.#requiredCore();
-		if (this.#activeRun?.sessionId === id) throw new Error("A turn is running in this session");
+		if (this.#hasPendingWork(id)) throw new Error("A turn is running in this session");
 		const source = await this.#sessionFor(id);
 		const forked = await core.forkSession(source, uptoSeq);
 		this.#sessions.set(forked.session.meta.id, forked.session);
@@ -663,15 +652,16 @@ export class DesktopHost {
 
 	async rollbackStep(): Promise<void> {
 		const core = this.#requiredCore();
-		if (this.#activeRun !== undefined) throw new Error("A turn is running; wait for it to finish");
-		await core.rollbackStep(this.#requireCurrent());
-		await this.#pushViewIfCurrent(this.#requireCurrent().meta.id);
+		const session = this.#requireCurrent();
+		if (this.#hasPendingWork(session.meta.id)) throw new Error("A turn is running; wait for it to finish");
+		await core.rollbackStep(session);
+		await this.#pushViewIfCurrent(session.meta.id);
 	}
 
 	async restoreCheckpoint(id: string): Promise<{ restored: number; removed: number }> {
 		const core = this.#requiredCore();
-		if (this.#activeRun !== undefined) throw new Error("A turn is running; wait for it to finish");
 		const session = this.#requireCurrent();
+		if (this.#hasPendingWork(session.meta.id)) throw new Error("A turn is running; wait for it to finish");
 		const result = await core.restoreCheckpoint(session, id);
 		await this.#pushViewIfCurrent(session.meta.id);
 		return result;
@@ -680,7 +670,7 @@ export class DesktopHost {
 	async compactSession(): Promise<{ compacted: boolean; covered: number; tokensBefore: number; tokensAfter: number }> {
 		const core = this.#requiredCore();
 		const session = this.#requireCurrent();
-		if (this.#activeRun !== undefined) throw new Error("A turn is already running");
+		if (this.#hasPendingWork(session.meta.id)) throw new Error("A turn is already running");
 		const result = await core.compactSession(session);
 		await this.#pushViewIfCurrent(session.meta.id);
 		return {
@@ -694,7 +684,7 @@ export class DesktopHost {
 	async reviewSession(prompt: string): Promise<ReviewResult> {
 		const core = this.#requiredCore();
 		const root = this.#requiredProject();
-		if (this.#activeRun !== undefined) throw new Error("A turn is already running");
+		if (this.#reviewing) throw new Error("A review is already running");
 		if (this.#reviewing) throw new Error("A review is already running");
 		this.#reviewing = true;
 		const runId = randomUUID();
@@ -747,10 +737,12 @@ export class DesktopHost {
 		}
 
 		const entry: QueuedEntry = { id: randomUUID(), sessionId: session.meta.id, text, images };
-		const queued = this.#activeRun !== undefined || this.#activeRunPromise !== undefined || this.#startingRun;
+		// 会话是并发的最小单位：同会话排队串行，不同会话立即并行启动
+		const queued = this.#runs.has(session.meta.id) || this.#starting.has(session.meta.id);
 		if (queued) {
-			if (this.#queue.length >= MAX_QUEUE) throw new Error(`Queue is full (${MAX_QUEUE})`);
-			this.#queue.push(entry);
+			const entries = this.#queues.get(session.meta.id) ?? [];
+			if (entries.length >= MAX_QUEUE) throw new Error(`Queue is full (${MAX_QUEUE})`);
+			this.#enqueueQueue(entry);
 			this.#pushQueue(session.meta.id);
 		} else {
 			await this.#startRun(entry);
@@ -760,30 +752,35 @@ export class DesktopHost {
 	}
 
 	abort(): void {
-		const run = this.#activeRun;
+		// 停止按钮属于当前会话：并行多任务时只停当前会话的回合，不影响其他会话
+		const sessionId = this.#current?.meta.id;
+		if (sessionId === undefined) return;
+		const run = this.#runs.get(sessionId);
 		if (run === undefined) return;
 		run.controller.abort(new Error("Stopped by user"));
 		try {
-			this.#requiredCore().abortSession(run.sessionId, "user");
+			this.#requiredCore().abortSession(sessionId, "user");
 		} catch {
 			// 外部 signal 已经能停掉这一轮；Loop 已收尾时没有可中止对象。
 		}
 	}
 
 	pause(): void {
-		const run = this.#activeRun;
-		if (run === undefined) throw new Error("No turn is running");
-		this.#requiredCore().pauseSession(run.sessionId);
+		const sessionId = this.#current?.meta.id;
+		const run = sessionId === undefined ? undefined : this.#runs.get(sessionId);
+		if (sessionId === undefined || run === undefined) throw new Error("No turn is running");
+		this.#requiredCore().pauseSession(sessionId);
 		run.paused = true;
-		this.#push({ type: "run", sessionId: run.sessionId, runId: run.runId, state: "paused" });
+		this.#push({ type: "run", sessionId, runId: run.runId, state: "paused" });
 	}
 
 	resume(): void {
-		const run = this.#activeRun;
-		if (run === undefined) throw new Error("No turn is running");
-		this.#requiredCore().resumeSession(run.sessionId);
+		const sessionId = this.#current?.meta.id;
+		const run = sessionId === undefined ? undefined : this.#runs.get(sessionId);
+		if (sessionId === undefined || run === undefined) throw new Error("No turn is running");
+		this.#requiredCore().resumeSession(sessionId);
 		run.paused = false;
-		this.#push({ type: "run", sessionId: run.sessionId, runId: run.runId, state: "running" });
+		this.#push({ type: "run", sessionId, runId: run.runId, state: "running" });
 	}
 
 	liveState(sessionId?: string): ChatLiveResult {
@@ -791,13 +788,13 @@ export class DesktopHost {
 		return {
 			sessionId: id,
 			live: this.#liveState(id),
-			queued: this.#queue.filter((entry) => entry.sessionId === id).map(toQueuedMessage),
+			queued: (this.#queues.get(id) ?? []).map(toQueuedMessage),
 		};
 	}
 
 	clearQueue(): void {
-		const affected = new Set(this.#queue.map((entry) => entry.sessionId));
-		this.#queue = [];
+		const affected = [...this.#queues.keys()];
+		this.#queues.clear();
 		for (const id of affected) this.#pushQueue(id);
 	}
 
@@ -1001,7 +998,7 @@ export class DesktopHost {
 		if (this.#disposed) return;
 		this.#disposed = true;
 		this.#broker.denyAll();
-		this.#activeRun?.controller.abort(new Error("Application is shutting down"));
+		for (const run of this.#runs.values()) run.controller.abort(new Error("Application is shutting down"));
 		try {
 			await this.#workspaceOperation;
 			await this.#teardownProject();
@@ -1012,6 +1009,42 @@ export class DesktopHost {
 	}
 
 	// 工作区切换与发送准备按顺序执行；等待的是创建/租约/信任检查，不是后台整轮任务。
+	/** 该会话是否有在飞、正在启动或排队的工作。 */
+	#hasPendingWork(sessionId: string): boolean {
+		return (
+			this.#runs.has(sessionId) ||
+			this.#starting.has(sessionId) ||
+			(this.#queues.get(sessionId)?.length ?? 0) > 0
+		);
+	}
+
+	/** 某个工作区是否有在飞、正在启动或排队的任务（按会话归属的 projectRoot 判定）。 */
+	#hasWorkInRoot(root: string): boolean {
+		const normalized = normalizeProjectRoot(root);
+		const inRoot = (sessionId: string): boolean => {
+			const session = this.#sessions.get(sessionId);
+			return session !== undefined && normalizeProjectRoot(session.meta.projectRoot) === normalized;
+		};
+		return (
+			[...this.#runs.keys()].some(inRoot) ||
+			[...this.#starting].some(inRoot) ||
+			[...this.#queues.entries()].some(([sessionId, entries]) => inRoot(sessionId) && entries.length > 0)
+		);
+	}
+
+	#enqueueQueue(entry: QueuedEntry): void {
+		const entries = this.#queues.get(entry.sessionId) ?? [];
+		entries.push(entry);
+		this.#queues.set(entry.sessionId, entries);
+	}
+
+	#takeQueue(sessionId: string): QueuedEntry | undefined {
+		const entries = this.#queues.get(sessionId);
+		const next = entries?.shift();
+		if (entries !== undefined && entries.length === 0) this.#queues.delete(sessionId);
+		return next;
+	}
+
 	#withWorkspace<T>(operation: () => Promise<T>): Promise<T> {
 		const result = this.#workspaceOperation.then(() => {
 			if (this.#disposed) throw new Error("Application is shutting down");
@@ -1055,6 +1088,7 @@ export class DesktopHost {
 
 	async #openProject(input: string): Promise<ProjectSnapshot> {
 		const root = await assertProjectDirectory(input, this.#taskRoot);
+		const previousRoot = this.#projectRoot;
 		if (!(await this.#switchWorkspace(root))) return this.projectSnapshot();
 		try {
 			await this.#rememberProject(root);
@@ -1063,7 +1097,10 @@ export class DesktopHost {
 			if (latest !== undefined) return (await this.#activateSession(latest.id)).project;
 			return await this.projectSnapshot();
 		} catch (error) {
-			await this.#teardownProject();
+			// 打开失败把视图退回原工作区；Core 与后台任务不动（不回滚也不销毁）。
+			if (previousRoot !== undefined && normalizeProjectRoot(previousRoot) !== normalizeProjectRoot(root)) {
+				await this.#switchWorkspace(previousRoot).catch(() => undefined);
+			}
 			throw error;
 		}
 	}
@@ -1075,6 +1112,12 @@ export class DesktopHost {
 		return this.projectSnapshot();
 	}
 
+	/**
+	 * 切换「正在查看的工作区」。Core 全程复用：会话自带 projectRoot，租约、沙箱与 MCP
+	 * 都按会话走，运行中的任务在后台继续并行——切换只影响视图、watcher 与列表过滤，
+	 * 不再销毁运行时（对齐 DSH per-session cwd / ZCode 多 app-server 的隔离模型）。
+	 * @returns 是否发生了切换（同根幂等返回 false）。
+	 */
 	async #switchWorkspace(root: string): Promise<boolean> {
 		if (
 			this.#core !== undefined &&
@@ -1083,42 +1126,47 @@ export class DesktopHost {
 		) {
 			return false;
 		}
-		if (
-			this.#activeRun !== undefined ||
-			this.#activeRunPromise !== undefined ||
-			this.#startingRun ||
-			this.#reviewing ||
-			this.#queue.length > 0
-		) {
-			throw new DesktopWorkspaceError("workspace-busy", "Wait for the current workspace task to finish, then retry");
-		}
-		await this.#teardownProject();
-		this.#warnings = [];
-		const core = new Core({
-			requestApproval: (request, signal) => this.#requestApproval(request, signal),
-			onWarning: (message) => {
-				this.#warnings = [...this.#warnings.slice(-(MAX_WARNINGS - 1)), message];
-				this.#notice("warn", message);
-			},
-			hostKind: "desktop",
-			...(this.#homeDir === undefined ? {} : { homeDir: this.#homeDir }),
-		});
-		this.#core = core;
+		this.#watcher?.close();
+		this.#watcher = undefined;
+		const previousRoot = this.#projectRoot;
 		this.#projectRoot = root;
-		try {
-			this.#startWatcher(root);
-			try {
-				await core.prepareMcp(root);
-			} catch (error) {
-				this.#notice("warn", `Could not start MCP servers: ${messageOf(error)}`);
-			}
-			await this.#refreshMetas();
-			await this.#refreshCatalog();
-			return true;
-		} catch (error) {
-			await this.#teardownProject();
-			throw error;
+		this.#warnings = [];
+		// 跨根切换时清掉属于旧根的当前会话；后台运行不受影响
+		if (
+			this.#current !== undefined &&
+			normalizeProjectRoot(this.#current.meta.projectRoot) !== normalizeProjectRoot(root)
+		) {
+			this.#current = undefined;
 		}
+		// 旧根里空闲会话的租约随视图切换释放；运行中/排队的保留（任务在后台继续）
+		if (previousRoot !== undefined) {
+			const normalizedPrevious = normalizeProjectRoot(previousRoot);
+			for (const [id, session] of this.#sessions) {
+				if (normalizeProjectRoot(session.meta.projectRoot) !== normalizedPrevious) continue;
+				if (this.#hasPendingWork(id)) continue;
+				if (this.#core?.hasSessionLease(id) === true) await this.#core.releaseSessionLease(id);
+			}
+		}
+		if (this.#core === undefined) {
+			this.#core = new Core({
+				requestApproval: (request, sessionId, signal) => this.#requestApproval(request, sessionId, signal),
+				onWarning: (message) => {
+					this.#warnings = [...this.#warnings.slice(-(MAX_WARNINGS - 1)), message];
+					this.#notice("warn", message);
+				},
+				hostKind: "desktop",
+				...(this.#homeDir === undefined ? {} : { homeDir: this.#homeDir }),
+			});
+		}
+		this.#startWatcher(root);
+		try {
+			await this.#requiredCore().prepareMcp(root);
+		} catch (error) {
+			this.#notice("warn", `Could not start MCP servers: ${messageOf(error)}`);
+		}
+		await this.#refreshMetas();
+		await this.#refreshCatalog();
+		return true;
 	}
 
 	async #projectSnapshot(current: Session | undefined): Promise<ProjectSnapshot> {
@@ -1245,9 +1293,10 @@ export class DesktopHost {
 
 	async #teardownProject(): Promise<void> {
 		this.#broker.denyAll();
-		this.#activeRun?.controller.abort(new Error("Project is closing"));
-		if (this.#activeRunPromise !== undefined) {
-			await Promise.race([this.#activeRunPromise.catch(() => undefined), delay(3_000)]);
+		for (const run of this.#runs.values()) run.controller.abort(new Error("Project is closing"));
+		const pendingRuns = [...this.#runPromises.values()];
+		if (pendingRuns.length > 0) {
+			await Promise.race([Promise.allSettled(pendingRuns), delay(3_000)]);
 		}
 		this.#watcher?.close();
 		this.#watcher = undefined;
@@ -1258,10 +1307,10 @@ export class DesktopHost {
 		}
 		this.#streams.clear();
 		this.#live.clear();
-		this.#queue = [];
-		this.#activeRun = undefined;
-		this.#activeRunPromise = undefined;
-		this.#startingRun = false;
+		this.#queues.clear();
+		this.#runs.clear();
+		this.#runPromises.clear();
+		this.#starting.clear();
 		this.#reviewing = false;
 		this.#prunePreparedImages();
 		this.#readOnlyIds.clear();
@@ -1296,7 +1345,8 @@ export class DesktopHost {
 
 	async #startRun(entry: QueuedEntry): Promise<void> {
 		if (this.#disposed) return;
-		this.#startingRun = true;
+		const sessionId = entry.sessionId;
+		this.#starting.add(sessionId);
 		try {
 			const core = this.#requiredCore();
 			const session = await this.#sessionFor(entry.sessionId);
@@ -1325,18 +1375,18 @@ export class DesktopHost {
 			live.reasoning = "";
 			live.toolOutputs.clear();
 			live.startedAt = Date.now();
-			this.#activeRun = {
+			this.#runs.set(session.meta.id, {
 				runId,
 				sessionId: session.meta.id,
 				controller,
 				startedAt: live.startedAt,
 				paused: false,
-			};
+			});
 			this.#push({ type: "run", sessionId: session.meta.id, runId, state: "running" });
 			this.#pushQueue(session.meta.id);
-			this.#activeRunPromise = this.#run(entry, session, runId, controller);
+			this.#runPromises.set(session.meta.id, this.#run(entry, session, runId, controller));
 		} finally {
-			this.#startingRun = false;
+			this.#starting.delete(sessionId);
 		}
 	}
 
@@ -1419,7 +1469,8 @@ export class DesktopHost {
 			}
 		} finally {
 			this.#flushSessionStreams(sessionId);
-			if (this.#activeRun?.runId === runId) this.#activeRun = undefined;
+			if (this.#runs.get(sessionId)?.runId === runId) this.#runs.delete(sessionId);
+			this.#runPromises.delete(sessionId);
 			live.running = false;
 			live.paused = false;
 			live.text = "";
@@ -1437,20 +1488,20 @@ export class DesktopHost {
 				this.#push({ type: "run", sessionId, runId, state: "idle" });
 			}
 			await this.#notifyRunFinished(sessionId, outcome === "error");
-			this.#activeRunPromise = undefined;
-			void this.#drainQueue();
+			void this.#drainQueue(sessionId);
 		}
 	}
 
-	#drainQueue(): void {
+	/** 只排空指定会话的队列：并行模型下每个会话独立续跑自己的排队消息。 */
+	#drainQueue(sessionId: string): void {
 		if (this.#disposed) return;
-		const next = this.#queue.shift();
+		const next = this.#takeQueue(sessionId);
 		if (next === undefined) return;
-		this.#pushQueue(next.sessionId);
+		this.#pushQueue(sessionId);
 		void this.#startRun(next).catch((error: unknown) => {
 			this.#notice("error", messageOf(error));
-			this.#pushQueue(next.sessionId);
-			void this.#drainQueue();
+			this.#pushQueue(sessionId);
+			void this.#drainQueue(sessionId);
 		});
 	}
 
@@ -1490,8 +1541,7 @@ export class DesktopHost {
 	}
 
 	async #releaseIfIdle(id: string): Promise<void> {
-		if (this.#activeRun?.sessionId === id) return;
-		if (this.#queue.some((entry) => entry.sessionId === id)) return;
+		if (this.#hasPendingWork(id)) return;
 		const core = this.#core;
 		if (core === undefined) return;
 		if (core.hasSessionLease(id)) await core.releaseSessionLease(id);
@@ -1499,8 +1549,7 @@ export class DesktopHost {
 
 	async #discardIfEmpty(id: string): Promise<void> {
 		if (!this.#createdSessionIds.has(id)) return;
-		if (this.#activeRun?.sessionId === id) return;
-		if (this.#queue.some((entry) => entry.sessionId === id)) return;
+		if (this.#hasPendingWork(id)) return;
 		const core = this.#core;
 		if (core === undefined) return;
 		try {
@@ -1527,8 +1576,7 @@ export class DesktopHost {
 	}
 
 	#dropSubscriptionIfIdle(id: string): void {
-		if (this.#activeRun?.sessionId === id) return;
-		if (this.#queue.some((entry) => entry.sessionId === id)) return;
+		if (this.#hasPendingWork(id)) return;
 		this.#dropSubscription(id);
 	}
 
@@ -1560,9 +1608,7 @@ export class DesktopHost {
 		}
 	}
 
-	#requestApproval(request: ApprovalRequest, signal?: AbortSignal): Promise<ApprovalDecision> {
-		const sessionId = this.#activeRun?.sessionId ?? this.#current?.meta.id;
-		if (sessionId === undefined) return Promise.resolve("deny");
+	#requestApproval(request: ApprovalRequest, sessionId: string, signal?: AbortSignal): Promise<ApprovalDecision> {
 		const card = toApprovalCard(request, sessionId);
 		this.#push({ type: "approval", card });
 		return this.#broker.request(request, signal).finally(() => {
@@ -1622,14 +1668,14 @@ export class DesktopHost {
 		return {
 			meta: this.#metaFor(session),
 			readOnly: this.#readOnlyIds.has(session.meta.id),
-			running: this.#activeRun?.sessionId === session.meta.id,
+			running: this.#runs.has(session.meta.id),
 			...(model === undefined ? {} : { model }),
 			effort: core.getSelectedEffort(session) ?? loaded.config.reasoningEffort,
 			approval: core.getSelectedApproval(session) ?? loaded.config.approval,
 			plan: core.isSessionPlan(session),
 			metrics,
 			live: this.#liveState(session.meta.id),
-			queued: this.#queue.filter((entry) => entry.sessionId === session.meta.id).length,
+			queued: (this.#queues.get(session.meta.id) ?? []).length,
 		};
 	}
 
@@ -1745,7 +1791,7 @@ export class DesktopHost {
 		this.#push({
 			type: "queue",
 			sessionId,
-			items: this.#queue.filter((entry) => entry.sessionId === sessionId).map(toQueuedMessage),
+			items: (this.#queues.get(sessionId) ?? []).map(toQueuedMessage),
 		});
 	}
 

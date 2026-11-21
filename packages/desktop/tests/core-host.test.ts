@@ -198,18 +198,20 @@ describe("DesktopHost initialization", () => {
 		expect(create).not.toHaveBeenCalled();
 	});
 
-	it("显式打开项目时恢复快照失败，释放半初始化 Core/租约并回到 tasks", async () => {
+	it("显式打开项目时恢复快照失败，视图退回 tasks；Core 复用不销毁、租约不占", async () => {
 		const input = await fixture();
 		const root = await projectDirectory(input, "project");
 		const session = await savedSession(input.core, root, "saved");
 		const { host } = await openHost(input);
-		await host.initialize();
+		const initial = await host.initialize();
 		vi.spyOn(Core.prototype, "getSessionMetrics").mockRejectedValueOnce(new Error("metrics unavailable"));
 		const dispose = vi.spyOn(Core.prototype, "dispose");
 
 		await expect(host.openProject(root)).rejects.toThrow("metrics unavailable");
 
-		expect(dispose).toHaveBeenCalled();
+		// Core 全程复用（并行模型下后台任务不因打开失败被销毁），视图退回 tasks。
+		expect(dispose).not.toHaveBeenCalled();
+		expect(host.workspaceRoot()).toBe(initial.taskRoot);
 		// 失败的激活没有占住会话租约，仍可被其他窗口加锁。
 		await input.core.acquireSessionLease(session);
 		await input.core.releaseSessionLease(session.meta.id);
@@ -657,49 +659,59 @@ describe("DesktopHost explicit session ownership", () => {
 });
 
 describe("DesktopHost running drafts and prepared images", () => {
-	it("跨根准备返回 workspace-busy；picker 不打断运行，同根新会话/排队会话不会被误清理", async () => {
+	it("跨根准备不再阻塞运行；picker 不打断运行，同根新会话不会被误清理", async () => {
 		const input = await fixture();
 		const root = await projectDirectory(input, "selected");
 		const { host } = await openHost(input);
 		await host.initialize();
 		const first = await host.createSession({ target: { kind: "tasks" } });
-		let finish = (): void => undefined;
-		const pending = new Promise<typeof RUN_RESULT>((resolve) => {
-			finish = () => resolve(RUN_RESULT);
+		let finishFirst = (): void => undefined;
+		let finishSecond = (): void => undefined;
+		const pendingFirst = new Promise<typeof RUN_RESULT>((resolve) => {
+			finishFirst = () => resolve(RUN_RESULT);
+		});
+		const pendingSecond = new Promise<typeof RUN_RESULT>((resolve) => {
+			finishSecond = () => resolve(RUN_RESULT);
 		});
 		let runs = 0;
 		const run = vi.spyOn(Core.prototype, "runSession").mockImplementation(async (session, text) => {
 			await session.append({ type: "user.input", payload: { text: text ?? "" } });
 			runs += 1;
-			return runs === 1 ? pending : RUN_RESULT;
+			return runs === 1 ? pendingFirst : runs === 2 ? pendingSecond : RUN_RESULT;
 		});
 		try {
 			await host.send({ sessionId: first.session.meta.id, text: "running" });
 			const signal = run.mock.calls[0]?.[2]?.signal;
-			await expect(host.prepareWorkspace({ kind: "project", root })).rejects.toMatchObject({ code: "workspace-busy" });
-			await expect(host.createSession({ target: { kind: "project", root } })).rejects.toMatchObject({
-				code: "workspace-busy",
-			});
+			// 刷新入口不跳根：仍在 tasks 草稿视图
+			expect((await host.initialize()).project?.target).toEqual({ kind: "tasks" });
+			// 跨根准备只切换视图：不再要求先停任务，原任务在后台继续
+			const prepared = await host.prepareWorkspace({ kind: "project", root });
+			expect(prepared.target).toEqual({ kind: "project", root });
+			expect(signal?.aborted).toBe(false);
+			await host.createSession({ target: { kind: "project", root } });
 			electronMock.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [root] });
 			await host.selectProjectDialog();
 			expect(signal?.aborted).toBe(false);
-			expect((await host.initialize()).project?.target).toEqual({ kind: "tasks" });
 
 			const second = await host.createSession({ target: { kind: "tasks" } });
-			expect(await host.send({ sessionId: second.session.meta.id, text: "queued" })).toEqual({ queued: true });
+			// 并行调度：不同会话立即并行启动，不再进全局队列
+			expect(await host.send({ sessionId: second.session.meta.id, text: "parallel" })).toEqual({ queued: false });
+			await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(2));
+			expect(run.mock.calls[1]?.[0].meta.id).toBe(second.session.meta.id);
 			await host.createSession({ target: { kind: "tasks" } });
 			expect((await host.listSessions({})).items.map((session) => session.id)).toContain(second.session.meta.id);
 			expect(host.liveState(first.session.meta.id).live.running).toBe(true);
-			finish();
-			await vi.waitFor(() => expect(run).toHaveBeenCalledTimes(2));
-			expect(run.mock.calls[1]?.[0].meta.id).toBe(second.session.meta.id);
-			await vi.waitFor(async () => {
-				const prepared = await host.prepareWorkspace({ kind: "project", root });
-				expect(prepared.target).toEqual({ kind: "project", root });
-			});
+			expect(host.liveState(second.session.meta.id).live.running).toBe(true);
+			// 各会话独立收尾：先结束第一个，第二个继续跑
+			finishFirst();
+			await vi.waitFor(() => expect(host.liveState(first.session.meta.id).live.running).toBe(false));
+			expect(host.liveState(second.session.meta.id).live.running).toBe(true);
+			finishSecond();
+			await vi.waitFor(() => expect(host.liveState(second.session.meta.id).live.running).toBe(false));
 			await host.dispose();
 		} finally {
-			finish();
+			finishFirst();
+			finishSecond();
 		}
 	});
 
@@ -870,7 +882,7 @@ describe("desktop workspace IPC and preload", () => {
 		expect(host.workspaceRoot()).toBe(currentRoot);
 	});
 
-	it("工作区忙经 IPC 返回结构化 workspace-busy，不中断原轮次", async () => {
+	it("跨工作区准备不再阻塞运行，原轮次继续", async () => {
 		const input = await fixture();
 		const root = await projectDirectory(input, "project");
 		const { host } = await openHost(input);
@@ -885,11 +897,10 @@ describe("desktop workspace IPC and preload", () => {
 		try {
 			await host.send({ sessionId: context.session.meta.id, text: "running" });
 			expect(await client.request(IPC.workspacePrepare, { kind: "project", root })).toMatchObject({
-				ok: false,
-				error: { code: "workspace-busy" },
+				ok: true,
 			});
 			expect(run.mock.calls[0]?.[2]?.signal?.aborted).toBe(false);
-			expect(host.workspaceRoot()).toBe(context.project.root);
+			expect(host.workspaceRoot()).toBe(root);
 		} finally {
 			finish();
 			await host.dispose();

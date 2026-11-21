@@ -41,7 +41,7 @@ afterEach(async () => {
 
 function createPipeline(
 	approval: ApprovalTier,
-	requestApproval?: (request: ApprovalRequest, signal?: AbortSignal) => Promise<ApprovalDecision>,
+	requestApproval?: (request: ApprovalRequest, sessionId: string, signal?: AbortSignal) => Promise<ApprovalDecision>,
 	reviewCommand?: (request: ReviewRequest, signal?: AbortSignal) => Promise<ReviewVerdict>,
 ): ToolPipeline {
 	return new ToolPipeline({

@@ -98,8 +98,15 @@ export interface CoreOptions {
 	readonly env?: NodeJS.ProcessEnv;
 	/** 接收非致命诊断（配置装载问题等）；由宿主决定呈现通道，Core 不直接写终端。 */
 	readonly onWarning?: (message: string) => void;
-	/** 工具审批回调；返回三档决定（allow / deny / allow-session）。 */
-	readonly requestApproval?: (request: ApprovalRequest, signal?: AbortSignal) => Promise<ApprovalDecision>;
+	/**
+	 * 工具审批回调；返回三档决定（allow / deny / allow-session）。
+	 * 第二个参数是发起审批的会话 ID：并行多会话时宿主据此把审批卡路由给正确的会话。
+	 */
+	readonly requestApproval?: (
+		request: ApprovalRequest,
+		sessionId: string,
+		signal?: AbortSignal,
+	) => Promise<ApprovalDecision>;
 	readonly now?: () => Date;
 	readonly monotonicNow?: () => number;
 	readonly random?: () => number;

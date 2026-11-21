@@ -90,7 +90,12 @@ export interface PipelineOptions {
 	readonly events: EventStore;
 	readonly snapshots: SnapshotStore;
 	readonly tools: readonly ToolDefinition[];
-	readonly requestApproval?: (request: ApprovalRequest, signal?: AbortSignal) => Promise<ApprovalDecision>;
+	/** 审批回调；`sessionId` 标识发起审批的会话，供宿主按会话路由审批卡。 */
+	readonly requestApproval?: (
+		request: ApprovalRequest,
+		sessionId: string,
+		signal?: AbortSignal,
+	) => Promise<ApprovalDecision>;
 	/**
 	 * 高危动作的模型审查；缺省时高危动作直接转人工。
 	 * 返回 error 或抛错都按「审查不可用」处理，一律退回人工，绝不放行。
