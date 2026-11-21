@@ -26,7 +26,7 @@
 	height: 26px;
 	display: grid;
 	place-items: center;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	color: var(--text-muted);
 }
 
@@ -48,7 +48,7 @@
 	height: 26px;
 	display: grid;
 	place-items: center;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	color: var(--text-muted);
 }
 
@@ -133,12 +133,47 @@
 	opacity: 0;
 }
 
+/* 拖拽调整宽度时禁用过渡，避免手柄跟手延迟。 */
+html.is-resizing-sidebar .sidebar,
+html.is-resizing-sidebar .sidebar > * {
+	transition: none;
+}
+
+/* 侧栏右缘拖拽手柄：命中区加宽到 12px（视觉仍是细线），负 margin 不占布局空间。 */
+.sidebar-resize-handle {
+	flex: none;
+	position: relative;
+	width: 12px;
+	margin-left: -6px;
+	margin-right: -6px;
+	z-index: 5;
+	cursor: col-resize;
+	touch-action: none;
+	background: transparent;
+}
+
+.sidebar-resize-handle::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: 5px;
+	width: 2px;
+	background: transparent;
+	transition: background 120ms ease;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar-resize-handle.is-dragging::after {
+	background: var(--accent-ring);
+}
+
 .sidebar .brand {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	height: 38px;
-	padding: 0 12px;
+	padding: 0 8px;
 	margin: 10px 0 12px;
 	flex: none;
 }
@@ -154,7 +189,7 @@
 .brand-tag {
 	padding: 2px 5px;
 	border: 1px solid var(--line-strong);
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	font-size: var(--text-small);
 	font-weight: 600;
 	letter-spacing: 0.08em;
@@ -166,15 +201,16 @@
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
+	/* 保留稳定滚动条占位，避免列表增减时右侧跳动；仅收窄内容水平内边距。 */
 	scrollbar-gutter: stable;
-	padding: 0 12px 16px;
+	padding: 0 8px 16px;
 }
 
 .side-menu {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
-	padding: 0 12px 10px;
+	padding: 0 8px 10px;
 	border-bottom: 1px solid var(--line);
 }
 
@@ -222,6 +258,11 @@
 	font-weight: var(--weight-semibold);
 }
 
+/* 任务组与项目组之间留出分组间距，避免末条任务紧贴上方的项目标题 */
+.task-list + .workspace-head {
+	margin-top: 16px;
+}
+
 .task-list .session-row {
 	padding-left: 8px;
 }
@@ -243,7 +284,7 @@
 	height: 30px;
 	padding: 0 8px;
 	border: none;
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
@@ -268,18 +309,239 @@
 	display: none;
 }
 
-.session-row {
+.workspace-head .group-add {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	/* 与行内「更多」按钮右缘对齐（行右 padding 4px，分组头 8px） */
+	margin-right: -4px;
+	padding: 0;
+	border: none;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: var(--text-dim);
+	cursor: pointer;
+}
+
+/* 项目头两个操作按钮并排：负边距交给容器，按钮自身不再偏移 */
+.workspace-head-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	margin-right: -4px;
+}
+
+.workspace-head-actions .group-add {
+	margin-right: 0;
+}
+
+.workspace-head .group-add:hover:not(:disabled) {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.workspace-head .group-add:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.sidebar-row {
+	position: relative;
+	display: flex;
+	align-items: center;
+	width: 100%;
+	border-radius: var(--r-lg);
+}
+
+/* 悬停/选中高亮放在整行容器上，名称与主按钮共用一块连续背景。 */
+.sidebar-row:hover {
+	background: var(--fill-hover);
+}
+
+.sidebar-row.is-selected {
+	background: var(--row-selected);
+}
+
+.sidebar-row .row-main {
+	min-width: 0;
+	flex: 1;
+	background: transparent;
+	transition: padding-right 120ms ease;
+}
+
+/* 悬停时给行尾更多图标预留空间，标题扩展到图标前而非与它重叠。 */
+.sidebar-row:hover .row-main,
+.sidebar-row:has(.row-menu-trigger[aria-expanded="true"]) .row-main {
+	padding-right: 26px;
+}
+
+.sidebar-row .row-main:hover {
+	background: transparent;
+}
+
+.sidebar-row.is-selected .row-main {
+	color: var(--text-primary);
+}
+
+/* 行尾区域：默认容纳时间靠右；悬停时塌缩让标题扩展，更多图标浮在行尾。 */
+.row-trailing {
+	position: relative;
+	flex: none;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	height: 22px;
+	margin-right: 4px;
+	transition:
+		width 120ms ease,
+		margin-right 120ms ease;
+}
+
+/* 悬停/菜单展开：时间绝对定位脱离文档流，行尾塌缩，标题得以扩展到行尾。 */
+.sidebar-row:hover .row-trailing,
+.sidebar-row:has(.row-menu-trigger[aria-expanded="true"]) .row-trailing {
+	width: 0;
+	margin-right: 0;
+}
+
+.sidebar-row .row-menu-trigger {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: none;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: var(--text-dim);
+	opacity: 0;
+	cursor: pointer;
+	z-index: 2;
+}
+
+.sidebar-row:hover .row-menu-trigger,
+.sidebar-row .row-menu-trigger:focus,
+.sidebar-row .row-menu-trigger[aria-expanded="true"] {
+	opacity: 1;
+}
+
+.sidebar-row .row-menu-trigger:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+/* 时间：静态时在流内靠右显示；悬停时绝对定位并淡出，不占据宽度。 */
+.row-trailing .session-time {
+	flex: none;
+	margin-left: 6px;
+	font-size: var(--text-micro);
+	color: var(--text-faint);
+	white-space: nowrap;
+}
+
+.sidebar-row:hover .row-trailing .session-time,
+.sidebar-row:has(.row-menu-trigger[aria-expanded="true"]) .row-trailing .session-time {
+	position: absolute;
+	right: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+
+.row-menu {
+	position: absolute;
+	right: 4px;
+	top: calc(100% + 4px);
+	z-index: 30;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 136px;
+	padding: 5px;
+	border: 1px solid var(--line-strong);
+	border-radius: 9px;
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+	animation: menu-down-in var(--duration-fast) var(--ease-out);
+}
+
+.row-menu-item {
 	display: flex;
 	align-items: center;
 	gap: 8px;
 	width: 100%;
-	height: 30px;
-	padding: 0 8px 0 29px;
+	min-height: 32px;
+	padding: 0 9px;
 	border: none;
-	border-radius: 8px;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: var(--text-secondary);
+	font-size: var(--text-small);
+	white-space: nowrap;
+	text-align: left;
+	cursor: pointer;
+}
+
+.row-menu-item:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.row-menu-item.is-danger {
+	color: var(--danger);
+}
+
+.row-menu-item.is-danger:hover {
+	background: var(--danger-soft);
+}
+
+.sidebar-row .project-row {
+	width: auto;
+	max-width: none;
+}
+
+.project-line {
+	height: 30px;
+}
+
+.task-list .sidebar-row .row-main {
+	padding-left: 8px;
+}
+
+.sidebar-row .session-row {
+	width: auto;
+}
+
+.session-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	height: 30px;
+	padding: 0 8px;
+	border: none;
+	border-radius: var(--r-lg);
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;
+}
+
+/* 固定图标槽：与项目行图标同列（图标 16px 起于 16），文字由此落在与项目名相同的列。 */
+.row-icon-slot {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	color: var(--text-dim);
 }
 
 .side-empty {
@@ -357,6 +619,7 @@
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
+	animation: turn-in var(--duration-normal) var(--ease-out);
 }
 
 .bubble {
@@ -404,7 +667,7 @@
 }
 
 .prose pre {
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 }
 
 .chat-empty {

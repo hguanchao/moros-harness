@@ -20,6 +20,8 @@ export interface DropdownOption {
 /** 菜单底部操作项：只执行动作、不改变当前选中值，例如“创建项目”或开关项。 */
 export interface DropdownAction {
 	readonly label: string;
+	/** 稳定标识；渲染为 data-value，便于按项定制样式。 */
+	readonly value?: string;
 	readonly icon?: ReactNode;
 	/** 操作下方的补充说明；存在时菜单项自动增高并允许换行。 */
 	readonly description?: string;
@@ -167,6 +169,7 @@ export function Dropdown({
 								<button
 									key={`${action.label}-${index}`}
 									type="button"
+									{...(action.value === undefined ? {} : { "data-value": action.value })}
 									className={`dropdown-option ${action.description === undefined ? "" : "has-description"} ${action.selected === true ? "is-selected" : ""}`}
 									disabled={action.disabled === true}
 									onClick={() => {

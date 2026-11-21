@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type JSX } from "react";
+import { createPortal } from "react-dom";
 
-import type { SettingsSnapshot } from "@moros/core/config/settings.ts";
-import type { ModelCatalog } from "@moros/core/core.ts";
 import type { PreparedImage, SessionView } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { currentNavigationEpoch, useDesktopActions } from "../hooks/actions.ts";
@@ -10,6 +9,8 @@ import { ProjectPicker } from "./ProjectPicker.tsx";
 import {
 	ArrowUpIcon,
 	ChevronLeftIcon,
+	FolderIcon,
+	GlobeIcon,
 	ImageIcon,
 	LightbulbIcon,
 	LinkIcon,
@@ -19,9 +20,11 @@ import {
 	ShieldAlertIcon,
 	ShieldCheckIcon,
 	StopIcon,
+	TerminalIcon,
 	XIcon,
 } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
+import { availableModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -38,6 +41,7 @@ export function Composer(): JSX.Element {
 	const [attachMenu, setAttachMenu] = useState(false);
 	const [showUrlInput, setShowUrlInput] = useState(false);
 	const [imageUrl, setImageUrl] = useState("");
+	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
 	const isSubmitting = useRef(false);
 	const platform = state.app?.platform ?? "win32";
@@ -53,7 +57,9 @@ export function Composer(): JSX.Element {
 	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
 	const model =
-		current === undefined ? (state.draft.model ?? configuredModel(state.models, state.settings)) : current.model;
+		current === undefined
+			? availableModel(state.models, state.draft.model ?? configuredModel(state.models, state.settings))
+			: availableModel(state.models, current.model);
 	const effort = current?.effort ?? state.draft.effort ?? state.settings?.config.reasoningEffort ?? "off";
 	const approval = current?.approval ?? state.draft.approval ?? state.settings?.config.approval ?? "ask";
 	const plan = current?.plan ?? state.draft.plan;
@@ -215,7 +221,16 @@ export function Composer(): JSX.Element {
 	};
 
 	// 权限项与计划模式互斥：选择任一审批档位会退出计划模式。
+	// 切到完全访问时二次确认；当前已是完全访问（且非计划模式）则重复选择不再询问。
 	const changeApproval = async (value: SessionView["approval"]): Promise<void> => {
+		if (value === "yolo" && (approval !== "yolo" || plan)) {
+			setYoloConfirmOpen(true);
+			return;
+		}
+		await applyApproval(value);
+	};
+
+	const applyApproval = async (value: SessionView["approval"]): Promise<void> => {
 		try {
 			if (current === undefined) {
 				dispatch({ type: "draft-options", options: { approval: value, plan: false } });
@@ -417,7 +432,86 @@ export function Composer(): JSX.Element {
 				</div>
 			</div>
 			{dragging ? <div className="drop-hint">松开以添加图片</div> : null}
+			{yoloConfirmOpen ? (
+				<YoloConfirmModal
+					onCancel={() => setYoloConfirmOpen(false)}
+					onConfirm={() => {
+						setYoloConfirmOpen(false);
+						void applyApproval("yolo");
+					}}
+				/>
+			) : null}
 		</div>
+	);
+}
+
+/**
+ * 完全访问权限的二次确认弹窗：列出高风险能力并要求显式勾选后确认。
+ * 用 portal 挂到 body，避免被输入栏的层叠上下文裁切。
+ */
+function YoloConfirmModal({
+	onCancel,
+	onConfirm,
+}: {
+	readonly onCancel: () => void;
+	readonly onConfirm: () => void;
+}): JSX.Element {
+	const [acknowledged, setAcknowledged] = useState(false);
+	return createPortal(
+		<div className="modal-backdrop" onClick={onCancel}>
+			<div
+				className="rename-dialog yolo-dialog"
+				role="dialog"
+				aria-label="确认允许完全访问"
+				onClick={(event) => event.stopPropagation()}
+			>
+				<div className="modal-head">
+					<h2>启用完全访问模式？</h2>
+					<button className="icon-button" aria-label="关闭" onClick={onCancel}>
+						<XIcon size={16} />
+					</button>
+				</div>
+				<p className="yolo-intro">
+					此模式下 Agent 执行操作不再逐条征求确认，仅危险命令仍由策略拦截。请确认你了解以下影响：
+				</p>
+				<ul className="yolo-risk-list">
+					<li>
+						<FolderIcon size={15} />
+						<div>
+							<strong>文件读写</strong>
+							<span>可在工作区内外读取、修改或删除文件</span>
+						</div>
+					</li>
+					<li>
+						<TerminalIcon size={15} />
+						<div>
+							<strong>Shell 命令</strong>
+							<span>可直接执行终端命令、安装依赖、改动系统设置</span>
+						</div>
+					</li>
+					<li>
+						<GlobeIcon size={15} />
+						<div>
+							<strong>联网与工具</strong>
+							<span>可访问网络、调用已启用的 MCP 工具并向外发送数据</span>
+						</div>
+					</li>
+				</ul>
+				<label className="discover-check yolo-confirm-check">
+					<input type="checkbox" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
+					<span>我已知晓风险，愿意自行承担数据安全责任</span>
+				</label>
+				<div className="modal-actions">
+					<button className="ghost-button" onClick={onCancel}>
+						取消
+					</button>
+					<button className="danger-button" disabled={!acknowledged} onClick={onConfirm}>
+						仍要启用
+					</button>
+				</div>
+			</div>
+		</div>,
+		document.body,
 	);
 }
 
@@ -596,6 +690,7 @@ function ApprovalPicker({
 			actions={[
 				{
 					label: "计划模式",
+					value: "plan",
 					description: "只探索并提交计划不修改文件",
 					icon: <LightbulbIcon size={14} />,
 					selected: plan,
@@ -612,19 +707,6 @@ function ApprovalPicker({
 			onChange={(value) => onChange(value as SessionView["approval"])}
 		/>
 	);
-}
-
-function configuredModel(catalog: ModelCatalog, settings: SettingsSnapshot | undefined): SessionView["model"] {
-	const configured = settings?.config.model;
-	if (configured === undefined) return undefined;
-	for (const provider of catalog.providers) {
-		if (settings?.config.provider !== undefined && settings.config.provider !== provider.name) continue;
-		const model = provider.models.find(
-			(entry) => entry.id === configured || `${provider.name}/${entry.id}` === configured,
-		);
-		if (model !== undefined) return { provider: provider.name, model: model.id };
-	}
-	return undefined;
 }
 
 function approvalLabel(mode: SessionView["approval"]): string {

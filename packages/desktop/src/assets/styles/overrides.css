@@ -67,19 +67,6 @@
 	color: var(--text-dim);
 }
 
-.trust-card,
-.modal {
-	border-radius: 14px;
-	border-color: var(--line-strong);
-	background: var(--surface-chrome);
-	box-shadow: var(--shadow);
-}
-
-.modal-backdrop,
-.trust-overlay {
-	background: rgba(0, 0, 0, 0.42);
-}
-
 /* ---------- 滚动条 ---------- */
 
 ::-webkit-scrollbar {
@@ -89,7 +76,7 @@
 
 ::-webkit-scrollbar-thumb {
 	background: var(--scrollbar);
-	border-radius: 999px;
+	border-radius: var(--r-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {

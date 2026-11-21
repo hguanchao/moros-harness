@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 import { z } from "zod";
 
 import { atomicWriteFile } from "@moros/core/atomic-file.ts";
-import type { RecentProject } from "../shared/contract.ts";
+import { DEFAULT_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH, type RecentProject } from "../shared/contract.ts";
 
 const RecentProjectSchema = z.object({
 	root: z.string().min(1),
@@ -19,16 +19,29 @@ const BoundsSchema = z.object({
 	height: z.number().int().positive(),
 });
 
+/** 最近项目数量上限；桌面端只做切换入口，不做项目档案管理。 */
+const MAX_RECENT = 12;
+
+/** 置顶只影响侧栏排序，本地保存时设置上限，避免状态文件无限增长。 */
+const MAX_PINNED_SESSIONS = 50;
+
+const SessionIdSchema = z
+	.string()
+	.regex(/^[A-Za-z0-9_-]+$/)
+	.max(200);
+
+const SidebarWidthSchema = z.number().int().min(MIN_SIDEBAR_WIDTH).max(MAX_SIDEBAR_WIDTH);
+
 const DesktopStateSchema = z.object({
 	recentProjects: z.array(RecentProjectSchema).default([]),
 	window: BoundsSchema.optional(),
 	maximized: z.boolean().default(false),
+	// 字段级容错：单个损坏的 pin 列表不应连带丢掉最近项目与窗口状态。
+	pinnedSessionIds: z.array(SessionIdSchema).max(MAX_PINNED_SESSIONS).catch([]).default([]),
+	sidebarWidth: SidebarWidthSchema.catch(DEFAULT_SIDEBAR_WIDTH).default(DEFAULT_SIDEBAR_WIDTH),
 });
 
 type DesktopState = z.infer<typeof DesktopStateSchema>;
-
-/** 最近项目数量上限；桌面端只做切换入口，不做项目档案管理。 */
-const MAX_RECENT = 12;
 
 /**
  * 桌面端本地状态：最近项目与窗口位置。
@@ -38,7 +51,12 @@ const MAX_RECENT = 12;
  */
 export class DesktopStore {
 	readonly #path: string;
-	#state: DesktopState = { recentProjects: [], maximized: false };
+	#state: DesktopState = {
+		recentProjects: [],
+		maximized: false,
+		pinnedSessionIds: [],
+		sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
+	};
 
 	private constructor(path: string) {
 		this.#path = path;
@@ -74,6 +92,51 @@ export class DesktopStore {
 		const recent = this.#state.recentProjects.filter((item) => item.root !== root);
 		if (recent.length === this.#state.recentProjects.length) return;
 		this.#state = { ...this.#state, recentProjects: recent };
+		await this.#save();
+	}
+
+	/** 侧栏置顶会话 ID；旧状态文件返回空数组。 */
+	pinnedSessionIds(): readonly string[] {
+		return this.#state.pinnedSessionIds;
+	}
+
+	/**
+	 * 设置或取消会话置顶；置顶顺序按最近操作时间向前排列，去重且受上限约束。
+	 * @param id 完整的会话 ID，由调用方校验归属；这里只校验格式。
+	 * @param pinned true 置顶，false 取消置顶。
+	 * @returns 更新后的置顶 ID 列表。
+	 */
+	async setPinned(id: string, pinned: boolean): Promise<readonly string[]> {
+		const existing = this.#state.pinnedSessionIds.filter((entry) => entry !== id);
+		this.#state = {
+			...this.#state,
+			pinnedSessionIds: pinned ? [id, ...existing].slice(0, MAX_PINNED_SESSIONS) : existing,
+		};
+		await this.#save();
+		return this.#state.pinnedSessionIds;
+	}
+
+	/** 侧栏宽度；旧状态文件返回默认值。 */
+	sidebarWidth(): number {
+		return this.#state.sidebarWidth;
+	}
+
+	/** 持久化侧栏宽度，越界值钳制到允许的范围内；无变化时跳过落盘。 */
+	async setSidebarWidth(width: number): Promise<number> {
+		if (!Number.isFinite(width)) return this.#state.sidebarWidth;
+		const clamped = Math.max(MIN_SIDEBAR_WIDTH, Math.min(MAX_SIDEBAR_WIDTH, Math.round(width)));
+		if (clamped === this.#state.sidebarWidth) return clamped;
+		this.#state = { ...this.#state, sidebarWidth: clamped };
+		await this.#save();
+		return clamped;
+	}
+
+	/** 会话删除后清理置顶记录；没有变化时跳过落盘。 */
+	async unpinSessions(ids: readonly string[]): Promise<void> {
+		const removed = new Set(ids);
+		const pinnedSessionIds = this.#state.pinnedSessionIds.filter((id) => !removed.has(id));
+		if (pinnedSessionIds.length === this.#state.pinnedSessionIds.length) return;
+		this.#state = { ...this.#state, pinnedSessionIds };
 		await this.#save();
 	}
 

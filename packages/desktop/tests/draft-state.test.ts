@@ -79,6 +79,8 @@ const APP: AppSnapshot = {
 	platform: "win32",
 	taskRoot: TASK_ROOT,
 	recentProjects: PROJECT.recentProjects,
+	sidebarWidth: 280,
+	pinnedSessionIds: [],
 	project: { ...PROJECT, session: SESSION },
 };
 
@@ -235,6 +237,55 @@ describe("renderer task draft state", () => {
 		expect(again.draft).toEqual(before.draft);
 		expect(again.draftGeneration).toBe(before.draftGeneration);
 		expect(again.draftRevision).toBe(before.draftRevision);
+	});
+
+	it("分组新建任务关联明确项目或清空归属，保留已输入内容", () => {
+		const draft = populatedDraft();
+		const otherProject: ProjectRef = { root: "C:/work/other", name: "Other" };
+
+		const associated = reducer(reducer(draft, { type: "new-task" }), {
+			type: "draft-project",
+			project: otherProject,
+		});
+		expect(associated.draft.project).toEqual(otherProject);
+		expect(associated.draft.branch).toBeUndefined();
+		expect(associated.draft.text).toBe(draft.draft.text);
+		expect(associated.draft.images).toBe(draft.draft.images);
+		expect(associated.draftRevision).toBe(draft.draftRevision);
+
+		const cleared = reducer(reducer(associated, { type: "new-task" }), { type: "draft-project", project: null });
+		expect(cleared.draft.project).toBeNull();
+		expect(cleared.draft.text).toBe(draft.draft.text);
+		expect(cleared.draft.images).toBe(draft.draft.images);
+	});
+
+	it("init 带入持久化的置顶 ID 并支持推送更新", () => {
+		const before = activeState();
+		const initialized = reducer(before, {
+			type: "init",
+			app: { ...APP, pinnedSessionIds: ["task-session"] },
+		});
+		expect(initialized.pinnedSessionIds).toEqual(["task-session"]);
+
+		const updated = reducer(initialized, {
+			type: "push",
+			message: { type: "session-pins", ids: ["project-session", "task-session"] },
+		});
+		expect(updated.pinnedSessionIds).toEqual(["project-session", "task-session"]);
+	});
+
+	it("init 带入持久化的侧栏宽度，拖拽动作与推送均更新宽度", () => {
+		const initialized = reducer(initialState, {
+			type: "init",
+			app: { ...APP, sidebarWidth: 320 },
+		});
+		expect(initialized.sidebarWidth).toBe(320);
+
+		const dragged = reducer(initialized, { type: "sidebar-width", width: 300 });
+		expect(dragged.sidebarWidth).toBe(300);
+
+		const pushed = reducer(dragged, { type: "push", message: { type: "sidebar-width", width: 288 } });
+		expect(pushed.sidebarWidth).toBe(288);
 	});
 
 	it("迟到的 init 和项目更新不覆盖已经进入的新草稿", () => {

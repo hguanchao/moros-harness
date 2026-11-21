@@ -50,10 +50,32 @@
 	--syn-variable: #e06c75;
 	--r-surface: 22px;
 
+	/* 圆角梯度：组件圆角统一从此处取值，避免散落魔法数字 */
+	--r-sm: 4px;
+	--r-md: 6px;
+	--r-lg: 8px;
+	--r-xl: 10px;
+	--r-pill: 999px;
+
+	/* 弹窗边距：遮罩留白、卡片内边距统一在此调节 */
+	--modal-backdrop-padding: 28px;
+	--modal-card-padding: 24px;
+	/* 确认类紧凑弹窗（如完全访问二次确认）的内边距 */
+	--modal-card-padding-compact: 20px;
+	/* 卡片背景：弹窗统一底色，深色主题取自 surface-chrome */
+	--modal-card-bg: var(--surface-chrome);
+
 	/* 侧栏收起/展开动画 */
 	--sidebar-width: 260px;
 	--duration-sidebar: 220ms;
 	--ease-sidebar: cubic-bezier(0.4, 0, 0.2, 1);
+
+	/* 通用交互动效：浮层入场、页面切换、状态反馈共用，便于统一调节节奏 */
+	--duration-fast: 120ms;
+	--duration-normal: 180ms;
+	--duration-slow: 260ms;
+	--ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+	--ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 :root[data-theme="light"] {
@@ -106,6 +128,9 @@
 	--syn-comment: #8b8f98;
 	--syn-function: #2f6fd0;
 	--syn-variable: #b23b3b;
+
+	/* 浅色主题：弹窗卡片统一为浅灰底 */
+	--modal-card-bg: #f5f5f5;
 }
 
 /* ============================================================

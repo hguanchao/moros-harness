@@ -20,6 +20,9 @@ export const IPC = {
 	appOpenProject: "moros:app-open-project",
 	appSelectProjectDialog: "moros:app-select-project-dialog",
 	appCreateProjectDialog: "moros:app-create-project-dialog",
+	appOpenProjectFolder: "moros:app-open-project-folder",
+	appCopyProjectPath: "moros:app-copy-project-path",
+	appForgetProject: "moros:app-forget-project",
 	workspacePrepare: "moros:workspace-prepare",
 	gitBranches: "moros:git-branches",
 	gitCheckout: "moros:git-checkout",
@@ -29,12 +32,17 @@ export const IPC = {
 	windowClose: "moros:window-close",
 	windowState: "moros:window-state",
 	windowSetTheme: "moros:window-set-theme",
+	sidebarSetWidth: "moros:sidebar-set-width",
 	sessionsList: "moros:sessions-list",
 	sessionsCreate: "moros:sessions-create",
 	sessionsActivate: "moros:sessions-activate",
 	sessionsRename: "moros:sessions-rename",
 	sessionsArchive: "moros:sessions-archive",
 	sessionsDelete: "moros:sessions-delete",
+	sessionsRenameInTarget: "moros:sessions-rename-in-target",
+	sessionsArchiveInTarget: "moros:sessions-archive-in-target",
+	sessionsDeleteInTarget: "moros:sessions-delete-in-target",
+	sessionPin: "moros:session-pin",
 	sessionsFork: "moros:sessions-fork",
 	sessionsExport: "moros:sessions-export",
 	sessionsReplay: "moros:sessions-replay",
@@ -81,6 +89,13 @@ export const IPC = {
 	imagesFromBytes: "moros:images-from-bytes",
 	imagesFromUrl: "moros:images-from-url",
 } as const;
+
+/** 侧栏宽度默认值与拖拽范围；与主流 agent 会话列表（约 264~300px）对齐。 */
+export const DEFAULT_SIDEBAR_WIDTH = 280;
+export const MIN_SIDEBAR_WIDTH = 200;
+export const MAX_SIDEBAR_WIDTH = 480;
+/** 内容区保底宽度：窗口收窄时侧栏自动让位，避免对话与输入框被挤变形。 */
+export const MIN_CONTENT_WIDTH = 480;
 
 export interface RpcError {
 	readonly message: string;
@@ -194,6 +209,10 @@ export interface AppSnapshot {
 	/** 稳定的内部任务根，只用于会话归组；不是客户端指定执行目录的入口。 */
 	readonly taskRoot: string;
 	readonly recentProjects: readonly RecentProject[];
+	/** 侧栏本地宽度；启动时由宿主读取持久化值。 */
+	readonly sidebarWidth: number;
+	/** 侧栏本地置顶的会话 ID；按最近置顶时间排序。 */
+	readonly pinnedSessionIds: readonly string[];
 	readonly project?: ProjectSnapshot;
 }
 
@@ -366,6 +385,8 @@ export type PushMessage =
 	| { readonly type: "approval"; readonly card: ApprovalCard }
 	| { readonly type: "approval-cleared"; readonly id: string }
 	| { readonly type: "session-updated"; readonly meta: SessionMeta }
+	| { readonly type: "session-pins"; readonly ids: readonly string[] }
+	| { readonly type: "sidebar-width"; readonly width: number }
 	| { readonly type: "session-view"; readonly view: SessionView }
 	| { readonly type: "session-cleared"; readonly sessionId: string }
 	| { readonly type: "sessions-changed" }
@@ -393,6 +414,12 @@ export interface DesktopBridge {
 	selectProjectDialog(): Promise<RpcResult<ProjectSelection | null>>;
 	/** 在用户选择的父目录中新建 name 文件夹；取消返回 null，已有路径不会被覆盖。 */
 	createProjectDialog(name: string): Promise<RpcResult<ProjectSelection | null>>;
+	/** 在系统文件管理器中打开已登记项目目录；不切换工作区。 */
+	openProjectFolder(root: string): Promise<RpcResult<void>>;
+	/** 复制已登记项目目录路径到剪贴板。 */
+	copyProjectPath(root: string): Promise<RpcResult<void>>;
+	/** 只从最近项目列表移除，不删除目录或会话；返回更新后的列表。 */
+	forgetProject(root: string): Promise<RpcResult<readonly RecentProject[]>>;
 	/** 准备明确的任务目标，不自动恢复或创建会话；返回信任与模型信息供首次发送校验。 */
 	prepareWorkspace(target: WorkspaceTarget): Promise<RpcResult<ProjectSnapshot>>;
 	/** 查询已登记项目的本地分支；非 Git 仓库返回空列表。 */
@@ -405,6 +432,8 @@ export interface DesktopBridge {
 	windowClose(): Promise<RpcResult<void>>;
 	windowState(): Promise<RpcResult<WindowState>>;
 	windowSetTheme(dark: boolean): Promise<RpcResult<void>>;
+	/** 持久化拖拽调整后的侧栏宽度，返回钳制后的实际值。 */
+	sidebarSetWidth(width: number): Promise<RpcResult<number>>;
 
 	sessionsList(query: SessionListQuery): Promise<RpcResult<SessionPage>>;
 	/** 在 input.target 下创建一次会话并应用草稿选项；错误以 RpcError 返回，不使用隐含项目。 */
@@ -416,6 +445,17 @@ export interface DesktopBridge {
 	sessionsDelete(
 		ids: readonly string[],
 	): Promise<RpcResult<{ deleted: readonly string[]; failed: readonly { id: string; error: string }[] }>>;
+	/** 在明确目标根内重命名，不切换当前工作区；target 必须与会话归属一致。 */
+	sessionsRenameInTarget(id: string, title: string, target: WorkspaceTarget): Promise<RpcResult<void>>;
+	/** 在明确目标根内归档/取消归档，不切换当前工作区。 */
+	sessionsArchiveInTarget(id: string, archived: boolean, target: WorkspaceTarget): Promise<RpcResult<void>>;
+	/** 在明确目标根内删除，不切换当前工作区；当前根沿用现有会话回退语义。 */
+	sessionsDeleteInTarget(
+		ids: readonly string[],
+		target: WorkspaceTarget,
+	): Promise<RpcResult<{ deleted: readonly string[]; failed: readonly { id: string; error: string }[] }>>;
+	/** 设置或取消侧栏置顶；只接受完整会话 ID，返回更新后的置顶列表。 */
+	sessionPin(id: string, pinned: boolean): Promise<RpcResult<readonly string[]>>;
 	sessionsFork(id: string, uptoSeq?: number): Promise<RpcResult<SessionView>>;
 	sessionsExport(id: string): Promise<RpcResult<SessionExportResult | null>>;
 	sessionsReplay(id: string): Promise<RpcResult<readonly EventRecord[]>>;

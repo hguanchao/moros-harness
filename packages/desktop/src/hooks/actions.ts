@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 
 import type {
+	ProjectRef,
 	ProjectSnapshot,
 	SessionContext,
 	SessionCreateInput,
@@ -24,6 +25,8 @@ export interface DesktopActions {
 	readonly openProjectDialog: () => Promise<void>;
 	readonly openProject: (root: string) => Promise<void>;
 	readonly newTask: () => void;
+	/** 进入新任务草稿并关联明确项目归属（null 表示内部任务根），保留当前已输入内容。 */
+	readonly newTaskInProject: (project: ProjectRef | null) => void;
 	readonly selectProjectDialog: () => Promise<void>;
 	readonly createProjectDialog: (name: string) => Promise<boolean>;
 	readonly prepareTask: (target: WorkspaceTarget, generation: number) => Promise<ProjectSnapshot | undefined>;
@@ -133,6 +136,15 @@ export function useDesktopActions(): DesktopActions {
 		dispatch({ type: "new-task" });
 	}, [dispatch]);
 
+	const newTaskInProject = useCallback(
+		(project: ProjectRef | null): void => {
+			++navigationEpoch;
+			dispatch({ type: "new-task" });
+			dispatch({ type: "draft-project", project });
+		},
+		[dispatch],
+	);
+
 	const selectProjectDialog = useCallback(async (): Promise<void> => {
 		const selection = await call(window.moros.selectProjectDialog());
 		if (selection !== null) dispatch({ type: "project-selected", selection, generation });
@@ -225,6 +237,7 @@ export function useDesktopActions(): DesktopActions {
 		openProjectDialog,
 		openProject,
 		newTask,
+		newTaskInProject,
 		selectProjectDialog,
 		createProjectDialog,
 		prepareTask,

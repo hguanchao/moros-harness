@@ -20,6 +20,7 @@ import type {
 	WorkspaceTarget,
 	WorkspaceTrustView,
 } from "../shared/contract.ts";
+import { DEFAULT_SIDEBAR_WIDTH } from "../shared/contract.ts";
 import { createTaskDraft, MAX_DRAFT_IMAGES, type TaskDraft } from "./draft.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
@@ -65,7 +66,11 @@ export interface AppState {
 	readonly project: ProjectSnapshot | undefined;
 	readonly page: Page;
 	readonly sidebarOpen: boolean;
+	/** 侧栏宽度（px），从宿主持久化状态读取，拖拽时更新。 */
+	readonly sidebarWidth: number;
 	readonly sessions: readonly SessionMeta[];
+	/** 侧栏本地置顶的会话 ID；按最近置顶时间排序。 */
+	readonly pinnedSessionIds: readonly string[];
 	readonly sessionsVersion: number;
 	readonly current: SessionView | undefined;
 	readonly events: Readonly<Record<string, readonly EventRecord[]>>;
@@ -124,6 +129,8 @@ export type Action =
 	  }
 	| { readonly type: "project"; readonly project: ProjectSnapshot }
 	| { readonly type: "sessions"; readonly items: readonly SessionMeta[] }
+	| { readonly type: "pinned-sessions"; readonly ids: readonly string[] }
+	| { readonly type: "recent-projects"; readonly projects: readonly RecentProject[] }
 	| { readonly type: "session"; readonly view: SessionView }
 	| {
 			readonly type: "events";
@@ -140,6 +147,7 @@ export type Action =
 	| { readonly type: "push"; readonly message: PushMessage }
 	| { readonly type: "page"; readonly page: Page }
 	| { readonly type: "sidebar"; readonly open: boolean }
+	| { readonly type: "sidebar-width"; readonly width: number }
 	| { readonly type: "settings"; readonly settings: SettingsSnapshot }
 	| { readonly type: "models"; readonly models: ModelCatalog }
 	| { readonly type: "resolved-theme"; readonly theme: ResolvedTheme }
@@ -177,7 +185,9 @@ export const initialState: AppState = {
 	review: undefined,
 	page: "chat",
 	sidebarOpen: true,
+	sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
 	sessions: [],
+	pinnedSessionIds: [],
 	sessionsVersion: 0,
 	events: {},
 	live: {},
@@ -214,6 +224,8 @@ export function reducer(state: AppState, action: Action): AppState {
 				history,
 				historyIndex: shouldRestore ? 0 : Math.min(state.historyIndex, history.length - 1),
 				app: action.app,
+				pinnedSessionIds: action.app.pinnedSessionIds,
+				sidebarWidth: action.app.sidebarWidth,
 				project,
 				settings,
 				draft,
@@ -366,6 +378,14 @@ export function reducer(state: AppState, action: Action): AppState {
 			return state.project?.root === action.project.root ? updateWorkspace(state, action.project) : state;
 		case "sessions":
 			return { ...state, sessions: action.items };
+		case "pinned-sessions":
+			return { ...state, pinnedSessionIds: action.ids };
+		case "recent-projects":
+			return {
+				...state,
+				app: state.app === undefined ? undefined : { ...state.app, recentProjects: action.projects },
+				sessionsVersion: state.sessionsVersion + 1,
+			};
 		case "session":
 			return {
 				...selectSession(state, action.view),
@@ -392,6 +412,8 @@ export function reducer(state: AppState, action: Action): AppState {
 			return { ...state, page: action.page };
 		case "sidebar":
 			return { ...state, sidebarOpen: action.open };
+		case "sidebar-width":
+			return { ...state, sidebarWidth: action.width };
 		case "settings":
 			return {
 				...state,
@@ -545,6 +567,10 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 				...(state.current?.meta.id === message.meta.id ? { current: { ...state.current, meta: message.meta } } : {}),
 			};
 		}
+		case "session-pins":
+			return { ...state, pinnedSessionIds: message.ids };
+		case "sidebar-width":
+			return { ...state, sidebarWidth: message.width };
 		case "session-cleared": {
 			const next = {
 				...state,

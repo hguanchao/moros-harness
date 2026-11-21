@@ -15,6 +15,8 @@ import {
 	MoonIcon,
 	PaletteIcon,
 	PlusIcon,
+	PuzzleIcon,
+	RefreshIcon,
 	SearchIcon,
 	SettingsIcon,
 	SlidersHorizontalIcon,
@@ -43,7 +45,10 @@ const NAV_GROUPS: readonly NavGroup[] = [
 	},
 	{
 		title: "Agent 能力",
-		items: [["personalize", "个性化", UserCogIcon]],
+		items: [
+			["personalize", "个性化", UserCogIcon],
+			["extensions", "扩展", PuzzleIcon],
+		],
 	},
 	{
 		title: "数据与统计",
@@ -132,17 +137,13 @@ export function SettingsApp(): JSX.Element {
 				);
 			case "general":
 				return <GeneralSettings settings={settings} summary={summary} />;
-			case "workspace":
-			case "mcp":
-			case "skills":
+			case "extensions":
 				return (
-					<WorkspaceTab
-						settings={settings}
+					<ExtensionsPanel
 						summary={summary}
 						skills={skills}
 						mcp={mcp}
 						mcpHealth={mcpHealth}
-						onUpdate={update}
 						onHealth={async () => {
 							try {
 								setMcpHealth(await call(window.moros.mcpHealth()));
@@ -158,6 +159,14 @@ export function SettingsApp(): JSX.Element {
 								notice("error", errorMessage(error));
 							}
 						}}
+					/>
+				);
+			case "workspace":
+				return (
+					<WorkspaceTab
+						settings={settings}
+						summary={summary}
+						onUpdate={update}
 						onTrust={async (remember) => {
 							try {
 								dispatch({ type: "trust", trust: await call(window.moros.trustAccept(remember)) });
@@ -364,10 +373,7 @@ function AppearanceSettings({
 				</SettingsCard>
 			</SettingsSection>
 
-			<SettingsSection
-				title="主题预览"
-				description="并排预览浅色与深色代码主题，当前生效的主题会标注出来。"
-			>
+			<SettingsSection title="主题预览" description="并排预览浅色与深色代码主题，当前生效的主题会标注出来。">
 				<div className="code-preview-grid">
 					<CodePreview title="浅色预览" theme="GitHub Light" current badge="当前生效" />
 					<CodePreview title="深色预览" theme="GitHub Dark" badge="备选" />
@@ -410,6 +416,173 @@ function GeneralSettings({
 					/>
 				) : null}
 			</SettingsCard>
+		</SettingsSection>
+	);
+}
+
+type ExtensionTab = "plugins" | "skills" | "mcp";
+
+/**
+ * 扩展面板：把插件、Skills 与 MCP 三类 Agent 能力集中管理。
+ * 插件后端机制尚未落地，保留占位空态；Skills 与 MCP 直接消费已就绪的 IPC。
+ */
+function ExtensionsPanel({
+	summary,
+	skills,
+	mcp,
+	mcpHealth,
+	onHealth,
+	onReconnect,
+}: {
+	readonly summary: ConfigSummary | undefined;
+	readonly skills: readonly SkillSummary[];
+	readonly mcp: readonly McpStatus[];
+	readonly mcpHealth: readonly string[];
+	readonly onHealth: () => Promise<void>;
+	readonly onReconnect: (name: string) => Promise<void>;
+}): JSX.Element {
+	const [tab, setTab] = useState<ExtensionTab>("skills");
+	const tabs: readonly { readonly key: ExtensionTab; readonly label: string }[] = [
+		{ key: "plugins", label: "插件" },
+		{ key: "skills", label: "Skills" },
+		{ key: "mcp", label: "MCP" },
+	];
+	return (
+		<div className="extensions-panel">
+			<div className="extensions-tabs" role="tablist" aria-label="扩展类型">
+				{tabs.map((item) => (
+					<button
+						key={item.key}
+						type="button"
+						role="tab"
+						aria-selected={tab === item.key}
+						className={`settings-tab ${tab === item.key ? "is-active" : ""}`}
+						onClick={() => setTab(item.key)}
+					>
+						{item.label}
+					</button>
+				))}
+			</div>
+			{/* key 绑定标签，切换时重挂载子视图以播放入场动画 */}
+			<div className="extensions-body" key={tab}>
+				{tab === "plugins" ? <PluginsEmpty /> : null}
+				{tab === "skills" ? <SkillsPanel skills={skills} summary={summary} /> : null}
+				{tab === "mcp" ? (
+					<McpPanel mcp={mcp} mcpHealth={mcpHealth} onHealth={onHealth} onReconnect={onReconnect} />
+				) : null}
+			</div>
+		</div>
+	);
+}
+
+/** 插件占位：后端尚无插件机制，明确说明现状而不提供无响应的操作按钮。 */
+function PluginsEmpty(): JSX.Element {
+	return (
+		<SettingsSection title="插件" description="发现与管理扩展包，为 Agent 添加新的工具与工作流。">
+			<div className="settings-coming-soon">
+				<div className="settings-coming-soon-icon">
+					<PuzzleIcon size={22} />
+				</div>
+				<h2>插件能力即将推出</h2>
+				<p>插件机制正在建设中。目前可通过 Skills 与 MCP 为 Agent 扩展能力，两者可在上方标签切换查看。</p>
+			</div>
+		</SettingsSection>
+	);
+}
+
+/** Skills：展示用户级与项目级技能；技能通过文件系统中的 SKILL.md 添加。 */
+function SkillsPanel({
+	skills,
+	summary,
+}: {
+	readonly skills: readonly SkillSummary[];
+	readonly summary: ConfigSummary | undefined;
+}): JSX.Element {
+	return (
+		<SettingsSection title="Skills" description="来自用户目录与当前项目的技能，模型按各技能的 SKILL.md 读取完整说明。">
+			{skills.length === 0 ? (
+				<div className="settings-empty-hint">
+					没有可用技能。在用户技能目录或项目的 <code>.moros/skills</code> 下添加 <code>SKILL.md</code> 即可被发现。
+				</div>
+			) : (
+				<div className="skill-list">
+					{skills.map((skill) => (
+						<div className="skill-row" key={`${skill.scope}:${skill.path}`}>
+							<span className={`pill ${skill.scope === "project" ? "warn" : ""}`}>
+								{skill.scope === "project" ? "项目" : "用户"}
+							</span>
+							<strong>{skill.name}</strong>
+							<span>{skill.description}</span>
+						</div>
+					))}
+				</div>
+			)}
+			{summary !== undefined && summary.skipped.length > 0 ? (
+				<div className="inline-notice notice-warn">
+					跳过条目：{summary.skipped.map((item) => `${item.path}（${item.reason}）`).join("；")}
+				</div>
+			) : null}
+		</SettingsSection>
+	);
+}
+
+/** MCP：外部工具服务器的连接状态，支持健康检查与重连。 */
+function McpPanel({
+	mcp,
+	mcpHealth,
+	onHealth,
+	onReconnect,
+}: {
+	readonly mcp: readonly McpStatus[];
+	readonly mcpHealth: readonly string[];
+	readonly onHealth: () => Promise<void>;
+	readonly onReconnect: (name: string) => Promise<void>;
+}): JSX.Element {
+	const connected = mcp.filter((server) => server.status === "connected").length;
+	return (
+		<SettingsSection
+			title="MCP"
+			description="外部工具服务器为 Agent 提供额外工具；在配置文件中添加 server 后在此查看连接状态。"
+		>
+			<div className="section-head">
+				<span className="mcp-summary">
+					{mcp.length === 0 ? "未配置 server" : `${connected} / ${mcp.length} 已连接`}
+				</span>
+				<button className="ghost-button small" onClick={() => void onHealth()}>
+					<RefreshIcon size={13} />
+					健康检查
+				</button>
+			</div>
+			{mcp.length === 0 ? (
+				<div className="settings-empty-hint">没有配置 MCP server。在配置文件中添加后，连接状态会显示在这里。</div>
+			) : (
+				<div className="mcp-list">
+					{mcp.map((server) => {
+						const isConnected = server.status === "connected";
+						return (
+							<div className="mcp-row" key={server.name}>
+								<span className={`status-dot status-${isConnected ? "ok" : "error"}`} />
+								<strong>{server.name}</strong>
+								<span className="pill">{server.status}</span>
+								<span className="mcp-detail">{server.detail}</span>
+								<button className="ghost-button small" onClick={() => void onReconnect(server.name)}>
+									重连
+								</button>
+							</div>
+						);
+					})}
+				</div>
+			)}
+			{mcpHealth.length > 0 ? (
+				<div className="mcp-health-output">
+					<div className="detail-label">健康检查输出</div>
+					{mcpHealth.map((line) => (
+						<div className="mcp-health" key={line}>
+							{line}
+						</div>
+					))}
+				</div>
+			) : null}
 		</SettingsSection>
 	);
 }

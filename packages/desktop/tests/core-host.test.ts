@@ -10,11 +10,14 @@ import { DesktopHost } from "../src/main/core-host.ts";
 import { registerIpc } from "../src/main/ipc.ts";
 import { DesktopStore } from "../src/main/store.ts";
 import {
+	DEFAULT_SIDEBAR_WIDTH,
 	IPC,
+	MIN_SIDEBAR_WIDTH,
 	type DesktopBridge,
 	type PushMessage,
 	type RpcResult,
 	type SessionCreateInput,
+	type WorkspaceTarget,
 } from "../src/shared/contract.ts";
 
 type IpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => Promise<RpcResult<unknown>>;
@@ -27,6 +30,8 @@ const electronMock = vi.hoisted(() => {
 		showSaveDialog: vi.fn(),
 		invoke: vi.fn(),
 		expose: vi.fn(),
+		openPath: vi.fn(),
+		writeText: vi.fn(),
 		handle: vi.fn((channel: string, handler: IpcHandler) => handlers.set(channel, handler)),
 	};
 });
@@ -34,7 +39,8 @@ const electronMock = vi.hoisted(() => {
 vi.mock("electron", () => ({
 	dialog: { showOpenDialog: electronMock.showOpenDialog, showSaveDialog: electronMock.showSaveDialog },
 	Notification: { isSupported: () => false },
-	shell: { beep: vi.fn(), openExternal: vi.fn() },
+	shell: { beep: vi.fn(), openExternal: vi.fn(), openPath: electronMock.openPath },
+	clipboard: { writeText: electronMock.writeText },
 	ipcMain: { handle: electronMock.handle },
 	contextBridge: { exposeInMainWorld: electronMock.expose },
 	ipcRenderer: { invoke: electronMock.invoke, on: vi.fn(), removeListener: vi.fn() },
@@ -117,6 +123,8 @@ beforeEach(() => {
 	electronMock.showSaveDialog.mockReset().mockResolvedValue({ canceled: true });
 	electronMock.invoke.mockReset().mockResolvedValue({ ok: true, value: null });
 	electronMock.expose.mockClear();
+	electronMock.openPath.mockReset().mockResolvedValue("");
+	electronMock.writeText.mockReset();
 });
 
 afterEach(async () => {
@@ -146,13 +154,11 @@ describe("DesktopHost initialization", () => {
 		await expect(access(join(snapshot.taskRoot, ".moros"))).rejects.toMatchObject({ code: "ENOENT" });
 	});
 
-	it("恢复最近真实项目最新活动未归档会话，而不是最新创建或归档会话", async () => {
+	it("有最近项目与可恢复会话时，启动仍回落 tasks 新建任务页，不恢复旧会话", async () => {
 		const input = await fixture();
 		const root = await projectDirectory(input, "project");
 		const older = await savedSession(input.core, root, "older");
 		await savedSession(input.core, root, "newer");
-		const archived = await savedSession(input.core, root, "archived");
-		await input.core.archiveSession(archived, true);
 		await older.append({ type: "user.input", payload: { text: "most recent activity" } });
 		await (await DesktopStore.open(input.userDataDir)).rememberProject(root);
 		const { host } = await openHost(input);
@@ -160,17 +166,19 @@ describe("DesktopHost initialization", () => {
 
 		const snapshot = await host.initialize();
 
-		expect(snapshot.project?.target).toEqual({ kind: "project", root });
-		expect(snapshot.project?.session?.meta.id).toBe(older.meta.id);
-		expect(snapshot.project?.session?.readOnly).toBe(false);
+		expect(snapshot.project?.target).toEqual({ kind: "tasks" });
+		expect(snapshot.project?.root).toBe(snapshot.taskRoot);
+		expect(snapshot.project?.session).toBeUndefined();
+		// 最近项目仍保留在侧栏列表，只是启动时不被打开。
+		expect(snapshot.recentProjects.map((project) => project.root)).toEqual([root]);
 		expect(create).not.toHaveBeenCalled();
 		expect(electronMock.showOpenDialog).not.toHaveBeenCalled();
-		await host.dispose();
+		// 旧会话未被激活，仍可被其他窗口正常加锁。
 		await input.core.acquireSessionLease(older);
 		await input.core.releaseSessionLease(older.meta.id);
 	});
 
-	it.each([false, true])("最近项目无可恢复会话（全归档=%s）时不补建", async (hasArchived) => {
+	it.each([false, true])("最近项目会话归档状态=%s 不影响启动回落 tasks", async (hasArchived) => {
 		const input = await fixture();
 		const root = await projectDirectory(input, "project");
 		if (hasArchived) {
@@ -183,28 +191,26 @@ describe("DesktopHost initialization", () => {
 
 		const snapshot = await host.initialize();
 
-		expect(snapshot.project?.root).toBe(root);
-		expect(snapshot.project?.session).toBeUndefined();
-		expect(create).not.toHaveBeenCalled();
-		expect((await host.listSessions({ includeArchived: true })).items).toHaveLength(hasArchived ? 1 : 0);
-	});
-
-	it("恢复快照失败释放半初始化 Core/租约，回到 tasks 无会话", async () => {
-		const input = await fixture();
-		const root = await projectDirectory(input, "project");
-		const session = await savedSession(input.core, root, "saved");
-		await (await DesktopStore.open(input.userDataDir)).rememberProject(root);
-		const { host, messages } = await openHost(input);
-		vi.spyOn(Core.prototype, "getSessionMetrics").mockRejectedValueOnce(new Error("metrics unavailable"));
-		const dispose = vi.spyOn(Core.prototype, "dispose");
-
-		const snapshot = await host.initialize();
-
 		expect(snapshot.project?.target).toEqual({ kind: "tasks" });
 		expect(snapshot.project?.root).toBe(snapshot.taskRoot);
 		expect(snapshot.project?.session).toBeUndefined();
-		expect(dispose).toHaveBeenCalledTimes(1);
-		expect(messages).toContainEqual(expect.objectContaining({ type: "notice", level: "warn" }));
+		expect(snapshot.recentProjects.map((project) => project.root)).toEqual([root]);
+		expect(create).not.toHaveBeenCalled();
+	});
+
+	it("显式打开项目时恢复快照失败，释放半初始化 Core/租约并回到 tasks", async () => {
+		const input = await fixture();
+		const root = await projectDirectory(input, "project");
+		const session = await savedSession(input.core, root, "saved");
+		const { host } = await openHost(input);
+		await host.initialize();
+		vi.spyOn(Core.prototype, "getSessionMetrics").mockRejectedValueOnce(new Error("metrics unavailable"));
+		const dispose = vi.spyOn(Core.prototype, "dispose");
+
+		await expect(host.openProject(root)).rejects.toThrow("metrics unavailable");
+
+		expect(dispose).toHaveBeenCalled();
+		// 失败的激活没有占住会话租约，仍可被其他窗口加锁。
 		await input.core.acquireSessionLease(session);
 		await input.core.releaseSessionLease(session.meta.id);
 	});
@@ -533,6 +539,121 @@ describe("DesktopHost explicit session ownership", () => {
 		expect(prepared.session).toBeUndefined();
 		expect(host.workspaceRoot()).toBe(prepared.root);
 	});
+
+	it("明确 target 的重命名/归档/删除跨项目生效，且不切换当前工作区与会话", async () => {
+		const input = await fixture();
+		const projectRoot = await projectDirectory(input, "cross-target");
+		const saved = await savedSession(input.core, projectRoot, "cross project task");
+		const { host, messages } = await openHost(input);
+		const initial = await host.initialize();
+		const current = await host.createSession({ target: { kind: "tasks" } });
+		await host.renameSession(current.session.meta.id, "current task");
+		const before = host.workspaceRoot();
+		const target: WorkspaceTarget = { kind: "project", root: projectRoot };
+
+		await host.renameSessionInTarget(saved.meta.id, "renamed cross", target);
+		expect((await input.core.openSession(saved.meta.id)).meta.title).toBe("renamed cross");
+		await host.archiveSessionInTarget(saved.meta.id, true, target);
+		expect((await input.core.openSession(saved.meta.id)).meta.archived).toBe(true);
+		const result = await host.deleteSessionsInTarget([saved.meta.id], target);
+
+		expect(result.deleted).toEqual([saved.meta.id]);
+		await expect(input.core.openSession(saved.meta.id)).rejects.toThrow();
+		expect(host.workspaceRoot()).toBe(before);
+		expect((await host.projectSnapshot()).session?.meta.id).toBe(current.session.meta.id);
+		expect(messages).toContainEqual({ type: "sessions-changed" });
+		expect(initial.taskRoot.length).toBeGreaterThan(0);
+	});
+
+	it("明确 target 与会话归属不符时拒绝操作", async () => {
+		const input = await fixture();
+		const projectRoot = await projectDirectory(input, "owner");
+		const otherRoot = await projectDirectory(input, "other");
+		const saved = await savedSession(input.core, projectRoot, "owned task");
+		const { host } = await openHost(input);
+		await host.initialize();
+		await host.prepareWorkspace({ kind: "project", root: projectRoot });
+
+		await expect(
+			host.renameSessionInTarget(saved.meta.id, "wrong", { kind: "project", root: otherRoot }),
+		).rejects.toThrow("does not belong");
+		await expect(
+			host.archiveSessionInTarget(saved.meta.id, true, { kind: "project", root: otherRoot }),
+		).rejects.toThrow("does not belong");
+		const result = await host.deleteSessionsInTarget([saved.meta.id], { kind: "project", root: otherRoot });
+		expect(result.deleted).toEqual([]);
+		expect((await input.core.openSession(saved.meta.id)).meta.id).toBe(saved.meta.id);
+	});
+
+	it("置顶只接受完整会话 ID，并写入本地状态", async () => {
+		const input = await fixture();
+		const { host, messages } = await openHost(input);
+		await host.initialize();
+		const context = await host.createSession({ target: { kind: "tasks" } });
+		const id = context.session.meta.id;
+
+		await expect(host.pinSession(id.slice(0, 8), true)).rejects.toThrow("full session ID");
+		expect(await host.pinSession(id, true)).toEqual([id]);
+		expect((await DesktopStore.open(input.userDataDir)).pinnedSessionIds()).toEqual([id]);
+		expect(messages).toContainEqual({ type: "session-pins", ids: [id] });
+		expect(await host.pinSession(id, false)).toEqual([]);
+	});
+
+	it("侧栏宽度在快照中返回默认值，设置后持久化并推送更新", async () => {
+		const input = await fixture();
+		const { host, messages } = await openHost(input);
+		const initial = await host.initialize();
+		expect(initial.sidebarWidth).toBe(DEFAULT_SIDEBAR_WIDTH);
+
+		expect(await host.setSidebarWidth(320)).toBe(320);
+		expect((await host.initialize()).sidebarWidth).toBe(320);
+		expect((await DesktopStore.open(input.userDataDir)).sidebarWidth()).toBe(320);
+		expect(messages).toContainEqual({ type: "sidebar-width", width: 320 });
+		expect(await host.setSidebarWidth(100)).toBe(MIN_SIDEBAR_WIDTH);
+	});
+
+	it("项目文件夹/路径/移除操作只接受已登记目录，且不切换工作区", async () => {
+		const input = await fixture();
+		const projectRoot = await projectDirectory(input, "registered");
+		const { host } = await openHost(input);
+		await host.initialize();
+		await host.prepareWorkspace({ kind: "project", root: projectRoot });
+
+		await host.openProjectFolder(projectRoot);
+		expect(electronMock.openPath).toHaveBeenCalledWith(projectRoot);
+		await host.copyProjectPath(projectRoot);
+		expect(electronMock.writeText).toHaveBeenCalledWith(projectRoot);
+
+		const unregistered = await projectDirectory(input, "unregistered");
+		await expect(host.openProjectFolder(unregistered)).rejects.toThrow("尚未登记");
+		await expect(host.copyProjectPath(unregistered)).rejects.toThrow("尚未登记");
+
+		electronMock.openPath.mockResolvedValueOnce("open failed");
+		await expect(host.openProjectFolder(projectRoot)).rejects.toThrow("无法打开项目文件夹");
+
+		await expect(host.forgetProject(projectRoot)).rejects.toThrow("当前项目无法从侧栏移除");
+		await host.prepareWorkspace({ kind: "tasks" });
+		const tasksRoot = host.workspaceRoot();
+		const recent = await host.forgetProject(projectRoot);
+		expect(recent.map((project) => project.root)).toEqual([]);
+		expect((await DesktopStore.open(input.userDataDir)).recentProjects()).toEqual([]);
+		expect(host.workspaceRoot()).toBe(tasksRoot);
+		await expect(host.forgetProject(projectRoot)).rejects.toThrow("尚未登记");
+	});
+
+	it("失效的最近项目记录可从侧栏移除，不触碰磁盘目录", async () => {
+		const input = await fixture();
+		const projectRoot = await projectDirectory(input, "stale");
+		const { host } = await openHost(input);
+		await host.initialize();
+		await host.prepareWorkspace({ kind: "project", root: projectRoot });
+		await host.prepareWorkspace({ kind: "tasks" });
+		await rm(projectRoot, { recursive: true, force: true });
+
+		const recent = await host.forgetProject(projectRoot);
+		expect(recent.map((project) => project.root)).toEqual([]);
+		expect((await DesktopStore.open(input.userDataDir)).recentProjects()).toEqual([]);
+	});
 });
 
 describe("DesktopHost running drafts and prepared images", () => {
@@ -806,19 +927,35 @@ describe("desktop workspace IPC and preload", () => {
 
 		await bridge.selectProjectDialog();
 		await bridge.createProjectDialog("project");
+		await bridge.openProjectFolder("/projects/app");
+		await bridge.copyProjectPath("/projects/app");
+		await bridge.forgetProject("/projects/app");
 		await bridge.prepareWorkspace(target);
 		await bridge.sessionsCreate(input);
 		await bridge.sessionsActivate("session-id");
 		await bridge.sessionsList({ target });
+		await bridge.sessionsRenameInTarget("session-id", "renamed", target);
+		await bridge.sessionsArchiveInTarget("session-id", true, target);
+		await bridge.sessionsDeleteInTarget(["session-id"], target);
+		await bridge.sessionPin("session-id", true);
+		await bridge.sidebarSetWidth(320);
 		await bridge.chatSend({ sessionId: "session-id", text: "message" });
 
 		expect(electronMock.invoke.mock.calls).toEqual([
 			[IPC.appSelectProjectDialog],
 			[IPC.appCreateProjectDialog, "project"],
+			[IPC.appOpenProjectFolder, "/projects/app"],
+			[IPC.appCopyProjectPath, "/projects/app"],
+			[IPC.appForgetProject, "/projects/app"],
 			[IPC.workspacePrepare, target],
 			[IPC.sessionsCreate, input],
 			[IPC.sessionsActivate, "session-id"],
 			[IPC.sessionsList, { target }],
+			[IPC.sessionsRenameInTarget, "session-id", "renamed", target],
+			[IPC.sessionsArchiveInTarget, "session-id", true, target],
+			[IPC.sessionsDeleteInTarget, ["session-id"], target],
+			[IPC.sessionPin, "session-id", true],
+			[IPC.sidebarSetWidth, 320],
 			[IPC.chatSend, { sessionId: "session-id", text: "message" }],
 		]);
 	});

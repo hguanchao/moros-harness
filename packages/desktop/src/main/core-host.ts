@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { basename, join } from "node:path";
 
-import { Notification, dialog, shell, type BrowserWindow } from "electron";
+import { clipboard, Notification, dialog, shell, type BrowserWindow } from "electron";
 
 import {
 	Core,
@@ -202,6 +202,18 @@ export class DesktopHost {
 		return this.#store.isMaximized();
 	}
 
+	/** 持久化侧栏宽度；渲染层拖拽结束后调用，返回钳制后的实际值。 */
+	async setSidebarWidth(width: number): Promise<number> {
+		const clamped = await this.#store.setSidebarWidth(width);
+		this.#push({ type: "sidebar-width", width: clamped });
+		return clamped;
+	}
+
+	/**
+	 * 建立初始工作区并返回应用快照。
+	 * 首次启动始终落在内部任务根的新建任务页：最近项目只保留在侧栏列表，
+	 * 不自动打开其工作区或恢复旧会话；已打开的工作区仅刷新快照，避免打断当前任务。
+	 */
 	async initialize(): Promise<AppSnapshot> {
 		return this.#withWorkspace(async () => {
 			let project: ProjectSnapshot | undefined;
@@ -209,22 +221,15 @@ export class DesktopHost {
 				// appState 也是刷新入口；picker-only 更新最近项目不能使它跳到另一个执行根。
 				project = await this.projectSnapshot();
 			} else {
-				const last = this.#recentProjects()[0];
-				if (last !== undefined) {
-					try {
-						project = await this.#openProject(last.root);
-					} catch (error) {
-						this.#notice("warn", `Could not reopen the recent project: ${messageOf(error)}`);
-						await this.#teardownProject();
-					}
-				}
-				project ??= await this.#prepareWorkspace({ kind: "tasks" });
+				project = await this.#prepareWorkspace({ kind: "tasks" });
 			}
 			return {
 				version: VERSION,
 				platform: process.platform,
 				taskRoot: this.#taskRoot,
 				recentProjects: this.#recentProjects(),
+				sidebarWidth: this.#store.sidebarWidth(),
+				pinnedSessionIds: this.#store.pinnedSessionIds(),
 				project,
 			};
 		});
@@ -346,6 +351,42 @@ export class DesktopHost {
 		return root;
 	}
 
+	/**
+	 * 在系统文件管理器中打开已登记项目目录；不切换执行工作区。
+	 * @param root 最近项目中的目录，不接受任意路径或任务根。
+	 * @throws DesktopWorkspaceError 目录未登记或打开失败时。
+	 */
+	async openProjectFolder(root: string): Promise<void> {
+		const projectRoot = await this.#knownProjectRoot(root);
+		const failure = await shell.openPath(projectRoot);
+		if (failure.length > 0) throw new DesktopWorkspaceError("open-folder-failed", "无法打开项目文件夹");
+	}
+
+	/** 复制已登记项目的规范路径到剪贴板；不切换执行工作区。 */
+	async copyProjectPath(root: string): Promise<void> {
+		const projectRoot = await this.#knownProjectRoot(root);
+		clipboard.writeText(projectRoot);
+	}
+
+	/**
+	 * 从最近项目列表移除；不删除目录或会话，也不允许移除当前正在使用的项目。
+	 * @param root 最近项目中的目录；允许目录已失效，以便清理陈旧记录。
+	 * @returns 更新后的最近项目列表。
+	 * @throws DesktopWorkspaceError 未登记或为当前工作区时。
+	 */
+	async forgetProject(root: string): Promise<readonly RecentProject[]> {
+		const matching = this.#store
+			.recentProjects()
+			.find((project) => normalizeProjectRoot(project.root) === normalizeProjectRoot(root));
+		if (matching === undefined) throw new DesktopWorkspaceError("invalid-project", "项目尚未登记");
+		const active = this.#projectRoot;
+		if (active !== undefined && normalizeProjectRoot(active) === normalizeProjectRoot(matching.root)) {
+			throw new DesktopWorkspaceError("project-active", "当前项目无法从侧栏移除");
+		}
+		await this.#store.forgetProject(matching.root);
+		return this.#recentProjects();
+	}
+
 	async projectSnapshot(): Promise<ProjectSnapshot> {
 		return this.#projectSnapshot(this.#current);
 	}
@@ -426,10 +467,12 @@ export class DesktopHost {
 			}
 		}
 		const result = await core.deleteSessions(allowed);
+		const deletedSet = new Set(result.deleted);
+		if (deletedSet.size > 0) await this.#store.unpinSessions(result.deleted);
 		const currentId = this.#current?.meta.id;
-		const clearedId = currentId !== undefined && result.deleted.includes(currentId) ? currentId : undefined;
+		const clearedId = currentId !== undefined && deletedSet.has(currentId) ? currentId : undefined;
 		if (result.deleted.length > 0) {
-			const deleted = new Set(result.deleted);
+			const deleted = deletedSet;
 			this.#queue = this.#queue.filter((entry) => !deleted.has(entry.sessionId));
 		}
 		for (const id of result.deleted) {
@@ -442,6 +485,7 @@ export class DesktopHost {
 		}
 		await this.#refreshMetas();
 		this.#push({ type: "sessions-changed" });
+		if (deletedSet.size > 0) this.#push({ type: "session-pins", ids: this.#store.pinnedSessionIds() });
 		if (clearedId !== undefined) {
 			const latest = this.#metas.filter((meta) => !meta.archived).at(-1);
 			if (latest !== undefined) {
@@ -451,6 +495,98 @@ export class DesktopHost {
 			}
 		}
 		return { deleted: result.deleted, failed: [...rejected, ...result.failed] };
+	}
+
+	/**
+	 * 明确目标根内的重命名；不切换工作区，目标须与会话归属一致。
+	 */
+	async renameSessionInTarget(id: string, title: string, target: WorkspaceTarget): Promise<void> {
+		const session = await this.#sessionForTarget(id, target);
+		await this.#requiredCore().renameSession(session, title);
+		await this.#refreshMetas();
+		this.#pushMeta(id);
+		this.#push({ type: "sessions-changed" });
+		await this.#pushViewIfCurrent(id);
+	}
+
+	/** 明确目标根内的归档/取消归档；不切换工作区。 */
+	async archiveSessionInTarget(id: string, archived: boolean, target: WorkspaceTarget): Promise<void> {
+		const session = await this.#sessionForTarget(id, target);
+		await this.#requiredCore().archiveSession(session, archived);
+		await this.#refreshMetas();
+		this.#pushMeta(id);
+		this.#push({ type: "sessions-changed" });
+		await this.#pushViewIfCurrent(id);
+	}
+
+	/**
+	 * 明确目标根内的批量删除；当前根沿用现有会话回退，其它根只清理缓存。
+	 */
+	async deleteSessionsInTarget(
+		ids: readonly string[],
+		target: WorkspaceTarget,
+	): Promise<{ deleted: readonly string[]; failed: readonly { id: string; error: string }[] }> {
+		const targetRoot = await this.#resolveTarget(target);
+		const isCurrent =
+			this.#projectRoot !== undefined && normalizeProjectRoot(this.#projectRoot) === normalizeProjectRoot(targetRoot);
+		if (isCurrent) return this.#withWorkspace(() => this.#deleteSessions(ids));
+
+		const allowed: string[] = [];
+		const rejected: { id: string; error: string }[] = [];
+		for (const id of ids) {
+			try {
+				const session = await this.#sessionForTarget(id, target);
+				if (
+					this.#activeRun?.sessionId === session.meta.id ||
+					this.#queue.some((e) => e.sessionId === session.meta.id)
+				) {
+					throw new Error("Session is running or has queued messages");
+				}
+				allowed.push(id);
+			} catch (error) {
+				rejected.push({ id, error: messageOf(error) });
+			}
+		}
+		const result = await this.#requiredCore().deleteSessions(allowed);
+		const deleted = new Set(result.deleted);
+		if (deleted.size > 0) await this.#store.unpinSessions(result.deleted);
+		for (const id of result.deleted) {
+			this.#sessions.delete(id);
+			this.#readOnlyIds.delete(id);
+			this.#createdSessionIds.delete(id);
+			this.#live.delete(id);
+			this.#dropSubscription(id);
+		}
+		await this.#refreshMetas();
+		this.#push({ type: "sessions-changed" });
+		if (deleted.size > 0) {
+			const pins = this.#store.pinnedSessionIds();
+			this.#push({ type: "session-pins", ids: pins });
+		}
+		return { deleted: result.deleted, failed: [...rejected, ...result.failed] };
+	}
+
+	/** 设置或取消侧栏置顶；只接受完整会话 ID，不切换工作区。 */
+	async pinSession(id: string, pinned: boolean): Promise<readonly string[]> {
+		const session = await this.#requiredCore().openSession(id);
+		if (session.meta.id !== id) throw new Error("A full session ID is required");
+		const ids = await this.#store.setPinned(id, pinned);
+		this.#push({ type: "session-pins", ids });
+		return ids;
+	}
+
+	/**
+	 * 按明确目标根解析会话，并校验归属一致；不依赖当前工作区。
+	 */
+	async #sessionForTarget(id: string, target: WorkspaceTarget): Promise<Session> {
+		const core = this.#requiredCore();
+		const targetRoot = await this.#resolveTarget(target);
+		const session = await core.openSession(id);
+		if (normalizeProjectRoot(session.meta.projectRoot) !== normalizeProjectRoot(targetRoot)) {
+			throw new Error("Session does not belong to the requested target");
+		}
+		this.#sessions.set(session.meta.id, session);
+		return session;
 	}
 
 	async forkSession(id: string, uptoSeq?: number): Promise<SessionView> {

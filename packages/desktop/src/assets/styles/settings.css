@@ -77,7 +77,7 @@
 .field select {
 	height: 33px;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-chrome);
 	padding: 0 10px;
 	outline: none;
@@ -139,7 +139,7 @@
 	gap: 16px;
 	padding: 13px 15px;
 	border: 1px solid var(--line);
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 }
 
@@ -182,7 +182,7 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 	padding: 1px 5px;
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	background: var(--fill-soft);
 }
 

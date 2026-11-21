@@ -15,6 +15,7 @@
 		"dompurify": "^3.4.18",
 		"highlight.js": "11.11.2",
 		"lowlight": "^3.3.0",
+		"lucide-react": "^1.76.0",
 		"marked": "18.1.1",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1",

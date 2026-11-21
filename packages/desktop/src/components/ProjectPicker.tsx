@@ -186,8 +186,13 @@ function CreateProjectDialog({ onClose }: { readonly onClose: () => void }): JSX
 					void create();
 				}}
 			>
-				<h2 id={titleId}>创建项目</h2>
-				<p>选择父目录后，新建一个同名文件夹作为项目；不会初始化 Git 或添加模板。</p>
+				<div className="modal-head">
+					<h2 id={titleId}>创建项目</h2>
+					<button type="button" className="icon-button" aria-label="关闭" onClick={onClose} disabled={isCreating}>
+						<XIcon size={16} />
+					</button>
+				</div>
+				<p className="project-create-desc">选择父目录后，新建一个同名文件夹作为项目；不会初始化 Git 或添加模板。</p>
 				<label htmlFor={nameId}>项目名称</label>
 				<input
 					id={nameId}

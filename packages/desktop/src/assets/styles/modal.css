@@ -1,5 +1,6 @@
-/* ---------- 信任 / 模态框 ---------- */
+/* ---------- 弹窗 / 模态框（全局统一） ---------- */
 
+/* 遮罩层：所有弹窗共用 */
 .trust-overlay,
 .modal-backdrop {
 	position: fixed;
@@ -8,35 +9,107 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 28px;
-	backdrop-filter: blur(3px);
+	padding: var(--modal-backdrop-padding);
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(4px);
+	animation: overlay-in var(--duration-normal) var(--ease-standard);
 }
 
-.trust-card {
-	width: min(600px, 100%);
-	padding: 26px;
+/* 原生 dialog 的遮罩 */
+.project-create-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.5);
+	backdrop-filter: blur(4px);
+	animation: overlay-in var(--duration-normal) var(--ease-standard);
+}
+
+/* 卡片入场：所有弹窗从中心轻微上浮缩放淡入，与遮罩淡入同步 */
+.modal,
+.rename-dialog,
+.trust-card,
+.project-create-dialog {
+	animation: modal-in var(--duration-slow) var(--ease-out);
+}
+
+/* 容器：统一卡片材质、内边距与圆角 */
+.modal,
+.rename-dialog,
+.trust-card,
+.project-create-dialog {
+	max-height: min(80vh, 760px);
+	overflow: auto;
+	padding: var(--modal-card-padding);
 	border: 1px solid var(--line-strong);
-	border-radius: 16px;
-	background: var(--surface-chrome);
+	border-radius: 14px;
+	background: var(--modal-card-bg);
+	color: var(--text-primary);
 	box-shadow: var(--shadow);
 }
 
-.trust-icon {
-	width: 44px;
-	height: 44px;
-	display: grid;
-	place-items: center;
-	border-radius: 12px;
-	background: var(--fill-soft);
-	margin-bottom: 12px;
+/* 各弹窗宽度作为修饰单独保留 */
+.modal {
+	width: min(760px, 100%);
 }
 
-.trust-card h2 {
-	margin: 0 0 6px;
+.modal.review-modal {
+	width: min(820px, 100%);
+}
+
+.modal.discover-modal {
+	width: min(880px, 100%);
+}
+
+.rename-dialog {
+	width: min(400px, 100%);
+}
+
+.trust-card {
+	width: min(560px, 100%);
+}
+
+.project-create-dialog {
+	width: min(440px, calc(100% - 32px));
+}
+
+/* 标题头：统一排版与关闭按钮对齐 */
+.modal-head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 18px;
+}
+
+.modal-head h2,
+.modal-head h3,
+.trust-card h2,
+.project-create-dialog h2 {
+	margin: 0;
+	font-size: 18px;
+	font-weight: 600;
+	line-height: 1.4;
+	color: var(--text-primary);
+}
+
+/* 信任弹窗标题栏：图标与标题同行 */
+.trust-heading {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+
+.trust-icon {
+	width: 40px;
+	height: 40px;
+	display: grid;
+	place-items: center;
+	flex: none;
+	border-radius: var(--r-xl);
+	background: var(--fill-soft);
+	color: var(--text-primary);
 }
 
 .trust-card p {
-	margin: 0 0 12px;
+	margin: 0 0 16px;
 	color: var(--text-secondary);
 	font-size: var(--text-ui);
 }
@@ -53,45 +126,18 @@
 	line-height: 1.7;
 }
 
-.trust-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-}
-
-.modal {
-	width: min(760px, 100%);
-	max-height: min(78vh, 760px);
-	overflow: auto;
-	padding: 20px;
-	border: 1px solid var(--line-strong);
-	border-radius: 15px;
-	background: var(--surface-chrome);
-	box-shadow: var(--shadow);
-}
-
-.modal.review-modal {
-	width: min(820px, 100%);
-}
-
-.modal-head {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 12px;
-	margin-bottom: 14px;
-}
-
-.modal-head h2,
-.modal-head h3 {
-	margin: 0;
-}
-
-.modal-actions {
+/* 底部操作区：统一间距与右对齐 */
+.modal-actions,
+.trust-actions,
+.project-create-actions {
 	display: flex;
 	justify-content: flex-end;
-	gap: 8px;
-	margin-top: 16px;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+.trust-actions {
+	flex-wrap: wrap;
 }
 
 .review-running {
@@ -102,16 +148,87 @@
 	color: var(--text-secondary);
 }
 
-.text-input {
+/* 输入框：统一高度、边框与聚焦态 */
+.text-input,
+.project-create-dialog input {
 	width: 100%;
 	height: 36px;
-	border: 1px solid var(--line-strong);
-	border-radius: 8px;
-	background: var(--surface-main);
 	padding: 0 10px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-lg);
+	background: var(--surface-main);
+	color: var(--text-primary);
+	font-size: var(--text-ui);
 	outline: none;
 }
 
-.text-input:focus {
-	border-color: var(--text-faint);
+.text-input:focus,
+.project-create-dialog input:focus {
+	border-color: var(--accent-ring);
+}
+
+/* ---------- 完全访问二次确认（沿用重命名弹窗的朴素样式） ---------- */
+
+/* 确认类弹窗内容较紧凑，单独收窄内边距，不影响重命名弹窗 */
+.rename-dialog.yolo-dialog {
+	padding: var(--modal-card-padding-compact);
+}
+
+.yolo-intro {
+	margin: 0 0 14px;
+	color: var(--text-secondary);
+	font-size: var(--text-small);
+	line-height: 1.6;
+}
+
+/* 风险列表：无卡片背景，仅用图标与文字，贴合主题 */
+.yolo-risk-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin: 0 0 16px;
+	padding: 0;
+	list-style: none;
+}
+
+.yolo-risk-list li {
+	display: flex;
+	align-items: flex-start;
+	gap: 9px;
+}
+
+.yolo-risk-list li > svg {
+	margin-top: 2px;
+	flex: none;
+	color: var(--text-dim);
+}
+
+.yolo-risk-list li > div {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+}
+
+.yolo-risk-list strong {
+	font-size: var(--text-small);
+	font-weight: 600;
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+
+.yolo-risk-list li > div > span {
+	font-size: var(--text-caption);
+	line-height: 1.5;
+	color: var(--text-faint);
+}
+
+label.yolo-confirm-check {
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	gap: 9px;
+	cursor: pointer;
+	color: var(--text-secondary);
+	font-size: var(--text-small);
 }

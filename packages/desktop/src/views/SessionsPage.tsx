@@ -137,7 +137,7 @@ export function SessionsPage(): JSX.Element {
 						</button>
 						<span className="session-table-time">{relativeTime(meta.updatedAt)}</span>
 						<span className="session-table-state">
-							{state.runStates[meta.id] === "running" ? <span className="pill accent">运行中</span> : null}
+							{state.runStates[meta.id] === "running" ? <span className="pill accent is-running">运行中</span> : null}
 							{meta.archived ? <span className="pill">已归档</span> : null}
 							{state.current?.meta.id === meta.id ? <span className="pill accent">当前</span> : null}
 							{meta.forkedFrom !== undefined ? <span className="pill">分叉</span> : null}

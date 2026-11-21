@@ -16,7 +16,9 @@ type WorkspaceErrorCode =
 	| "invalid-project"
 	| "invalid-project-name"
 	| "project-exists"
-	| "project-create-failed";
+	| "project-create-failed"
+	| "project-active"
+	| "open-folder-failed";
 
 /**
  * 主进程工作区业务错误；IPC 只公开 code/message，保留 cause 供内部诊断。

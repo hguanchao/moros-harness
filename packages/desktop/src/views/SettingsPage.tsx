@@ -6,8 +6,6 @@ import type { DiscoveredModel } from "@moros/core/config/model-discovery.ts";
 import type { ModelCapability, ModelInputType } from "@moros/core/config/schema.ts";
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft, ProviderView } from "@moros/core/config/settings.ts";
 import type { ReasoningEffort } from "@moros/core/llm/types.ts";
-import type { McpStatus } from "@moros/core/mcp/types.ts";
-import type { SkillSummary } from "@moros/core/skills.ts";
 import type { ConfigSummary } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { Dropdown } from "../components/Dropdown.tsx";
@@ -311,6 +309,8 @@ export function ProvidersTab({
 	const current =
 		selected === undefined ? undefined : settings.providers.find((provider) => provider.name === selected);
 	const keyDisplay = selected === undefined ? "" : (revealed[selected] ?? current?.apiKey.display ?? "");
+	// 已有密钥且未揭示时用圆点占位，外观与普通填写内容一致但不进入 value。
+	const keyPlaceholderDots = !isNew && keyDisplay.length > 0 && draft.apiKey.length === 0;
 	const isEditing = isNew || selected !== undefined;
 	const set = (patch: Partial<ProviderForm>): void => setDraft((previous) => ({ ...previous, ...patch }));
 	const updateModelEditor = (patch: Partial<ModelForm>): void => {
@@ -711,7 +711,9 @@ export function ProvidersTab({
 				}
 				return form;
 			});
-		const newForms = chosen.filter((model) => !existingForms.some((form) => form.id.trim() === model.id)).map(toModelForm);
+		const newForms = chosen
+			.filter((model) => !existingForms.some((form) => form.id.trim() === model.id))
+			.map(toModelForm);
 		const nextModels = [...untouched, ...existingForms, ...newForms];
 		const changed =
 			hasCorrection ||
@@ -732,7 +734,8 @@ export function ProvidersTab({
 		}
 	};
 
-	const modelHeading = modelEditor === undefined ? "模型列表" : modelEditor.index === undefined ? "添加模型" : "编辑模型";
+	const modelHeading =
+		modelEditor === undefined ? "模型列表" : modelEditor.index === undefined ? "添加模型" : "编辑模型";
 	const showAddModelMenu = modelEditor === undefined;
 	const selectedCount = fetchedModels.filter((model) => selectedModelIds.has(model.id)).length;
 	const allModelsSelected = fetchedModels.length > 0 && selectedCount === fetchedModels.length;
@@ -872,12 +875,10 @@ export function ProvidersTab({
 								</FieldLabel>
 								<span className="prov-key-wrap">
 									<input
-										className="prov-input"
+										className={`prov-input ${keyPlaceholderDots ? "has-key-placeholder" : ""}`}
 										type={showKey ? "text" : "password"}
 										value={draft.apiKey}
-										placeholder={
-											isNew ? "输入 API Key" : `留空保持不变${keyDisplay.length > 0 ? `（当前 ${keyDisplay}）` : ""}`
-										}
+										placeholder={isNew ? "输入 API Key" : keyPlaceholderDots ? "••••••••••••" : ""}
 										onChange={(event) => set({ apiKey: event.target.value })}
 										onBlur={() => void autoSave()}
 									/>
@@ -924,21 +925,21 @@ export function ProvidersTab({
 									/>
 								) : null}
 							</div>
-						{modelEditor !== undefined ? (
-							<div className="prov-model-panel">
-								<div className="prov-model-fields">
-									<div className="prov-field">
-										<span id="model-id-label">模型 ID</span>
-										<input
-											className="prov-input"
-											aria-labelledby="model-id-label"
-											autoFocus
-											value={modelEditor.model.id}
-											placeholder="例如 claude-sonnet-4"
-											onChange={(event) => updateModelEditor({ id: event.target.value })}
-											onBlur={(event) => void applyMetadataForModel(event.target.value)}
-										/>
-									</div>
+							{modelEditor !== undefined ? (
+								<div className="prov-model-panel">
+									<div className="prov-model-fields">
+										<div className="prov-field">
+											<span id="model-id-label">模型 ID</span>
+											<input
+												className="prov-input"
+												aria-labelledby="model-id-label"
+												autoFocus
+												value={modelEditor.model.id}
+												placeholder="例如 claude-sonnet-4"
+												onChange={(event) => updateModelEditor({ id: event.target.value })}
+												onBlur={(event) => void applyMetadataForModel(event.target.value)}
+											/>
+										</div>
 										<label className="prov-field">
 											<span>模型名称</span>
 											<input
@@ -1123,7 +1124,12 @@ export function ProvidersTab({
 			</div>
 			{discoverOpen
 				? createPortal(
-						<div className="modal-backdrop" onClick={() => { if (!isSavingDiscovered) resetDiscovery(); }}>
+						<div
+							className="modal-backdrop"
+							onClick={() => {
+								if (!isSavingDiscovered) resetDiscovery();
+							}}
+						>
 							<div className="modal discover-modal" onClick={(event) => event.stopPropagation()}>
 								<div className="modal-head">
 									<h2>获取模型</h2>
@@ -1180,10 +1186,18 @@ export function ProvidersTab({
 																onChange={() => toggleModelSelection(model.id)}
 															/>
 														</span>
-														<span className="discover-item-id" title={model.id}>{model.id}</span>
-														<span className="discover-item-name" title={model.name}>{model.name || "—"}</span>
-														<span className="discover-num">{model.contextWindow === undefined ? "—" : model.contextWindow.toLocaleString()}</span>
-														<span className="discover-num">{model.maxTokens === undefined ? "—" : model.maxTokens.toLocaleString()}</span>
+														<span className="discover-item-id" title={model.id}>
+															{model.id}
+														</span>
+														<span className="discover-item-name" title={model.name}>
+															{model.name || "—"}
+														</span>
+														<span className="discover-num">
+															{model.contextWindow === undefined ? "—" : model.contextWindow.toLocaleString()}
+														</span>
+														<span className="discover-num">
+															{model.maxTokens === undefined ? "—" : model.maxTokens.toLocaleString()}
+														</span>
 														<span className={model.reasoning ? "discover-yes" : "discover-no"}>
 															{model.reasoning ? "支持" : "不支持"}
 														</span>
@@ -1194,6 +1208,7 @@ export function ProvidersTab({
 									</>
 								)}
 								<div className="modal-actions">
+									<span className="discover-selected-count">已选 {selectedCount} 条</span>
 									<button className="ghost-button" disabled={isSavingDiscovered} onClick={resetDiscovery}>
 										取消
 									</button>
@@ -1208,7 +1223,7 @@ export function ProvidersTab({
 												保存中…
 											</>
 										) : (
-											<>保存（{selectedCount}）</>
+											<>保存</>
 										)}
 									</button>
 								</div>
@@ -1224,23 +1239,13 @@ export function ProvidersTab({
 export function WorkspaceTab({
 	settings,
 	summary,
-	skills,
-	mcp,
-	mcpHealth,
 	onUpdate,
-	onHealth,
-	onReconnect,
 	onTrust,
 	onDeny,
 }: {
 	readonly settings: SettingsSnapshot | undefined;
 	readonly summary: ConfigSummary | undefined;
-	readonly skills: readonly SkillSummary[];
-	readonly mcp: readonly McpStatus[];
-	readonly mcpHealth: readonly string[];
 	readonly onUpdate: (patch: SettingsPatch, message?: string) => Promise<SettingsSnapshot | undefined>;
-	readonly onHealth: () => Promise<void>;
-	readonly onReconnect: (name: string) => Promise<void>;
 	readonly onTrust: (remember: boolean) => Promise<void>;
 	readonly onDeny: () => Promise<void>;
 }): JSX.Element {
@@ -1292,44 +1297,6 @@ export function WorkspaceTab({
 					))}
 				</ul>
 			) : null}
-
-			<h3>技能</h3>
-			<div className="skill-list">
-				{skills.length === 0 ? <div className="side-empty">没有可用技能</div> : null}
-				{skills.map((skill) => (
-					<div className="skill-row" key={`${skill.scope}:${skill.path}`}>
-						<span className="pill">{skill.scope}</span>
-						<strong>{skill.name}</strong>
-						<span>{skill.description}</span>
-					</div>
-				))}
-			</div>
-
-			<div className="section-head">
-				<h3>MCP</h3>
-				<button className="ghost-button" onClick={() => void onHealth()}>
-					健康检查
-				</button>
-			</div>
-			<div className="mcp-list">
-				{mcp.length === 0 ? <div className="side-empty">没有配置 MCP server</div> : null}
-				{mcp.map((server) => (
-					<div className="mcp-row" key={server.name}>
-						<span className={`status-dot status-${server.status === "connected" ? "ok" : "error"}`} />
-						<strong>{server.name}</strong>
-						<span className="pill">{server.status}</span>
-						<span className="mcp-detail">{server.detail}</span>
-						<button className="ghost-button small" onClick={() => void onReconnect(server.name)}>
-							重连
-						</button>
-					</div>
-				))}
-				{mcpHealth.map((line) => (
-					<div className="mcp-health" key={line}>
-						{line}
-					</div>
-				))}
-			</div>
 
 			<h3>运行环境</h3>
 			<div className="field-grid">

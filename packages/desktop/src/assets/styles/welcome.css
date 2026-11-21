@@ -42,7 +42,7 @@
 	gap: 10px;
 	padding: 9px 10px;
 	border: none;
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: transparent;
 	color: var(--text-secondary);
 	text-align: left;

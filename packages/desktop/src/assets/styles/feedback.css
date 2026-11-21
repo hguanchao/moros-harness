@@ -6,22 +6,24 @@
 	top: 52px;
 	right: 20px;
 	z-index: 80;
-	width: min(340px, calc(100vw - 40px));
+	max-width: min(360px, calc(100vw - 40px));
 	display: flex;
 	flex-direction: column-reverse;
+	align-items: flex-end;
 	gap: 8px;
 	pointer-events: none;
 }
 
 .toast {
-	width: 100%;
 	pointer-events: auto;
 	display: flex;
 	align-items: flex-start;
 	gap: 10px;
+	width: max-content;
+	max-width: 100%;
 	padding: 11px 12px;
 	border: 1px solid var(--line-strong);
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 	color: var(--text-secondary);
@@ -131,6 +133,116 @@
 	to {
 		opacity: 1;
 		transform: translateY(0);
+	}
+}
+
+/* ---------- 通用交互动效 keyframes ---------- */
+
+/* 遮罩淡入：所有模态框/弹窗共用 */
+@keyframes overlay-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* 模态卡片：轻微上浮 + 缩放回弹，落在画面中心 */
+@keyframes modal-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px) scale(0.97);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0) scale(1);
+	}
+}
+
+/* 下拉/行菜单：向下轻微滑入（向上弹出的菜单各自覆盖方向） */
+@keyframes menu-down-in {
+	from {
+		opacity: 0;
+		transform: translateY(-5px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 向上弹出的菜单（输入栏附近） */
+@keyframes menu-up-in {
+	from {
+		opacity: 0;
+		transform: translateY(5px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 页面切换：纯淡入。刻意不用 transform——页面根内含 position:fixed 弹窗，
+   位移会短暂创建 containing block，干扰弹窗定位。 */
+@keyframes page-in {
+	from {
+		opacity: 0;
+	}
+	to {
+		opacity: 1;
+	}
+}
+
+/* 消息回合入场：只作用于新挂载的 turn，稳定 key 下流式重渲染不会重播 */
+@keyframes turn-in {
+	from {
+		opacity: 0;
+		transform: translateY(6px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+/* 审批卡：阻塞式交互，从右侧滑入以抓取注意 */
+@keyframes approval-in {
+	from {
+		opacity: 0;
+		transform: translateX(10px);
+	}
+	to {
+		opacity: 1;
+		transform: translateX(0);
+	}
+}
+
+/* 工具行成功：短暂绿色底闪一下后消退 */
+@keyframes tool-success-flash {
+	0% {
+		background: transparent;
+	}
+	30% {
+		background: rgba(114, 214, 158, 0.14);
+	}
+	100% {
+		background: transparent;
+	}
+}
+
+/* 工具行失败：轻微左右抖动 */
+@keyframes tool-error-shake {
+	0%,
+	100% {
+		transform: translateX(0);
+	}
+	25% {
+		transform: translateX(-3px);
+	}
+	75% {
+		transform: translateX(3px);
 	}
 }
 

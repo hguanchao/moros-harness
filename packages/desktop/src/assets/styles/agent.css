@@ -45,7 +45,7 @@
 	height: 27px;
 	padding: 0 7px;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-secondary);
 	font-size: var(--text-small);
@@ -76,6 +76,15 @@
 
 .tool-row {
 	border-radius: 7px;
+}
+
+/* 工具完成瞬间给一次轻微反馈；running 态无动画，状态切换时才触发 */
+.tool-row.status-ok {
+	animation: tool-success-flash 0.6s var(--ease-out);
+}
+
+.tool-row.status-error {
+	animation: tool-error-shake 0.32s var(--ease-standard);
 }
 
 .tool-row-main {
@@ -153,7 +162,7 @@
 
 .branch-meta {
 	padding: 0 5px;
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 	font-size: var(--text-micro);
@@ -163,7 +172,7 @@
 	margin: 3px 0 6px 29px;
 	padding: 9px 11px;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--code-bg);
 }
 
@@ -208,7 +217,7 @@ pre.is-error {
 	padding: 0 8px;
 	margin: 3px 0;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 	font-size: var(--text-caption);
@@ -249,7 +258,7 @@ pre.is-error {
 	align-items: center;
 	gap: 7px;
 	padding: 6px 10px;
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 	font-size: var(--text-small);
@@ -304,6 +313,7 @@ pre.is-error {
 	box-shadow:
 		inset 3px 0 0 var(--warn),
 		var(--shadow);
+	animation: approval-in var(--duration-slow) var(--ease-out);
 }
 
 .approval-card.risk-high {
@@ -329,7 +339,7 @@ pre.is-error {
 	padding: 0 7px;
 	display: inline-flex;
 	align-items: center;
-	border-radius: 999px;
+	border-radius: var(--r-pill);
 	font-size: var(--text-micro);
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
@@ -379,7 +389,7 @@ pre.is-error {
 	margin: 6px 0 0;
 	padding: 9px 11px;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--code-bg);
 	font-size: var(--text-caption);
 	line-height: 1.55;
@@ -509,6 +519,7 @@ pre.is-error {
 	color: var(--text-secondary);
 	font-size: var(--text-ui);
 	pointer-events: none;
+	animation: overlay-in var(--duration-fast) var(--ease-out);
 }
 
 /* ---------- 下拉菜单 ---------- */

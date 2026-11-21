@@ -15,6 +15,7 @@ import {
 	type SessionCreateInput,
 	type SessionListQuery,
 	type WindowState,
+	type WorkspaceTarget,
 } from "../shared/contract.ts";
 import { DesktopGitError } from "./_git.ts";
 import { DesktopWorkspaceError } from "./_workspace.ts";
@@ -95,6 +96,13 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.appCreateProjectDialog, getWindow, z.tuple([z.string().min(1).max(255)]), ([name]) =>
 		host.createProjectDialog(name),
 	);
+	handle(IPC.appOpenProjectFolder, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) =>
+		host.openProjectFolder(root),
+	);
+	handle(IPC.appCopyProjectPath, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) =>
+		host.copyProjectPath(root),
+	);
+	handle(IPC.appForgetProject, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) => host.forgetProject(root));
 	handle(IPC.workspacePrepare, getWindow, z.tuple([WorkspaceTargetSchema]), ([target]) =>
 		host.prepareWorkspace(target),
 	);
@@ -125,6 +133,7 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 		if (window === undefined || window.isDestroyed()) return;
 		window.setBackgroundColor(dark ? "#202020" : "#ebebeb");
 	});
+	handle(IPC.sidebarSetWidth, getWindow, z.tuple([z.number().int()]), ([width]) => host.setSidebarWidth(width));
 
 	handle(IPC.sessionsList, getWindow, z.tuple([SessionListQuerySchema]), ([query]) =>
 		host.listSessions(query as SessionListQuery),
@@ -142,6 +151,27 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	);
 	handle(IPC.sessionsDelete, getWindow, z.tuple([z.array(z.string().min(1).max(200)).max(100)]), ([ids]) =>
 		host.deleteSessions(ids),
+	);
+	handle(
+		IPC.sessionsRenameInTarget,
+		getWindow,
+		z.tuple([z.string().min(1).max(200), z.string().min(1).max(200), WorkspaceTargetSchema]),
+		([id, title, target]) => host.renameSessionInTarget(id, title, target as WorkspaceTarget),
+	);
+	handle(
+		IPC.sessionsArchiveInTarget,
+		getWindow,
+		z.tuple([z.string().min(1).max(200), z.boolean(), WorkspaceTargetSchema]),
+		([id, archived, target]) => host.archiveSessionInTarget(id, archived, target as WorkspaceTarget),
+	);
+	handle(
+		IPC.sessionsDeleteInTarget,
+		getWindow,
+		z.tuple([z.array(z.string().min(1).max(200)).max(100), WorkspaceTargetSchema]),
+		([ids, target]) => host.deleteSessionsInTarget(ids, target as WorkspaceTarget),
+	);
+	handle(IPC.sessionPin, getWindow, z.tuple([z.string().min(1).max(200), z.boolean()]), ([id, pinned]) =>
+		host.pinSession(id, pinned),
 	);
 	handle(
 		IPC.sessionsFork,

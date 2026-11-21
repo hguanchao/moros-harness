@@ -1,7 +1,8 @@
-import { useEffect, type JSX } from "react";
+import { useEffect, useRef, useState, type Dispatch, type JSX, type PointerEvent as ReactPointerEvent } from "react";
 
 import { currentNavigationEpoch, useDesktopActions } from "./hooks/actions.ts";
 import { call, errorMessage } from "./api/api.ts";
+import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "./shared/contract.ts";
 import { ChangesPage } from "./views/ChangesPage.tsx";
 import { ChatPage } from "./views/ChatPage.tsx";
 import { FilesPage } from "./views/FilesPage.tsx";
@@ -10,7 +11,8 @@ import { SettingsApp } from "./views/SettingsApp.tsx";
 import { TracePage } from "./views/TracePage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
-import { useApp } from "./store/state.tsx";
+import { useApp, type Action } from "./store/state.tsx";
+import { clampSidebarToViewport } from "./utils/layout.ts";
 import { AlertIcon, InfoIcon, XIcon } from "./components/Icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
@@ -68,6 +70,26 @@ export function App(): JSX.Element {
 		return () => query.removeEventListener("change", apply);
 	}, [state.theme, dispatch]);
 
+	// 侧栏宽度：渲染层即时应用，拖拽结束时由宿主持久化；覆盖 CSS 默认与响应式断点。
+	useEffect(() => {
+		document.documentElement.style.setProperty("--sidebar-width", `${state.sidebarWidth}px`);
+	}, [state.sidebarWidth]);
+
+	// 窗口收窄时自动收窄侧栏，为内容区保底；窗口放大不自动放宽，避免覆盖用户设定。
+	useEffect(() => {
+		const apply = (): void => {
+			const next = clampSidebarToViewport(state.sidebarWidth, window.innerWidth, state.sidebarOpen);
+			if (next === undefined) return;
+			dispatch({ type: "sidebar-width", width: next });
+			void call(window.moros.sidebarSetWidth(next)).catch((error: unknown) => {
+				dispatch({ type: "notice", level: "warn", message: `无法保存侧栏宽度：${errorMessage(error)}` });
+			});
+		};
+		apply();
+		window.addEventListener("resize", apply);
+		return () => window.removeEventListener("resize", apply);
+	}, [state.sidebarWidth, state.sidebarOpen, dispatch]);
+
 	// 界面字号：只缩放文字，图标与布局尺寸保持不变
 	useEffect(() => {
 		document.documentElement.style.setProperty("--ui-scale", String(state.uiFontSize / 14));
@@ -119,6 +141,7 @@ export function App(): JSX.Element {
 			) : (
 				<div className="app-body">
 					<Sidebar open={state.sidebarOpen} />
+					{state.sidebarOpen ? <SidebarResizeHandle width={state.sidebarWidth} dispatch={dispatch} /> : null}
 					<main className="main">
 						{state.page === "chat" ? <ChatPage /> : null}
 						{state.page === "files" ? <FilesPage /> : null}
@@ -130,6 +153,67 @@ export function App(): JSX.Element {
 			)}
 			<Toasts />
 		</div>
+	);
+}
+
+/**
+ * 侧栏右缘的拖拽手柄：拖动时即时更新宽度，松手后由宿主持久化。
+ * 用 pointer capture 保证拖出手柄范围仍继续跟踪。
+ */
+function SidebarResizeHandle({
+	width,
+	dispatch,
+}: {
+	readonly width: number;
+	readonly dispatch: Dispatch<Action>;
+}): JSX.Element {
+	const [dragging, setDragging] = useState(false);
+	const startX = useRef(0);
+	const startWidth = useRef(width);
+	const latestWidth = useRef(width);
+
+	const onPointerDown = (event: ReactPointerEvent<HTMLDivElement>): void => {
+		if (event.button !== 0) return;
+		event.preventDefault();
+		event.currentTarget.setPointerCapture(event.pointerId);
+		startX.current = event.clientX;
+		startWidth.current = width;
+		latestWidth.current = width;
+		setDragging(true);
+		document.documentElement.classList.add("is-resizing-sidebar");
+	};
+
+	const onPointerMove = (event: ReactPointerEvent<HTMLDivElement>): void => {
+		if (!dragging) return;
+		const next = Math.max(
+			MIN_SIDEBAR_WIDTH,
+			Math.min(MAX_SIDEBAR_WIDTH, startWidth.current + event.clientX - startX.current),
+		);
+		latestWidth.current = next;
+		dispatch({ type: "sidebar-width", width: next });
+	};
+
+	const finish = (event: ReactPointerEvent<HTMLDivElement>): void => {
+		if (!dragging) return;
+		event.currentTarget.releasePointerCapture(event.pointerId);
+		setDragging(false);
+		document.documentElement.classList.remove("is-resizing-sidebar");
+		void call(window.moros.sidebarSetWidth(latestWidth.current)).catch((error: unknown) => {
+			dispatch({ type: "notice", level: "warn", message: `无法保存侧栏宽度：${errorMessage(error)}` });
+		});
+	};
+
+	return (
+		<div
+			className={`sidebar-resize-handle ${dragging ? "is-dragging" : ""}`}
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="调整侧栏宽度"
+			onPointerDown={onPointerDown}
+			onPointerMove={onPointerMove}
+			onPointerUp={finish}
+			onPointerCancel={finish}
+		/>
 	);
 }
 

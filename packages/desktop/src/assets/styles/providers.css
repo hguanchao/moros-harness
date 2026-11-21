@@ -82,7 +82,7 @@
 	gap: 8px;
 	padding: 9px 10px;
 	border: 1px solid transparent;
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: transparent;
 	color: var(--text-secondary);
 	cursor: pointer;
@@ -211,7 +211,7 @@
 	gap: 8px;
 	padding: 0 9px;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-secondary);
 	font-size: var(--text-small);
@@ -246,7 +246,7 @@
 	display: grid;
 	place-items: center;
 	flex: none;
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 }
@@ -286,7 +286,7 @@
 	margin: -3px 0;
 	border: none;
 	border-bottom: none;
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	background: var(--fill-soft);
 	font-size: var(--text-h2);
 	font-weight: var(--weight-semibold);
@@ -347,7 +347,7 @@
 	max-width: 260px;
 	padding: 7px 9px;
 	border: 1px solid var(--line-strong);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 	color: var(--text-secondary);
@@ -376,7 +376,7 @@
 	height: 36px;
 	padding: 0 11px;
 	border: 1px solid var(--line-strong);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-main);
 	color: var(--text-primary);
 	font-size: var(--text-body);
@@ -385,6 +385,12 @@
 
 .prov-input::placeholder {
 	color: var(--text-faint);
+}
+
+/* 已有密钥的圆点占位按正常填写内容显示，字号略大让圆点更清晰 */
+.prov-input.has-key-placeholder::placeholder {
+	color: var(--text-primary);
+	font-size: calc(0.9375rem * var(--ui-scale));
 }
 
 .prov-input:focus {
@@ -422,7 +428,7 @@
 	justify-content: space-between;
 	padding: 0 11px;
 	border: 1px solid var(--line-strong);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-main);
 	color: var(--text-primary);
 	font-size: var(--text-body);
@@ -505,9 +511,10 @@
 	gap: 0;
 	padding: 7px;
 	border: 1px solid var(--line-strong);
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
+	animation: menu-down-in var(--duration-fast) var(--ease-out);
 }
 
 .dropdown-box .dropdown-menu {
@@ -516,6 +523,7 @@
 
 .dropdown-inline .dropdown-menu {
 	bottom: calc(100% + 6px);
+	animation-name: menu-up-in;
 }
 
 /* 选项包在 group 内，间距必须由 group 提供（menu 的 gap 只作用于 group 之间） */
@@ -553,7 +561,7 @@
 	gap: 5px;
 	padding: 0 7px;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-secondary);
 	font-size: var(--text-small);
@@ -605,7 +613,7 @@
 	gap: 8px;
 	padding: 0 9px;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-secondary);
 	font-size: var(--text-small);
@@ -754,7 +762,7 @@
 	display: grid;
 	place-items: center;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-faint);
 	cursor: pointer;
@@ -794,7 +802,7 @@
 	gap: 6px;
 	padding: 0 8px;
 	border-color: var(--line);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: transparent;
 	color: var(--text-secondary);
 	font-size: var(--text-small);
@@ -822,7 +830,7 @@
 	gap: 14px;
 	padding: 16px;
 	border: 1px solid var(--line-strong);
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 	background: var(--surface-main);
 }
 
@@ -881,7 +889,10 @@
 	white-space: nowrap;
 	cursor: pointer;
 	user-select: none;
-	transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+	transition:
+		background-color 0.15s ease,
+		color 0.15s ease,
+		border-color 0.15s ease;
 }
 
 .prov-checkbox-button:first-child {
@@ -928,7 +939,7 @@
 	height: 24px;
 	padding: 0 10px;
 	border: 1px solid transparent;
-	border-radius: 999px;
+	border-radius: var(--r-pill);
 	color: var(--text-muted);
 	font-size: var(--text-caption);
 	cursor: pointer;
@@ -971,7 +982,7 @@
 	gap: 8px;
 	padding: 4px 8px;
 	border: 1px solid var(--line-strong);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-main);
 	color: var(--text-primary);
 	font-size: var(--text-body);
@@ -1011,7 +1022,7 @@
 	align-items: center;
 	gap: 2px;
 	padding: 0 3px 0 6px;
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 	font-size: var(--text-caption);
@@ -1045,7 +1056,7 @@
 	display: inline-flex;
 	align-items: center;
 	padding: 0 6px;
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 	font-size: var(--text-caption);
@@ -1070,7 +1081,7 @@
 	padding: 6px;
 	overflow-y: auto;
 	border: 1px solid var(--line-strong);
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 }
@@ -1084,7 +1095,7 @@
 	gap: 8px;
 	padding: 0 10px;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-primary);
 	font-size: var(--text-small);
@@ -1138,7 +1149,7 @@
 	gap: 4px;
 	padding: 0 8px 0 11px;
 	border: 1px solid var(--line-strong);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-main);
 	color: var(--text-primary);
 	cursor: text;
@@ -1173,7 +1184,7 @@
 	flex: none;
 	display: grid;
 	place-items: center;
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	color: var(--text-faint);
 	cursor: pointer;
 }
@@ -1198,7 +1209,7 @@
 	flex-direction: column;
 	padding: 6px;
 	border: 1px solid var(--line-strong);
-	border-radius: 10px;
+	border-radius: var(--r-xl);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 }
@@ -1221,7 +1232,7 @@
 	gap: 8px;
 	padding: 4px 9px;
 	border: none;
-	border-radius: 6px;
+	border-radius: var(--r-md);
 	background: transparent;
 	color: var(--text-primary);
 	font-size: var(--text-small);
@@ -1286,7 +1297,7 @@
 	min-height: 48px;
 	padding: 12px;
 	border: 1px dashed var(--line-strong);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	color: var(--text-faint);
 	font-size: var(--text-small);
 }
@@ -1308,7 +1319,7 @@
 	gap: 12px;
 	padding: 9px 12px;
 	border: 1px solid var(--line);
-	border-radius: 8px;
+	border-radius: var(--r-lg);
 	background: var(--surface-main);
 }
 
@@ -1399,11 +1410,7 @@
 	background: var(--danger-soft);
 }
 
-/* ---------- 获取模型弹窗 ---------- */
-
-.discover-modal {
-	width: min(880px, 100%);
-}
+/* 获取模型弹窗：宽度与容器样式统一在 modal.css，这里仅保留内容区样式。 */
 
 .discover-status {
 	display: flex;
@@ -1428,6 +1435,10 @@
 
 .discover-table {
 	width: 100%;
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	overflow: hidden;
+	background: var(--surface-chrome);
 }
 
 .discover-row {
@@ -1435,29 +1446,38 @@
 	grid-template-columns: 32px minmax(0, 2fr) minmax(0, 1.3fr) 110px 130px 68px;
 	align-items: center;
 	column-gap: 10px;
-	padding: 8px 6px;
+	padding: 10px 8px;
+	text-align: left;
 }
 
 .discover-row-head {
 	position: sticky;
 	top: 0;
 	z-index: 1;
-	border-bottom: 1px solid var(--line);
+	border-bottom: 1px solid var(--line-strong);
 	color: var(--text-secondary);
 	font-size: var(--text-caption);
 	font-weight: 600;
-	background: var(--surface-chrome);
+	background: var(--fill-soft);
+	/* 数据区滚动条宽 6px，表头补同宽 padding 以对齐列边缘 */
+	padding-right: 14px;
 }
 
 .discover-list {
 	max-height: min(52vh, 420px);
 	overflow-y: auto;
+	scrollbar-gutter: stable;
 }
 
 .discover-item {
-	border-radius: 8px;
 	cursor: pointer;
 	font-size: var(--text-caption);
+	border-bottom: 1px solid var(--line);
+}
+
+/* 最后一行不画分隔线，避免与外框底边叠成双线 */
+.discover-item:last-child {
+	border-bottom: none;
 }
 
 .discover-item:hover {
@@ -1468,7 +1488,7 @@
 .discover-check {
 	display: flex;
 	align-items: center;
-	justify-content: center;
+	justify-content: flex-start;
 }
 
 .discover-check input[type="checkbox"] {
@@ -1477,7 +1497,7 @@
 	height: 16px;
 	margin: 0;
 	border: 1px solid var(--line-strong);
-	border-radius: 4px;
+	border-radius: var(--r-sm);
 	background: var(--surface-main);
 	cursor: pointer;
 	position: relative;
@@ -1493,16 +1513,21 @@
 	border-color: var(--accent);
 }
 
+/* 选中勾：lucide Check 路径，用 mask 让勾色跟随 --accent-contrast，明暗主题都清晰。
+   stroke-width 3.5 是为 16px 小勾选框的可读性刻意加粗。 */
 .discover-check input[type="checkbox"]:checked::after {
 	content: "";
 	position: absolute;
-	left: 4px;
-	top: 1px;
-	width: 5px;
-	height: 9px;
-	border: solid var(--accent-contrast);
-	border-width: 0 2px 2px 0;
-	transform: rotate(45deg);
+	inset: 2px;
+	width: auto;
+	height: auto;
+	border: none;
+	transform: none;
+	background-color: var(--accent-contrast);
+	-webkit-mask: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M20 6 9 17l-5-5"/%3E%3C/svg%3E')
+		center / contain no-repeat;
+	mask: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M20 6 9 17l-5-5"/%3E%3C/svg%3E')
+		center / contain no-repeat;
 }
 
 .discover-check input[type="checkbox"]:focus-visible {
@@ -1527,7 +1552,7 @@
 }
 
 .discover-num {
-	text-align: right;
+	text-align: left;
 	font-variant-numeric: tabular-nums;
 }
 
@@ -1537,6 +1562,14 @@
 
 .discover-no {
 	color: var(--text-muted);
+}
+
+/* 已选计数靠左，与右侧操作按钮分组 */
+.discover-selected-count {
+	margin-right: auto;
+	align-self: center;
+	color: var(--text-faint);
+	font-size: var(--text-caption);
 }
 
 .modal-actions .primary-button:disabled,

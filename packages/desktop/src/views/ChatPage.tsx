@@ -246,11 +246,13 @@ function TrustGate(): JSX.Element {
 	};
 	return (
 		<div className="trust-overlay">
-			<div className="trust-card">
-				<div className="trust-icon">
-					<SparklesIcon size={22} />
+			<div className="trust-card" role="dialog" aria-modal="true" aria-label="信任这个工作区">
+				<div className="modal-head trust-heading">
+					<span className="trust-icon">
+						<SparklesIcon size={22} />
+					</span>
+					<h2>信任这个工作区？</h2>
 				</div>
-				<h2>信任这个工作区？</h2>
 				<p>项目配置、项目技能与 AGENTS.md 会在信任后生效；未信任时只加载全局配置。</p>
 				{project.trust.files.length > 0 ? (
 					<ul className="trust-files">
