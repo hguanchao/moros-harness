@@ -148,6 +148,9 @@
 		"Helvetica Neue", Helvetica, Arial, sans-serif;
 	--font-ui: var(--font-ui-system);
 
+	/* 对话内容列的最大宽度：对话流与输入栏共用；宽视口下由 responsive.css 放大 */
+	--content-max: 760px;
+
 	--ui-scale: 1;
 
 	/* 标题层级 h1 > h2 > h3 > h4 > h5 > h6；h2 用于页面头，h3 用于分区标题 */

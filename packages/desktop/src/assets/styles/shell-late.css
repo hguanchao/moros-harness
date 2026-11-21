@@ -631,7 +631,7 @@ html.is-resizing-sidebar .sidebar > * {
 
 .transcript {
 	width: calc(100% - 48px);
-	max-width: 760px;
+	max-width: var(--content-max);
 	margin: 0 auto;
 	padding: 20px 0;
 	font-size: var(--text-body);

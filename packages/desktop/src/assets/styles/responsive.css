@@ -1,3 +1,17 @@
+/* ---------- 宽视窗：对话内容列随窗口放大，减少两侧留白 ---------- */
+
+@media (min-width: 1440px) {
+	:root {
+		--content-max: 920px;
+	}
+}
+
+@media (min-width: 1800px) {
+	:root {
+		--content-max: 1080px;
+	}
+}
+
 /* ---------- 窄窗 ---------- */
 
 @media (max-width: 960px) {

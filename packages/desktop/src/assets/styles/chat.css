@@ -101,7 +101,7 @@
 }
 
 .new-task-stage .composer-dock {
-	width: min(100%, 762px);
+	width: min(100%, var(--content-max));
 	margin: 0;
 	padding: 0;
 }
