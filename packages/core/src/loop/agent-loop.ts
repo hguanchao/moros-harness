@@ -33,7 +33,7 @@ export interface LoopOptions {
 	readonly breakpoint?: boolean;
 	/** 接收主模型请求的流式文本增量；不落盘，仅用于 UI 实时显示。 */
 	readonly onText?: (text: string) => void;
-	/** 接收推理模型的思考增量；不落盘，仅用于 UI 实时显示。 */
+	/** 接收推理模型的推理增量；不落盘，仅用于 UI 实时显示。 */
 	readonly onReasoning?: (text: string) => void;
 	/** 流因空闲超时或提前结束而重试时回调，用于清空 UI 中的未完成增量。 */
 	readonly onRetry?: () => void;
@@ -237,6 +237,8 @@ export class AgentLoop {
 			corr,
 			payload: {
 				text: response.text,
+				// 推理链随响应落盘供对话流回放；不进入 #messages，回传 API 时不含推理内容
+				...(response.reasoning === undefined ? {} : { reasoning: response.reasoning }),
 				toolCalls: response.toolCalls,
 				usage: response.usage ?? { inputTokens: 0, outputTokens: 0 },
 				stopReason: response.stopReason,

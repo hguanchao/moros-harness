@@ -6,7 +6,8 @@ import type { WorkspaceInstructions } from "./instructions.ts";
  *
  * 结构：静态主体（Role / Working loop / Tools / Guardrails / Boundaries / Communication）
  * 字节稳定；条件段只**追加**在静态主体之后，顺序固定——Delegation（工具面含 task）→
- * Plan mode（计划模式）→ Instructions（ADR-16 工作区指令）→ Skills（有技能）→ Workspace（始终）。
+ * Plan mode（计划模式）→ Instructions（ADR-16 工作区指令）→ Skills（有技能）→
+ * Workspace（提供 workingDirectory 时；内部任务工作区不披露路径）。
  * 静态主体不含工具名清单：`Tools:` 名单与 schema 重复、且随工具面变化破坏前缀缓存，
  * 选择策略改按职能写进 Tools 节。工具自身的 description 仍归各工具文件，是单一出处。
  *
@@ -117,7 +118,7 @@ export function formatSkillsSection(skills: readonly SkillSummary[]): string | u
  * @param input.toolNames 当轮工具面的工具名清单；仅用于判断是否追加 Delegation（含 task）。
  * @param input.instructionsSection 工作区指令节（`formatInstructionsSection` 的输出，可为空）。
  * @param input.skillsSection 技能清单节（`formatSkillsSection` 的输出，可为空）。
- * @param input.workingDirectory 项目根；反斜杠归一为正斜杠。
+ * @param input.workingDirectory 项目根，反斜杠归一为正斜杠；传 undefined（内部任务工作区）时整节省略。
  * @param input.plan 是否处于计划模式（只读叠加层）。
  * @returns 完整系统提示词。
  */
@@ -125,7 +126,7 @@ export function buildSystemMessage(input: {
 	readonly toolNames: readonly string[];
 	readonly instructionsSection: string | undefined;
 	readonly skillsSection: string | undefined;
-	readonly workingDirectory: string;
+	readonly workingDirectory: string | undefined;
 	readonly plan: boolean;
 }): string {
 	const appended = [
@@ -133,7 +134,9 @@ export function buildSystemMessage(input: {
 		...(input.plan ? [PLAN_MODE] : []),
 		...(input.instructionsSection ? [input.instructionsSection] : []),
 		...(input.skillsSection ? [input.skillsSection] : []),
-		`## Workspace\nRoot: ${input.workingDirectory.replace(/\\/g, "/")}`,
+		...(input.workingDirectory === undefined
+			? []
+			: [`## Workspace\nRoot: ${input.workingDirectory.replace(/\\/g, "/")}`]),
 	];
 	return [STATIC_BODY, ...appended].join("\n\n");
 }

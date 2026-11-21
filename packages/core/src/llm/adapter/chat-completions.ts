@@ -43,6 +43,7 @@ export const chatCompletionsAdapter: ProtocolAdapter = {
 	},
 	async parse(stream, request, onText, signal, onReasoning) {
 		let text = "";
+		let reasoningText = "";
 		let usage: ModelUsage | undefined;
 		let stopReason: ModelResponse["stopReason"] = "end_turn";
 		let receivedDone = false;
@@ -60,11 +61,14 @@ export const chatCompletionsAdapter: ProtocolAdapter = {
 			usage = mergeUsage(usage, parseUsage(objectAt(data, "usage")));
 			const choice = firstObject(data.choices);
 			const delta = objectAt(choice, "delta");
-			// 推理模型把思考放在 reasoning_content / reasoning / reasoning_text；它与正文分开推送，
-			// 不能拼进 text，否则界面会把思考当成回答显示。
+			// 推理模型把推理放在 reasoning_content / reasoning / reasoning_text；它与正文分开推送，
+			// 不能拼进 text，否则界面会把推理当成回答显示。
 			const reasoning =
 				stringAt(delta, "reasoning_content") ?? stringAt(delta, "reasoning") ?? stringAt(delta, "reasoning_text");
-			if (reasoning) onReasoning?.(reasoning);
+			if (reasoning) {
+				reasoningText += reasoning;
+				onReasoning?.(reasoning);
+			}
 			const piece = stringAt(delta, "content");
 			if (piece) {
 				text += piece;
@@ -94,7 +98,13 @@ export const chatCompletionsAdapter: ProtocolAdapter = {
 		if (!receivedDone && !receivedFinishReason) {
 			throw new ProviderError("Chat Completions stream ended before a completion marker", undefined, undefined, true);
 		}
-		return { text, toolCalls: [...tools.values()].map(parseToolCall), ...(usage ? { usage } : {}), stopReason };
+		return {
+			text,
+			...(reasoningText.length > 0 ? { reasoning: reasoningText } : {}),
+			toolCalls: [...tools.values()].map(parseToolCall),
+			...(usage ? { usage } : {}),
+			stopReason,
+		};
 	},
 };
 

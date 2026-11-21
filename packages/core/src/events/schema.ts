@@ -51,6 +51,8 @@ export const EventSchema = z.discriminatedUnion("type", [
 		type: z.literal("llm.response"),
 		payload: z.object({
 			text: z.string(),
+			/** 模型推理链全文；供应商未回传或缺省时界面不渲染推理块。 */
+			reasoning: z.string().optional(),
 			toolCalls: z.array(z.unknown()),
 			usage: z.object({
 				inputTokens: z.number(),

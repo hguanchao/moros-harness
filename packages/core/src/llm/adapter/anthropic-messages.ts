@@ -44,6 +44,7 @@ export const anthropicMessagesAdapter: ProtocolAdapter = {
 	},
 	async parse(stream, request, onText, signal, onReasoning) {
 		let text = "";
+		let reasoningText = "";
 		let usage: ModelUsage | undefined;
 		let stopReason: ModelResponse["stopReason"] = "end_turn";
 		const tools = new Map<number, { id: string; name: string; json: string }>();
@@ -68,7 +69,10 @@ export const anthropicMessagesAdapter: ProtocolAdapter = {
 				const delta = objectAt(data, "delta");
 				if (stringAt(delta, "type") === "thinking_delta") {
 					const thinking = stringAt(delta, "thinking") ?? "";
-					if (thinking) onReasoning?.(thinking);
+					if (thinking) {
+						reasoningText += thinking;
+						onReasoning?.(thinking);
+					}
 				} else if (stringAt(delta, "type") === "text_delta") {
 					const piece = stringAt(delta, "text") ?? "";
 					text += piece;
@@ -89,7 +93,13 @@ export const anthropicMessagesAdapter: ProtocolAdapter = {
 				throw new ProviderError(stringAt(error, "message") ?? "Anthropic stream error");
 			}
 		}
-		return { text, toolCalls: [...tools.values()].map(parseToolCall), ...(usage ? { usage } : {}), stopReason };
+		return {
+			text,
+			...(reasoningText.length > 0 ? { reasoning: reasoningText } : {}),
+			toolCalls: [...tools.values()].map(parseToolCall),
+			...(usage ? { usage } : {}),
+			stopReason,
+		};
 	},
 };
 

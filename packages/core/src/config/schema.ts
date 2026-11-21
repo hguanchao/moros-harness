@@ -66,8 +66,10 @@ const ConfigSchema = z.object({
 			maxTurns: z.number().int().nonnegative().default(0),
 			spillThreshold: z.number().int().nonnegative().default(8192),
 			streamIdleTimeoutSec: z.number().nonnegative().default(0),
+			/** auto 档高风险审查的单次模型调用时限；推理模型偏慢，过短会频繁超时退回人工。 */
+			reviewTimeoutSec: z.number().int().positive().max(600).default(90),
 		})
-		.default({ maxTurns: 0, spillThreshold: 8192, streamIdleTimeoutSec: 0 }),
+		.default({ maxTurns: 0, spillThreshold: 8192, streamIdleTimeoutSec: 0, reviewTimeoutSec: 90 }),
 	retry: z
 		.object({
 			maxRetries: z.number().int().nonnegative().default(3),
@@ -224,7 +226,7 @@ export function parseConfig(
 		if (!knownTop.has(key)) skipped.push({ path: key, reason: "Unknown config key (stripped)" });
 	}
 	const groups: ReadonlyArray<readonly [string, readonly string[]]> = [
-		["limits", ["maxTurns", "spillThreshold", "streamIdleTimeoutSec"]],
+		["limits", ["maxTurns", "spillThreshold", "streamIdleTimeoutSec", "reviewTimeoutSec"]],
 		["retry", ["maxRetries", "maxDelayMs"]],
 		["compaction", ["compactAt", "keepRecent", "summaryTimeoutSec"]],
 		["ui", ["theme", "notify", "fontSize"]],

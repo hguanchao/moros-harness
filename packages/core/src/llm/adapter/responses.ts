@@ -51,6 +51,7 @@ export const responsesAdapter: ProtocolAdapter = {
 	},
 	async parse(stream, request, onText, signal, onReasoning) {
 		let text = "";
+		let reasoningText = "";
 		let usage: ModelUsage | undefined;
 		let stopReason: ModelResponse["stopReason"] = "end_turn";
 		const tools = new Map<string, { id: string; name: string; json: string }>();
@@ -66,9 +67,13 @@ export const responsesAdapter: ProtocolAdapter = {
 				onText?.(piece);
 			} else if (type === "response.reasoning_summary_text.delta" || type === "response.reasoning_text.delta") {
 				const piece = stringAt(data, "delta") ?? "";
-				if (piece) onReasoning?.(piece);
+				if (piece) {
+					reasoningText += piece;
+					onReasoning?.(piece);
+				}
 			} else if (type === "response.reasoning_summary_part.done") {
-				// 摘要分段之间补一个空行，连续思考不会粘成一段
+				// 摘要分段之间补一个空行，连续推理不会粘成一段
+				reasoningText += "\n\n";
 				onReasoning?.("\n\n");
 			} else if (type === "response.output_item.added") {
 				const item = objectAt(data, "item");
@@ -96,7 +101,13 @@ export const responsesAdapter: ProtocolAdapter = {
 				throw new ProviderError(stringAt(error, "message") ?? stringAt(data, "message") ?? "Responses stream error");
 			}
 		}
-		return { text, toolCalls: [...tools.values()].map(parseToolCall), ...(usage ? { usage } : {}), stopReason };
+		return {
+			text,
+			...(reasoningText.length > 0 ? { reasoning: reasoningText } : {}),
+			toolCalls: [...tools.values()].map(parseToolCall),
+			...(usage ? { usage } : {}),
+			stopReason,
+		};
 	},
 };
 

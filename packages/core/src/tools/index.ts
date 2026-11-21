@@ -7,6 +7,7 @@ export * from "./builtins/present-plan.ts";
 export * from "./builtins/read.ts";
 export * from "./builtins/task.ts";
 export * from "./builtins/todo.ts";
+export * from "./builtins/web-fetch.ts";
 export * from "./builtins/write.ts";
 export * from "./environment.ts";
 export * from "./output-collector.ts";

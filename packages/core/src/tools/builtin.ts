@@ -6,6 +6,7 @@ import { createGrepTool } from "./builtins/grep.ts";
 import { createReadTool } from "./builtins/read.ts";
 import { createTaskTool, type TaskRunner } from "./builtins/task.ts";
 import { createTodoTool } from "./builtins/todo.ts";
+import { createWebFetchTool } from "./builtins/web-fetch.ts";
 import { createWriteTool } from "./builtins/write.ts";
 
 export type { TaskRunner } from "./builtins/task.ts";
@@ -19,7 +20,7 @@ export interface BuiltinToolOptions extends BashToolOptions {
 /**
  * 按固定工具顺序组装内置工具，不包含管线策略或权限判断。
  * @param options Shell 适配配置与可选的子代理执行通道。
- * @returns read、glob、grep、edit、write、todo、平台 Shell 工具，注入 taskRunner 时外加 task。
+ * @returns read、glob、grep、edit、write、todo、平台 Shell、web_fetch 工具，注入 taskRunner 时外加 task。
  */
 export function createBuiltinTools(options: BuiltinToolOptions = {}): readonly ToolDefinition[] {
 	const tools: ToolDefinition[] = [
@@ -30,6 +31,7 @@ export function createBuiltinTools(options: BuiltinToolOptions = {}): readonly T
 		createWriteTool(),
 		createTodoTool(),
 		createBashTool(options),
+		createWebFetchTool(),
 	];
 	// task 工具只在执行通道就绪时装配：Core 运行态注入通道，未注入执行通道的调用点保持原工具面
 	if (options.taskRunner !== undefined) tools.push(createTaskTool(options.taskRunner));

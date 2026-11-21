@@ -41,6 +41,8 @@ export interface ModelUsage {
 }
 export interface ModelResponse {
 	text: string;
+	/** 模型回传的推理链全文（reasoning_content / thinking / reasoning summary）；供应商未回传时缺省。 */
+	reasoning?: string;
 	toolCalls: CanonicalToolCall[];
 	usage?: ModelUsage;
 	stopReason: "end_turn" | "tool_use" | "max_tokens" | "error";

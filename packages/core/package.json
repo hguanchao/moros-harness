@@ -11,10 +11,15 @@
 		"update-model-catalog": "node --experimental-strip-types scripts/update-model-catalog.ts"
 	},
 	"dependencies": {
+		"@joplin/turndown-plugin-gfm": "^1.0.71",
 		"cross-spawn": "^7.0.6",
 		"micromatch": "^4.0.8",
 		"smol-toml": "^1.4.2",
+		"turndown": "^7.2.5",
 		"undici": "^6.21.3",
 		"zod": "^4.1.12"
+	},
+	"devDependencies": {
+		"@types/turndown": "^5.0.6"
 	}
 }

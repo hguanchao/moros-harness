@@ -12,7 +12,7 @@ export interface CompleteOptions {
 	signal?: AbortSignal;
 	retry?: Partial<RetryOptions>;
 	onText?: (text: string) => void;
-	/** 推理模型的思考增量；与正文分开推送，不进入最终文本。 */
+	/** 推理模型的推理增量；与正文分开推送，不进入最终文本。 */
 	onReasoning?: (text: string) => void;
 	onRetry?: () => void;
 }

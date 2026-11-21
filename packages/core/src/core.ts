@@ -168,6 +168,8 @@ export interface ModelCatalog {
 			readonly maxTokens: number;
 			readonly contextWindow?: number;
 			readonly reasoning: boolean;
+			/** 模型支持的推理档位（不含 off）；未配置时端侧回退为全档位可选。 */
+			readonly reasoningEfforts?: readonly Exclude<ReasoningEffort, "off">[];
 			readonly input: readonly ModelInputType[];
 			readonly capabilities?: readonly ModelCapability[];
 		}[];
@@ -186,12 +188,14 @@ export interface RunSessionOptions {
 	readonly onText?: (text: string) => void;
 	/** 接收本次运行中的非致命诊断；未提供时回退到 Core 级 warning 回调。 */
 	readonly onWarning?: (message: string) => void;
-	/** 接收推理模型的思考增量；不落盘，仅供 UI 实时显示。 */
+	/** 接收推理模型的推理增量；不落盘，仅供 UI 实时显示。 */
 	readonly onReasoning?: (text: string) => void;
 	/** 流因空闲超时或提前结束而重试时回调，用于清空 UI 中的未完成增量。 */
 	readonly onRetry?: () => void;
 	/** 标记本次运行是一次性子代理会话：工具面不再注入 task，防止递归。 */
 	readonly subagent?: boolean;
+	/** 会话运行在内部任务工作区：系统提示词不披露工作区路径；项目会话不设置。 */
+	readonly internalWorkspace?: boolean;
 	/** 接收子代理实时进度（步数/耗时），不落盘。 */
 	readonly onSubagent?: (progress: SubagentProgress) => void;
 	/** 接收工具执行中的实时输出；不落盘，仅供界面展示。 */
@@ -247,8 +251,6 @@ const SPILL_DIRECTORY = join(tmpdir(), "moros-spill");
  * 不做成配置项：审查是执行路径上的同步等待，给使用者调大只会让 agent 卡得更久；
  * 超时按 error 收尾、退回人工，本身就是安全侧。
  */
-const REVIEW_TIMEOUT_SEC = 30;
-
 /**
  * 数据目录根：显式 `homeDir` > `MOROS_HOME` > 系统 home。
  *
@@ -700,6 +702,7 @@ export class Core {
 				maxTokens: model.maxTokens,
 				...(model.contextWindow ? { contextWindow: model.contextWindow } : {}),
 				reasoning: model.reasoning,
+				...(model.reasoningEfforts === undefined ? {} : { reasoningEfforts: model.reasoningEfforts }),
 				input: model.input,
 				...(model.capabilities === undefined ? {} : { capabilities: model.capabilities }),
 			})),
@@ -1129,7 +1132,7 @@ export class Core {
 			llm: this.#createLlmClient(options.config.retry),
 			request: this.#modelRequest(active, options.config, { maxTokens: 512, reasoningEffort: "off" }),
 			modelLabel: `${active.name}/${active.modelId}`,
-			timeoutSec: REVIEW_TIMEOUT_SEC,
+			timeoutSec: options.config.limits.reviewTimeoutSec,
 			projectRoot: options.projectRoot,
 		});
 	}
@@ -1228,7 +1231,7 @@ export class Core {
 			? createBuiltinTools(config.shellPath ? { shellPath: config.shellPath } : {})
 			: createBuiltinTools({
 					...(config.shellPath ? { shellPath: config.shellPath } : {}),
-					taskRunner: (task, context) => this.#runSubagent(session, projectRoot, task, context, options.onSubagent),
+					taskRunner: (task, context) => this.#runSubagent(session, projectRoot, task, context, options),
 				});
 		const tools = [...baseTools, ...mcpTools, ...(plan ? [createPresentPlanTool()] : [])];
 		const pipeline = await this.createPipeline({
@@ -1262,7 +1265,7 @@ export class Core {
 			toolNames: tools.map((tool) => tool.name),
 			instructionsSection: formatInstructionsSection(instructions),
 			skillsSection: formatSkillsSection(skills),
-			workingDirectory: projectRoot,
+			workingDirectory: options.internalWorkspace === true ? undefined : projectRoot,
 			plan,
 		});
 		const loop = new AgentLoop({
@@ -1328,7 +1331,7 @@ export class Core {
 		projectRoot: string,
 		task: string,
 		context: ToolContext,
-		onProgress?: (progress: SubagentProgress) => void,
+		runOptions: RunSessionOptions,
 	): Promise<ToolResult> {
 		const startedAt = Date.now();
 		const toolCallId = context.toolCallId ?? "task";
@@ -1346,10 +1349,10 @@ export class Core {
 		await parent.append({ type: "subagent.started", payload: { toolCallId, task: task.slice(0, 2_000) } }).catch(warn);
 		const signal = context.signal;
 		let progressTimer: NodeJS.Timeout | undefined;
-		if (onProgress) {
+		if (runOptions.onSubagent !== undefined) {
 			progressTimer = setInterval(() => {
 				void this.#subagentStats(session, Date.now() - startedAt).then((stats) => {
-					onProgress({
+					runOptions.onSubagent?.({
 						toolCallId,
 						steps: stats.steps,
 						totalTokens: stats.totalTokens,
@@ -1362,6 +1365,7 @@ export class Core {
 		try {
 			const result = await this.runSession(session, task, {
 				subagent: true,
+				...(runOptions.internalWorkspace === true ? { internalWorkspace: true } : {}),
 				...(signal ? { signal } : {}),
 			});
 			const finalText = lastAssistantText(result.messages);
@@ -1521,6 +1525,7 @@ export class Core {
 			readonly signal?: AbortSignal;
 			readonly onText?: (text: string) => void;
 			readonly onRetry?: () => void;
+			readonly internalWorkspace?: boolean;
 		} = {},
 	): Promise<{ readonly report: string; readonly turns: number; readonly stopReason: "done" | "steps" | "aborted" }> {
 		const root = resolve(projectRoot);
@@ -1535,6 +1540,7 @@ export class Core {
 				...(options.signal ? { signal: options.signal } : {}),
 				...(options.onText ? { onText: options.onText } : {}),
 				...(options.onRetry ? { onRetry: options.onRetry } : {}),
+				...(options.internalWorkspace === true ? { internalWorkspace: true } : {}),
 			});
 			const lastAssistant = [...result.messages].reverse().find((message) => message.role === "assistant");
 			const report = typeof lastAssistant?.content === "string" ? lastAssistant.content : "";
