@@ -46,7 +46,7 @@ export function Dropdown({
 	placeholder = "请选择",
 	trigger,
 	className,
-	title,
+	tooltip,
 	disabled = false,
 	actions = [],
 	keepOpenOnSelect = false,
@@ -62,7 +62,7 @@ export function Dropdown({
 	/** 自定义触发器内容；不传则显示选中项文本 + 箭头。 */
 	readonly trigger?: ReactNode;
 	readonly className?: string;
-	readonly title?: string;
+	readonly tooltip?: string;
 	/** 禁用时不可打开菜单或选择选项。 */
 	readonly disabled?: boolean;
 	/** 选项之后、分割线下方展示的操作项。 */
@@ -109,7 +109,7 @@ export function Dropdown({
 	const groups = groupOptions(options);
 
 	return (
-		<div className={`dropdown dropdown-${variant} ${className ?? ""}`} ref={rootRef} title={title}>
+		<div className={`dropdown dropdown-${variant} ${className ?? ""}`} ref={rootRef} data-tooltip={tooltip}>
 			<button
 				type="button"
 				className={`dropdown-trigger ${open ? "is-open" : ""}`}

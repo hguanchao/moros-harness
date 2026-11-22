@@ -344,6 +344,10 @@ html.is-resizing-sidebar .sidebar > * {
 	.project-group.is-expanded .project-tasks {
 		transition: none;
 	}
+
+	.scroll-bottom-button {
+		animation: none;
+	}
 }
 
 .workspace-head .group-add {
@@ -525,6 +529,16 @@ html.is-resizing-sidebar .sidebar > * {
 	animation: menu-down-in var(--duration-fast) var(--ease-out);
 }
 
+/* 侧栏菜单经 portal 挂到 body，改用 fixed + 触发按钮矩形定位，避开折叠容器的 overflow 裁剪。
+   定位坐标由 JS 内联写入（top/left），这里只覆盖定位模式与偏移。 */
+.row-menu.menu-portal {
+	position: fixed;
+	right: auto;
+	top: 0;
+	left: 0;
+	z-index: 120;
+}
+
 .row-menu-item {
 	display: flex;
 	align-items: center;
@@ -553,6 +567,125 @@ html.is-resizing-sidebar .sidebar > * {
 
 .row-menu-item.is-danger:hover {
 	background: var(--danger-soft);
+}
+
+/* 菜单内分组分隔线：批量操作入口与单行操作之间留出视觉区隔。 */
+.row-menu-separator {
+	height: 1px;
+	margin: 3px 4px;
+	background: var(--line-strong);
+}
+
+/* 批量模式操作栏：占据侧栏底部、替换设置按钮，紧凑排布全选、计数与操作按钮。 */
+.batch-bar {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	min-height: 36px;
+	padding: 0 8px;
+	border: 1px solid var(--line-strong);
+	border-radius: 9px;
+	background: var(--fill-soft);
+}
+
+.batch-select-all {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--text-secondary);
+	font-size: var(--text-small);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.batch-select-all input {
+	width: 13px;
+	height: 13px;
+	margin: 0;
+	accent-color: var(--accent);
+	cursor: pointer;
+}
+
+.batch-count {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--text-dim);
+	font-size: var(--text-caption);
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.batch-actions {
+	display: flex;
+	flex: none;
+	gap: 2px;
+}
+
+.batch-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
+	padding: 0;
+	border: none;
+	border-radius: var(--r-md);
+	background: transparent;
+	color: var(--text-secondary);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.batch-action:hover:not(:disabled) {
+	background: var(--fill-strong);
+	color: var(--text-primary);
+}
+
+.batch-action:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.batch-action.is-danger {
+	color: var(--danger);
+}
+
+.batch-action.is-danger:hover:not(:disabled) {
+	background: var(--danger-soft);
+}
+
+/* 批量勾选框：占据与行图标槽相同的 16px 列，标题不位移。 */
+.batch-checkbox {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border: 1.5px solid var(--text-dim);
+	border-radius: var(--r-sm);
+	color: var(--accent-contrast);
+}
+
+.batch-checkbox.is-checked {
+	border-color: var(--accent);
+	background: var(--accent);
+}
+
+.sidebar-row.is-checked {
+	background: var(--accent-soft);
+}
+
+/* 批量模式：行尾时间与更多按钮让位给勾选，仅保留标题与勾选框。 */
+.sidebar.is-batch-mode .row-trailing,
+.sidebar.is-batch-mode .row-menu-trigger {
+	display: none;
+}
+
+.sidebar.is-batch-mode .sidebar-row .row-main {
+	padding-right: 8px;
 }
 
 .sidebar-row .project-row {
@@ -648,16 +781,31 @@ html.is-resizing-sidebar .sidebar > * {
 	white-space: nowrap;
 	font-size: var(--text-title);
 	font-weight: 500;
-	color: var(--text-muted);
+	/* 与对话正文同色，避免标题单独偏暗/偏亮 */
+	color: var(--text-primary);
 }
 
 .conversation {
 	flex: 1;
+	min-width: 0;
 	min-height: 0;
 	overflow-y: auto;
 	scrollbar-gutter: stable;
 	display: flex;
 	flex-direction: column;
+}
+
+/* 搜索命中回合的短暂高亮 */
+.turn {
+	transition:
+		background var(--duration-fast) var(--ease-out),
+		box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.turn.is-search-hit {
+	background: var(--accent-soft);
+	box-shadow: inset 0 0 0 1px var(--accent-ring);
+	border-radius: var(--r-lg);
 }
 
 /* 会话视口外壳：承载回合生命线（运行中的回合在内容左缘显示流动推进线） */
@@ -704,6 +852,45 @@ html.is-resizing-sidebar .sidebar > * {
 	}
 	to {
 		top: 100%;
+	}
+}
+
+/* 回到底部：离开底部时浮现在对话区下缘居中，圆形按钮带阴影淡入 */
+.scroll-bottom-button {
+	position: absolute;
+	bottom: 14px;
+	left: 50%;
+	transform: translateX(-50%);
+	z-index: 10;
+	width: 34px;
+	height: 34px;
+	display: grid;
+	place-items: center;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-pill);
+	background: var(--surface-raised);
+	box-shadow: var(--shadow);
+	color: var(--text-secondary);
+	cursor: pointer;
+	animation: scroll-bottom-in var(--duration-normal) var(--ease-out);
+	transition:
+		background var(--duration-fast) var(--ease-standard),
+		color var(--duration-fast) var(--ease-standard);
+}
+
+.scroll-bottom-button:hover {
+	background: var(--accent-soft);
+	color: var(--text-primary);
+}
+
+@keyframes scroll-bottom-in {
+	from {
+		opacity: 0;
+		transform: translate(-50%, 6px);
+	}
+	to {
+		opacity: 1;
+		transform: translate(-50%, 0);
 	}
 }
 

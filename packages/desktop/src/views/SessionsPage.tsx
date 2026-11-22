@@ -49,7 +49,7 @@ export function SessionsPage(): JSX.Element {
 					setNextCursor(page.nextCursor);
 				}
 			} catch (error) {
-				if (!cancelled) dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+				if (!cancelled) console.error(`[moros] ${errorMessage(error)}`);
 			} finally {
 				if (!cancelled) setLoading(false);
 			}
@@ -73,18 +73,17 @@ export function SessionsPage(): JSX.Element {
 			setItems((existing) => [...existing, ...page.items]);
 			setNextCursor(page.nextCursor);
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			console.error(`[moros] ${errorMessage(error)}`);
 		}
 	};
 
-	const mutate = async (action: () => Promise<unknown>, success?: string): Promise<boolean> => {
+	const mutate = async (action: () => Promise<unknown>, _success?: string): Promise<boolean> => {
 		try {
 			await action();
 			dispatch({ type: "sessions-changed" });
-			if (success !== undefined) dispatch({ type: "notice", level: "info", message: success });
 			return true;
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			console.error(`[moros] ${errorMessage(error)}`);
 			return false;
 		}
 	};
@@ -97,7 +96,7 @@ export function SessionsPage(): JSX.Element {
 				actions={
 					<button
 						className="icon-button"
-						title="刷新"
+						data-tooltip="刷新"
 						aria-label="刷新"
 						onClick={() => {
 							void actions.refreshSessions();
@@ -148,19 +147,19 @@ export function SessionsPage(): JSX.Element {
 							{meta.forkedFrom !== undefined ? <span className="pill">分叉</span> : null}
 						</span>
 						<span className="session-table-actions">
-							<button className="icon-button" title="打开" onClick={() => void actions.activateSession(meta.id)}>
+							<button className="icon-button" data-tooltip="打开" onClick={() => void actions.activateSession(meta.id)}>
 								<ArchiveIcon size={14} />
 							</button>
 							<button
 								className="icon-button"
-								title="重命名"
+								data-tooltip="重命名"
 								onClick={() => setRenaming({ id: meta.id, title: meta.title })}
 							>
 								<span className="text-icon">Aa</span>
 							</button>
 							<button
 								className="icon-button"
-								title={meta.archived ? "取消归档" : "归档"}
+								data-tooltip={meta.archived ? "取消归档" : "归档"}
 								onClick={() =>
 									void mutate(
 										() => call(window.moros.sessionsArchive(meta.id, !meta.archived)),
@@ -172,7 +171,7 @@ export function SessionsPage(): JSX.Element {
 							</button>
 							<button
 								className="icon-button"
-								title="分叉"
+								data-tooltip="分叉"
 								onClick={() =>
 									void mutate(async () => {
 										await call(window.moros.sessionsFork(meta.id));
@@ -184,13 +183,10 @@ export function SessionsPage(): JSX.Element {
 							</button>
 							<button
 								className="icon-button"
-								title="导出"
+								data-tooltip="导出"
 								onClick={() =>
 									void mutate(async () => {
-										const result = await call(window.moros.sessionsExport(meta.id));
-										if (result !== null) {
-											dispatch({ type: "notice", level: "info", message: `已导出到 ${result.path}` });
-										}
+										await call(window.moros.sessionsExport(meta.id));
 									})
 								}
 							>
@@ -198,7 +194,7 @@ export function SessionsPage(): JSX.Element {
 							</button>
 							<button
 								className="icon-button"
-								title="回放"
+								data-tooltip="回放"
 								onClick={() =>
 									void mutate(async () => {
 										const events = await call(window.moros.sessionsReplay(meta.id));
@@ -210,7 +206,7 @@ export function SessionsPage(): JSX.Element {
 							</button>
 							<button
 								className="icon-button danger"
-								title="删除"
+								data-tooltip="删除"
 								onClick={async () => {
 									const confirmed = await confirm({
 										title: "删除会话",
@@ -362,6 +358,8 @@ function summarize(event: EventRecord): string {
 		case "session.archived":
 			return event.payload.archived ? "归档" : "取消归档";
 		case "mode.switched":
+			return `${event.payload.from} → ${event.payload.to}`;
+		case "model.changed":
 			return `${event.payload.from} → ${event.payload.to}`;
 		case "subagent.started":
 			return firstLine(event.payload.task, 120);

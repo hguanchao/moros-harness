@@ -15,6 +15,7 @@ import {
 	FolderPlusIcon,
 	ListChevronsDownUpIcon,
 	ListChevronsUpDownIcon,
+	ListChecksIcon,
 	MessagePlusIcon,
 	MoreIcon,
 	PencilIcon,
@@ -26,6 +27,7 @@ import {
 } from "./Icons.tsx";
 import { useConfirm } from "./ConfirmDialog.tsx";
 import { useApp } from "../store/state.tsx";
+import { groupByTarget, type BatchEntry } from "../utils/batch.ts";
 import { relativeTime } from "../utils/format.ts";
 import { workspaceRootsMatch } from "../utils/workspace.ts";
 
@@ -44,11 +46,16 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 	const actions = useDesktopActions();
 	const [expanded, setExpanded] = useState<Readonly<Record<string, boolean>>>({});
 	const [openMenu, setOpenMenu] = useState<MenuKey | undefined>(undefined);
+	/** 菜单锚点：触发按钮的视口矩形，菜单经 portal 渲染到 body 后据此定位，避开侧栏折叠容器的 overflow 裁剪。 */
+	const [menuAnchor, setMenuAnchor] = useState<DOMRect | undefined>(undefined);
 	const [copiedRoot, setCopiedRoot] = useState<string | undefined>(undefined);
 	const copyTimer = useRef<number | undefined>(undefined);
 	const [renaming, setRenaming] = useState<{ meta: SessionMeta; target: WorkspaceTarget; title: string } | undefined>(
 		undefined,
 	);
+	// 批量模式：selection 保存当前勾选的会话归属，key 为会话 id；进入时预选触发菜单的那一行。
+	const [batchMode, setBatchMode] = useState(false);
+	const [selection, setSelection] = useState<ReadonlyMap<string, WorkspaceTarget>>(new Map());
 	const platform = state.app?.platform ?? "win32";
 	const taskRoot = state.app?.taskRoot;
 	const sessions = state.sessions.filter((meta) => !meta.archived);
@@ -71,6 +78,24 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 		setExpanded(nextExpanded);
 	};
 
+	// 批量模式的候选集与下方渲染同源：任务根会话 + 各项目会话，每个 id 只归属一处。
+	const visibleTargets = new Map<string, WorkspaceTarget>();
+	if (taskRoot !== undefined) {
+		for (const meta of tasks) visibleTargets.set(meta.id, { kind: "tasks" });
+	}
+	for (const project of projects) {
+		const target: WorkspaceTarget = { kind: "project", root: project.root };
+		for (const meta of orderedForRoot(sessions, project.root, platform, pinned)) {
+			visibleTargets.set(meta.id, target);
+		}
+	}
+	// 只保留仍然可见的会话，避免外部变更导致对已消失的 id 执行操作。
+	const selectedEntries: BatchEntry[] = [];
+	for (const [id, target] of selection) {
+		if (visibleTargets.has(id)) selectedEntries.push({ id, target: visibleTargets.get(id) ?? target });
+	}
+	const allSelected = visibleTargets.size > 0 && selectedEntries.length === visibleTargets.size;
+
 	useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
 	useEffect(() => {
@@ -88,13 +113,12 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 	}, [openMenu]);
 
 	const report = (error: unknown): void => {
-		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+		console.error(`[moros] ${errorMessage(error)}`);
 	};
-	const mutate = async (action: () => Promise<unknown>, success?: string): Promise<boolean> => {
+	const mutate = async (action: () => Promise<unknown>, _success?: string): Promise<boolean> => {
 		try {
 			await action();
 			dispatch({ type: "sessions-changed" });
-			if (success !== undefined) dispatch({ type: "notice", level: "info", message: success });
 			return true;
 		} catch (error) {
 			report(error);
@@ -102,7 +126,70 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 		}
 	};
 
-	const toggleMenu = (key: MenuKey): void => setOpenMenu((current) => (current === key ? undefined : key));
+	const exitBatchMode = (): void => {
+		setBatchMode(false);
+		setSelection(new Map());
+	};
+	const toggleSelected = (id: string, target: WorkspaceTarget): void => {
+		setSelection((previous) => {
+			const next = new Map(previous);
+			if (next.has(id)) next.delete(id);
+			else next.set(id, target);
+			return next;
+		});
+	};
+	const toggleAllSelected = (): void => {
+		setSelection(allSelected ? new Map() : new Map(visibleTargets));
+	};
+
+	// 归档为单条 IPC，按归属分组后并行发出；删除 IPC 本身支持批量，同样按归属分组以通过根校验。
+	const runBatchArchive = async (entries: readonly BatchEntry[]): Promise<void> => {
+		const groups = groupByTarget(entries);
+		const ok = await mutate(async () => {
+			for (const group of groups.values()) {
+				await Promise.all(group.ids.map((id) => call(window.moros.sessionsArchiveInTarget(id, true, group.target))));
+			}
+		}, `已归档 ${entries.length} 项`);
+		if (ok) exitBatchMode();
+	};
+	const runBatchDelete = async (entries: readonly BatchEntry[]): Promise<void> => {
+		const confirmed = await confirm({
+			title: "批量删除会话",
+			message: `删除选中的 ${entries.length} 个会话？该操作不可恢复。`,
+			confirmLabel: "删除",
+			danger: true,
+		});
+		if (!confirmed) return;
+		const groups = groupByTarget(entries);
+		const ok = await mutate(async () => {
+			for (const group of groups.values()) {
+				await call(window.moros.sessionsDeleteInTarget(group.ids, group.target));
+			}
+		}, `已删除 ${entries.length} 项`);
+		if (ok) exitBatchMode();
+	};
+
+	// 批量模式中 Escape 退出，避免与菜单的 Escape 关闭逻辑冲突（菜单关闭只改 openMenu）。
+	useEffect(() => {
+		if (!batchMode) return;
+		const onKeyDown = (event: KeyboardEvent): void => {
+			if (event.key === "Escape") {
+				setBatchMode(false);
+				setSelection(new Map());
+			}
+		};
+		document.addEventListener("keydown", onKeyDown);
+		return () => document.removeEventListener("keydown", onKeyDown);
+	}, [batchMode]);
+
+	const toggleMenu = (key: MenuKey, button: HTMLButtonElement): void => {
+		if (openMenu === key) {
+			setOpenMenu(undefined);
+			return;
+		}
+		setMenuAnchor(button.getBoundingClientRect());
+		setOpenMenu(key);
+	};
 	const select = (id: string): void => {
 		// 已选中的会话不再重复激活，避免重复拉取事件与刷新导致闪烁。
 		if (state.current?.meta.id === id) return;
@@ -114,6 +201,7 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 		const selected =
 			state.current?.meta.id === meta.id &&
 			workspaceRootsMatch(state.current.meta.projectRoot, meta.projectRoot, platform);
+		const isChecked = selection.has(meta.id);
 		const isPinned = pinned.includes(meta.id);
 		// 行内活状态按优先级：执行中 > 等待审批 > 置顶标记
 		const runState = state.runStates[meta.id];
@@ -121,22 +209,37 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 		const isPaused = runState === "paused";
 		const slotStatus = isRunning ? "运行中" : isPaused ? "等待审批" : isPinned ? "已置顶" : undefined;
 		return (
-			<div className={`sidebar-row ${selected ? "is-selected" : ""}`} key={meta.id}>
-				<button className="row-main session-row" onClick={() => select(meta.id)}>
-					{/* 单一图标槽：执行中转圈 / 待审批警示 / 置顶图钉，标题列始终对齐 */}
-					<span
-						className={`row-icon-slot ${isRunning ? "session-running" : ""} ${isPaused ? "session-paused" : ""}`}
-						aria-hidden={slotStatus === undefined}
-						{...(slotStatus === undefined ? {} : { role: "status", "aria-label": slotStatus, title: slotStatus })}
-					>
-						{isRunning ? (
-							<span className="spinner small" />
-						) : isPaused ? (
-							<AlertIcon size={14} />
-						) : isPinned ? (
-							<PinIcon size={14} />
-						) : null}
-					</span>
+			<div
+				className={`sidebar-row ${selected ? "is-selected" : ""} ${batchMode && isChecked ? "is-checked" : ""}`}
+				key={meta.id}
+			>
+				<button
+					className="row-main session-row"
+					aria-pressed={batchMode ? isChecked : undefined}
+					onClick={() => (batchMode ? toggleSelected(meta.id, rowTarget.target) : select(meta.id))}
+				>
+					{/* 批量模式显示勾选框；否则单一图标槽：执行中转圈 / 待审批警示 / 置顶图钉，标题列始终对齐 */}
+					{batchMode ? (
+						<span className={`batch-checkbox ${isChecked ? "is-checked" : ""}`} aria-hidden="true">
+							{isChecked ? <CheckIcon size={13} strokeWidth={3} /> : null}
+						</span>
+					) : (
+						<span
+							className={`row-icon-slot ${isRunning ? "session-running" : ""} ${isPaused ? "session-paused" : ""}`}
+							aria-hidden={slotStatus === undefined}
+							{...(slotStatus === undefined
+								? {}
+								: { role: "status", "aria-label": slotStatus, "data-tooltip": slotStatus })}
+						>
+							{isRunning ? (
+								<span className="spinner small" />
+							) : isPaused ? (
+								<AlertIcon size={14} />
+							) : isPinned ? (
+								<PinIcon size={14} />
+							) : null}
+						</span>
+					)}
 					<MarqueeTitle title={meta.title} />
 				</button>
 				<span className="row-trailing">
@@ -147,14 +250,14 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 					aria-label={`${meta.title} 操作`}
 					aria-haspopup="menu"
 					aria-expanded={openMenu === menuKey}
-					title="操作"
+					data-tooltip="操作"
 					onPointerDown={(event) => event.stopPropagation()}
-					onClick={() => toggleMenu(menuKey)}
+					onClick={(event) => toggleMenu(menuKey, event.currentTarget)}
 				>
 					<MoreIcon size={14} />
 				</button>
 				{openMenu === menuKey ? (
-					<RowMenu>
+					<RowMenu anchor={menuAnchor}>
 						<MenuItem
 							icon={<PencilIcon size={14} />}
 							label="重命名"
@@ -198,6 +301,16 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 								void mutate(() => call(window.moros.sessionsDeleteInTarget([meta.id], rowTarget.target)), "会话已删除");
 							}}
 						/>
+						<div className="row-menu-separator" role="separator" />
+						<MenuItem
+							icon={<ListChecksIcon size={14} />}
+							label="批量操作"
+							onClick={() => {
+								setOpenMenu(undefined);
+								setBatchMode(true);
+								setSelection(new Map([[meta.id, rowTarget.target]]));
+							}}
+						/>
 					</RowMenu>
 				) : null}
 			</div>
@@ -205,7 +318,11 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 	};
 
 	return (
-		<aside className={`sidebar ${open ? "" : "is-collapsed"}`} inert={!open} aria-hidden={!open}>
+		<aside
+			className={`sidebar ${open ? "" : "is-collapsed"} ${batchMode ? "is-batch-mode" : ""}`}
+			inert={!open}
+			aria-hidden={!open}
+		>
 			<div className="brand">
 				<span className="brand-name">Moros</span>
 				<span className="brand-tag">Harness</span>
@@ -224,7 +341,7 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 					<button
 						className="group-add"
 						aria-label="在任务中新建任务"
-						title="新建任务"
+						data-tooltip="新建任务"
 						onClick={() => actions.newTaskInProject(null)}
 					>
 						<MessagePlusIcon size={14} />
@@ -241,7 +358,7 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 						<button
 							className="group-add"
 							aria-label={allProjectsExpanded ? "收起所有项目任务" : "展开所有项目任务"}
-							title={allProjectsExpanded ? "收起所有项目任务" : "展开所有项目任务"}
+							data-tooltip={allProjectsExpanded ? "收起所有项目任务" : "展开所有项目任务"}
 							disabled={projects.length === 0}
 							onClick={toggleAllProjects}
 						>
@@ -250,7 +367,7 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 						<button
 							className="group-add"
 							aria-label="添加项目"
-							title="添加项目"
+							data-tooltip="添加项目"
 							onClick={() => void actions.openProjectDialog().catch(report)}
 						>
 							<FolderPlusIcon size={14} />
@@ -270,7 +387,7 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 								<button
 									className="row-main project-row"
 									aria-expanded={isExpanded}
-									title={project.root}
+									data-tooltip={project.root}
 									onClick={() => setExpanded((previous) => ({ ...previous, [project.root]: !isExpanded }))}
 								>
 									{isExpanded ? <FolderOpenIcon size={16} /> : <FolderIcon size={16} />}
@@ -279,7 +396,7 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 								<button
 									className="project-add"
 									aria-label={`在 ${project.name} 中新建任务`}
-									title="在项目中新建任务"
+									data-tooltip="在项目中新建任务"
 									onClick={() => actions.newTaskInProject(projectRef)}
 								>
 									<MessagePlusIcon size={14} />
@@ -289,14 +406,14 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 									aria-label={`${project.name} 操作`}
 									aria-haspopup="menu"
 									aria-expanded={openMenu === menuKey}
-									title="操作"
+									data-tooltip="操作"
 									onPointerDown={(event) => event.stopPropagation()}
-									onClick={() => toggleMenu(menuKey)}
+									onClick={(event) => toggleMenu(menuKey, event.currentTarget)}
 								>
 									<MoreIcon size={14} />
 								</button>
 								{openMenu === menuKey ? (
-									<RowMenu>
+									<RowMenu anchor={menuAnchor}>
 										<MenuItem
 											icon={<FolderOpenIcon size={14} />}
 											label="打开文件夹"
@@ -346,16 +463,46 @@ export function Sidebar({ open }: { readonly open: boolean }): JSX.Element {
 				})}
 			</div>
 			<div className="sidebar-footer">
-				<button
-					className="settings-button"
-					aria-label="设置"
-					title="设置"
-					disabled={!state.ready}
-					onClick={() => dispatch({ type: "page", page: "settings" })}
-				>
-					<SettingsIcon size={16} />
-					<span>设置</span>
-				</button>
+				{batchMode ? (
+					<div className="batch-bar">
+						<label className="batch-select-all">
+							<input type="checkbox" aria-label="全选" checked={allSelected} onChange={toggleAllSelected} />
+							<span>全选</span>
+						</label>
+						<span className="batch-count">已选 {selectedEntries.length} 项</span>
+						<div className="batch-actions">
+							<button className="batch-action" data-tooltip="取消批量操作" onClick={exitBatchMode}>
+								<XIcon size={14} />
+							</button>
+							<button
+								className="batch-action"
+								data-tooltip="归档所选"
+								disabled={selectedEntries.length === 0}
+								onClick={() => void runBatchArchive(selectedEntries)}
+							>
+								<ArchiveIcon size={14} />
+							</button>
+							<button
+								className="batch-action is-danger"
+								data-tooltip="删除所选"
+								disabled={selectedEntries.length === 0}
+								onClick={() => void runBatchDelete(selectedEntries)}
+							>
+								<TrashIcon size={14} />
+							</button>
+						</div>
+					</div>
+				) : (
+					<button
+						className="settings-button"
+						aria-label="设置"
+						disabled={!state.ready}
+						onClick={() => dispatch({ type: "page", page: "settings" })}
+					>
+						<SettingsIcon size={16} />
+						<span>设置</span>
+					</button>
+				)}
 			</div>
 
 			{renaming !== undefined ? (
@@ -449,16 +596,41 @@ function orderedForRoot(
 		});
 }
 
-function RowMenu({ children }: { readonly children: ReactNode }): JSX.Element {
-	return (
+function RowMenu({
+	anchor,
+	children,
+}: {
+	/** 触发按钮的视口矩形；菜单渲染到 body 后据此定位。 */
+	readonly anchor: DOMRect | undefined;
+	readonly children: ReactNode;
+}): JSX.Element {
+	// 菜单挂在 body 而非侧栏的折叠容器内，避免 overflow:hidden 裁掉下方菜单项。
+	// 定位用 fixed + 触发按钮矩形，超出视口底部时向上翻转。
+	const menuRef = useRef<HTMLDivElement>(null);
+	const [style, setStyle] = useState<{ top: number; left: number }>({ top: -9999, left: -9999 });
+	useEffect(() => {
+		if (anchor === undefined || menuRef.current === null) return;
+		const menu = menuRef.current;
+		const gap = 4;
+		const rightAligned = anchor.right - menu.offsetWidth;
+		const left = Math.max(8, rightAligned);
+		const below = anchor.bottom + gap;
+		const top =
+			below + menu.offsetHeight > window.innerHeight ? Math.max(8, anchor.top - menu.offsetHeight - gap) : below;
+		setStyle({ top, left });
+	}, [anchor]);
+	return createPortal(
 		<div
-			className="row-menu"
+			ref={menuRef}
+			className="row-menu menu-portal"
 			role="menu"
+			style={style}
 			onPointerDown={(event) => event.stopPropagation()}
 			onClick={(event) => event.stopPropagation()}
 		>
 			{children}
-		</div>
+		</div>,
+		document.body,
 	);
 }
 

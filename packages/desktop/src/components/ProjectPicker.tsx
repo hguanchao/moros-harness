@@ -49,7 +49,7 @@ export function ProjectPicker(): JSX.Element {
 			.catch((error: unknown) => {
 				if (cancelled) return;
 				setBranches(undefined);
-				dispatch({ type: "notice", level: "warn", message: `无法读取 Git 分支：${errorMessage(error)}` });
+				console.warn(`[moros] 无法读取 Git 分支：${errorMessage(error)}`);
 			});
 		return () => {
 			cancelled = true;
@@ -69,7 +69,7 @@ export function ProjectPicker(): JSX.Element {
 		try {
 			await actions.selectProjectDialog();
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			console.error(`[moros] ${errorMessage(error)}`);
 		} finally {
 			setIsSelecting(false);
 		}
@@ -88,7 +88,7 @@ export function ProjectPicker(): JSX.Element {
 				<Dropdown
 					className="project-picker"
 					variant="inline"
-					title={project?.root ?? "选择或创建项目后，任务会归入该项目"}
+					tooltip={project?.root ?? "选择或创建项目后，任务会归入该项目"}
 					disabled={isDisabled}
 					value={project?.root ?? ""}
 					options={options}
@@ -110,7 +110,7 @@ export function ProjectPicker(): JSX.Element {
 					<button
 						type="button"
 						className="project-clear"
-						title="取消选择项目"
+						data-tooltip="取消选择项目"
 						aria-label="取消选择项目"
 						disabled={isDisabled}
 						onClick={() => dispatch({ type: "draft-project", project: null })}
@@ -123,7 +123,7 @@ export function ProjectPicker(): JSX.Element {
 				<Dropdown
 					className="branch-picker"
 					variant="inline"
-					title="首次发送前切换到该分支；工作区有未提交改动时不会切换"
+					tooltip="首次发送前切换到该分支；工作区有未提交改动时不会切换"
 					disabled={isDisabled}
 					value={selectedBranch ?? ""}
 					options={branchOptions}

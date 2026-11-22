@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type Dispatch, type JSX, type PointerEvent as ReactPointerEvent } from "react";
 
 import { currentNavigationEpoch, useDesktopActions } from "./hooks/actions.ts";
-import { useExitingItems } from "./hooks/use-exiting.ts";
 import { call, errorMessage } from "./api/api.ts";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "./shared/contract.ts";
 import { ChangesPage } from "./views/ChangesPage.tsx";
@@ -12,11 +11,15 @@ import { SettingsApp } from "./views/SettingsApp.tsx";
 import { TracePage } from "./views/TracePage.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
+import { TooltipHost } from "./components/Tooltip.tsx";
 import { useApp, type Action } from "./store/state.tsx";
 import { clampSidebarToViewport } from "./utils/layout.ts";
-import { AlertIcon, InfoIcon, XIcon } from "./components/Icons.tsx";
 
 const isMac = navigator.platform.toLowerCase().includes("mac");
+/** 主题切换颜色过渡时长；与 base.css 中 data-theme-transition 的过渡时长保持一致。 */
+const THEME_TRANSITION_MS = 150;
+/** 主题切换过渡类的清理定时器；连续切换时先清掉上一次。 */
+let themeTransitionTimer: number | undefined;
 
 export function App(): JSX.Element {
 	const { state, dispatch } = useApp();
@@ -30,7 +33,7 @@ export function App(): JSX.Element {
 			try {
 				const app = await call(window.moros.appState());
 				const settings = await call(window.moros.settingsGet()).catch((error: unknown) => {
-					dispatch({ type: "notice", level: "warn", message: `无法加载设置：${errorMessage(error)}` });
+					console.warn(`[moros] 无法加载设置：${errorMessage(error)}`);
 					return undefined;
 				});
 				if (cancelled) return;
@@ -52,7 +55,7 @@ export function App(): JSX.Element {
 	useEffect(() => {
 		if (!state.ready) return;
 		void actions.refreshSessions().catch((error: unknown) => {
-			dispatch({ type: "notice", level: "warn", message: `无法刷新会话列表：${errorMessage(error)}` });
+			console.warn(`[moros] 无法刷新会话列表：${errorMessage(error)}`);
 		});
 	}, [state.ready, state.sessionsVersion, actions.refreshSessions, dispatch]);
 
@@ -60,17 +63,17 @@ export function App(): JSX.Element {
 		const query = window.matchMedia("(prefers-color-scheme: dark)");
 		const apply = (): void => {
 			const resolved = state.theme === "auto" ? (query.matches ? "dark" : "light") : state.theme;
-			const commit = (): void => {
-				document.documentElement.dataset.theme = resolved;
-				document.documentElement.dataset.themeChoice = state.theme;
-			};
-			// 主题切换用 View Transitions 圆形扩散；不支持或用户偏好减少动效时直接应用
-			const doc = document as Document & { startViewTransition?: (update: () => void) => void };
+			// 切换瞬间临时挂上颜色过渡类，150ms 后移除，避免常驻 transition 干扰其它动效
+			const root = document.documentElement;
 			const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-			if (typeof doc.startViewTransition === "function" && !reducedMotion) {
-				doc.startViewTransition(commit);
-			} else {
-				commit();
+			window.clearTimeout(themeTransitionTimer);
+			if (!reducedMotion) root.dataset.themeTransition = "";
+			root.dataset.theme = resolved;
+			root.dataset.themeChoice = state.theme;
+			if (!reducedMotion) {
+				themeTransitionTimer = window.setTimeout(() => {
+					delete root.dataset.themeTransition;
+				}, THEME_TRANSITION_MS);
 			}
 			dispatch({ type: "resolved-theme", theme: resolved });
 			void window.moros.windowSetTheme(resolved === "dark");
@@ -93,7 +96,7 @@ export function App(): JSX.Element {
 			if (next === undefined) return;
 			dispatch({ type: "sidebar-width", width: next });
 			void call(window.moros.sidebarSetWidth(next)).catch((error: unknown) => {
-				dispatch({ type: "notice", level: "warn", message: `无法保存侧栏宽度：${errorMessage(error)}` });
+				console.warn(`[moros] 无法保存侧栏宽度：${errorMessage(error)}`);
 			});
 		};
 		apply();
@@ -129,7 +132,7 @@ export function App(): JSX.Element {
 				event.preventDefault();
 				if (!state.ready) return;
 				void actions.openProjectDialog().catch((error: unknown) => {
-					dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+					console.error(`[moros] 打开项目失败：${errorMessage(error)}`);
 				});
 				return;
 			}
@@ -167,7 +170,7 @@ export function App(): JSX.Element {
 					</main>
 				</div>
 			)}
-			<Toasts />
+			<TooltipHost />
 		</div>
 	);
 }
@@ -215,7 +218,7 @@ function SidebarResizeHandle({
 		setDragging(false);
 		document.documentElement.classList.remove("is-resizing-sidebar");
 		void call(window.moros.sidebarSetWidth(latestWidth.current)).catch((error: unknown) => {
-			dispatch({ type: "notice", level: "warn", message: `无法保存侧栏宽度：${errorMessage(error)}` });
+			console.warn(`[moros] 无法保存侧栏宽度：${errorMessage(error)}`);
 		});
 	};
 
@@ -230,57 +233,5 @@ function SidebarResizeHandle({
 			onPointerUp={finish}
 			onPointerCancel={finish}
 		/>
-	);
-}
-
-function Toasts(): JSX.Element {
-	const { state, dispatch } = useApp();
-	const exiting = useExitingItems(state.notices, (notice) => String(notice.id));
-	const slots = [
-		...state.notices.map((notice) => ({ notice, leaving: false })),
-		...exiting.map((notice) => ({ notice, leaving: true })),
-	];
-	return (
-		<div className="toasts">
-			{slots.map((slot) => (
-				<div key={slot.notice.id} className={`toast-slot ${slot.leaving ? "is-leaving" : ""}`}>
-					<div className="toast-slot-inner">
-						<Toast
-							id={slot.notice.id}
-							level={slot.notice.level}
-							message={slot.notice.message}
-							onDismiss={() => dispatch({ type: "dismiss-notice", id: slot.notice.id })}
-						/>
-					</div>
-				</div>
-			))}
-		</div>
-	);
-}
-
-function Toast({
-	id,
-	level,
-	message,
-	onDismiss,
-}: {
-	readonly id: number;
-	readonly level: "info" | "warn" | "error";
-	readonly message: string;
-	readonly onDismiss: () => void;
-}): JSX.Element {
-	useEffect(() => {
-		const timer = window.setTimeout(onDismiss, level === "error" ? 9_000 : 5_000);
-		return () => window.clearTimeout(timer);
-	}, [id, level, onDismiss]);
-
-	return (
-		<div className={`toast toast-${level}`} role={level === "error" ? "alert" : "status"}>
-			<span className="toast-icon">{level === "info" ? <InfoIcon size={15} /> : <AlertIcon size={15} />}</span>
-			<span className="toast-message">{message}</span>
-			<button className="toast-close" aria-label="关闭" onClick={onDismiss}>
-				<XIcon size={13} />
-			</button>
-		</div>
 	);
 }

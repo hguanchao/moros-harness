@@ -46,6 +46,31 @@ export interface DiscoverProviderModelsOptions {
 }
 
 /**
+ * UI 发起的模型连通性测试请求；使用当前表单中的供应商配置直接向模型发一条最小请求。
+ * apiKey 可直接提供，或通过 providerName 复用已保存供应商的密钥。
+ */
+export interface TestModelRequest {
+	readonly api: ProviderConfig["api"];
+	readonly baseUrl: string;
+	readonly modelId: string;
+	readonly apiKey?: string;
+	readonly providerName?: string;
+	readonly timeoutMs?: number;
+	readonly httpProxy?: string;
+}
+
+/** 模型测试结果；ok=false 时 error 携带面向用户的简短原因。 */
+export interface TestModelResult {
+	readonly ok: boolean;
+	/** 请求耗时（毫秒）。 */
+	readonly durationMs: number;
+	/** 供应商回包的正文预览（截断到合理长度），仅成功时有值。 */
+	readonly text?: string;
+	/** 失败原因；对外已脱敏，不含堆栈与密钥。 */
+	readonly error?: string;
+}
+
+/**
  * 从供应商的 `/models` 接口读取模型列表；只发 GET，不修改任何配置。
  * @param input 供应商 API 类型、Base URL、密钥表达式，可选超时时间。
  * @param options 可注入的 fetch、环境变量与取消信号，便于测试与代理场景扩展。

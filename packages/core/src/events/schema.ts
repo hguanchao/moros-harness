@@ -37,6 +37,21 @@ export const EventSchema = z.discriminatedUnion("type", [
 		}),
 	}),
 	EventBaseSchema.extend({ type: z.literal("mode.switched"), payload: z.object({ from: modeSchema, to: modeSchema }) }),
+	EventBaseSchema.extend({
+		type: z.literal("model.changed"),
+		payload: z.object({
+			/** 旧模型的显示名（模型配置的 name，缺省为 ID）。 */
+			from: z.string(),
+			/** 新模型的显示名。 */
+			to: z.string(),
+			/** 旧模型的 provider/model 标识，用于审计与诊断。 */
+			fromModel: z.string(),
+			/** 新模型的 provider/model 标识。 */
+			toModel: z.string(),
+			/** 切换发生在回合运行中：模型在下一轮生效，分隔线延后到下一轮显示。 */
+			appliesNextTurn: z.boolean(),
+		}),
+	}),
 	EventBaseSchema.extend({ type: z.literal("session.renamed"), payload: z.object({ title: z.string().min(1) }) }),
 	EventBaseSchema.extend({ type: z.literal("session.archived"), payload: z.object({ archived: z.boolean() }) }),
 	EventBaseSchema.extend({
@@ -197,6 +212,7 @@ export const EventSchema = z.discriminatedUnion("type", [
 export const EVENT_TYPES = [
 	"session.created",
 	"mode.switched",
+	"model.changed",
 	"session.renamed",
 	"session.archived",
 	"user.input",

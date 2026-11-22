@@ -126,6 +126,23 @@ describe("ToolPipeline 审批闸门", () => {
 		expect(result.isError).toBe(true);
 		expect(result.content).toContain("denylist");
 	});
+
+	it("运行中切到 yolo 后，后续调用不再请求审批", async () => {
+		let asked = 0;
+		const pipeline = createPipeline("ask", async () => {
+			asked += 1;
+			return "allow";
+		});
+
+		await pipeline.run("bash", { command: "ls -la" }, "turn-before-yolo");
+		expect(asked).toBe(1);
+
+		pipeline.setPolicy("creator", "yolo");
+		const result = await pipeline.run("bash", { command: "curl https://example.com" }, "turn-after-yolo");
+
+		expect(asked).toBe(1);
+		expect(result.isError).toBeFalsy();
+	});
 });
 
 describe("ToolPipeline 模型审查", () => {

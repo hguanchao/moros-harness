@@ -1,4 +1,9 @@
-import type { DiscoveredModel, DiscoverModelsRequest } from "@moros/core/config/model-discovery.ts";
+import type {
+	DiscoveredModel,
+	DiscoverModelsRequest,
+	TestModelRequest,
+	TestModelResult,
+} from "@moros/core/config/model-discovery.ts";
 import type { ModelMetadata as CatalogModelMetadata } from "@moros/core/config/model-catalog/fill.ts";
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft } from "@moros/core/config/settings.ts";
 import type { ApprovalMode, FileChangeDiff, ModelCatalog, SessionMetrics } from "@moros/core/core.ts";
@@ -21,6 +26,7 @@ export const IPC = {
 	appSelectProjectDialog: "moros:app-select-project-dialog",
 	appCreateProjectDialog: "moros:app-create-project-dialog",
 	appOpenProjectFolder: "moros:app-open-project-folder",
+	appOpenTerminal: "moros:app-open-terminal",
 	appCopyProjectPath: "moros:app-copy-project-path",
 	appForgetProject: "moros:app-forget-project",
 	workspacePrepare: "moros:workspace-prepare",
@@ -72,6 +78,7 @@ export const IPC = {
 	settingsRenameProvider: "moros:settings-rename-provider",
 	settingsRevealSecret: "moros:settings-reveal-secret",
 	settingsDiscoverModels: "moros:settings-discover-models",
+	settingsTestModel: "moros:settings-test-model",
 	settingsLookupModelMetadata: "moros:settings-lookup-model-metadata",
 	modelsList: "moros:models-list",
 	configSummary: "moros:config-summary",
@@ -391,7 +398,13 @@ export type PushMessage =
 	| { readonly type: "session-cleared"; readonly sessionId: string }
 	| { readonly type: "sessions-changed" }
 	| { readonly type: "workspace"; readonly paths: readonly string[] }
-	| { readonly type: "notice"; readonly level: "info" | "warn" | "error"; readonly message: string }
+	/** 会话级警告/错误，渲染在对应会话的对话流顶部而非浮动提示。 */
+	| {
+			readonly type: "inline-notice";
+			readonly sessionId: string;
+			readonly tone: "warn" | "error";
+			readonly text: string;
+	  }
 	| { readonly type: "project"; readonly project: ProjectSnapshot }
 	| { readonly type: "trust"; readonly trust: WorkspaceTrustView }
 	| { readonly type: "queue"; readonly sessionId: string; readonly items: readonly QueuedMessage[] }
@@ -416,6 +429,8 @@ export interface DesktopBridge {
 	createProjectDialog(name: string): Promise<RpcResult<ProjectSelection | null>>;
 	/** 在系统文件管理器中打开已登记项目目录；不切换工作区。 */
 	openProjectFolder(root: string): Promise<RpcResult<void>>;
+	/** 在已登记项目根目录打开系统终端。 */
+	openTerminal(root: string): Promise<RpcResult<void>>;
 	/** 复制已登记项目目录路径到剪贴板。 */
 	copyProjectPath(root: string): Promise<RpcResult<void>>;
 	/** 只从最近项目列表移除，不删除目录或会话；返回更新后的列表。 */
@@ -490,6 +505,7 @@ export interface DesktopBridge {
 	settingsRenameProvider(from: string, to: string): Promise<RpcResult<SettingsSnapshot>>;
 	settingsRevealSecret(name: string): Promise<RpcResult<string>>;
 	settingsDiscoverModels(input: DiscoverModelsRequest): Promise<RpcResult<readonly DiscoveredModel[]>>;
+	settingsTestModel(input: TestModelRequest): Promise<RpcResult<TestModelResult>>;
 	settingsLookupModelMetadata(id: string): Promise<RpcResult<CatalogModelMetadata | null>>;
 	modelsList(): Promise<RpcResult<ModelCatalog>>;
 	configSummary(): Promise<RpcResult<ConfigSummary>>;

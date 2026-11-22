@@ -196,6 +196,12 @@ export function mapCoreEvent(event: EventRecord, state: CoreEventStreamState): r
 			];
 		case "mode.switched":
 			return [notice(`Mode: ${event.payload.from} → ${event.payload.to}`)];
+		case "model.changed":
+			return [
+				notice(
+					`Model: ${event.payload.from} → ${event.payload.to}${event.payload.appliesNextTurn ? " (next turn)" : ""}`,
+				),
+			];
 		case "session.renamed":
 			return [notice(`Session renamed: ${event.payload.title}`)];
 		case "session.archived":

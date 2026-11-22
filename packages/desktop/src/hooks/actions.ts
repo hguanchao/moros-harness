@@ -95,7 +95,7 @@ export function useDesktopActions(): DesktopActions {
 		const items = pages.flatMap((page, index) => {
 			if (page.status === "fulfilled") return page.value.items;
 			const label = index === 0 ? "任务" : (app.recentProjects[index - 1]?.name ?? "项目");
-			dispatch({ type: "notice", level: "warn", message: `无法加载${label}会话：${errorMessage(page.reason)}` });
+			console.warn(`[moros] 无法加载${label}会话：${errorMessage(page.reason)}`);
 			return [];
 		});
 		const sessions = new Map(items.map((meta) => [meta.id, meta]));

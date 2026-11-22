@@ -108,6 +108,11 @@
 	color: var(--text-primary);
 }
 
+/* 浅色主题下选中项使用固定的中性灰，深色主题沿用 --row-selected */
+:root[data-theme="light"] .prov-sidebar .provider-card.prov-item.is-active {
+	background: #d3d3d3;
+}
+
 .prov-sidebar .provider-card.prov-item > svg {
 	flex: none;
 	color: var(--text-dim);
@@ -345,40 +350,6 @@
 .prov-field-help:hover,
 .prov-field-help:focus-visible {
 	color: var(--text-secondary);
-}
-
-.prov-field-tooltip {
-	position: absolute;
-	bottom: calc(100% + 8px);
-	left: 50%;
-	transform: translateX(-50%) translateY(4px);
-	z-index: 30;
-	width: max-content;
-	max-width: 260px;
-	padding: 7px 9px;
-	border: 1px solid var(--line-strong);
-	border-radius: var(--r-lg);
-	background: var(--surface-chrome);
-	box-shadow: var(--shadow);
-	color: var(--text-secondary);
-	font-size: var(--text-caption);
-	line-height: 1.5;
-	text-align: left;
-	white-space: normal;
-	opacity: 0;
-	visibility: hidden;
-	pointer-events: none;
-	transition:
-		opacity 0.12s ease,
-		transform 0.12s ease,
-		visibility 0.12s;
-}
-
-.prov-field-help:hover .prov-field-tooltip,
-.prov-field-help:focus-visible .prov-field-tooltip {
-	opacity: 1;
-	visibility: visible;
-	transform: translateX(-50%) translateY(0);
 }
 
 .prov-input {
@@ -1378,33 +1349,37 @@
 	white-space: nowrap;
 }
 
-.prov-model-facts {
-	display: grid;
-	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 4px 16px;
-	margin-top: 5px;
-}
-
-.prov-model-facts > span {
-	display: flex;
-	align-items: baseline;
-	gap: 5px;
-	min-width: 0;
-	font-size: var(--text-caption);
-}
-
-.prov-fact-label {
-	flex-shrink: 0;
-	color: var(--text-faint);
-}
-
-.prov-fact-value {
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+/* 标题行内的紧凑信息：上下文窗口徽章（默认底色）与图片能力标记 */
+.prov-model-title > .prov-model-context {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	min-height: 18px;
+	padding: 0 6px;
+	border-radius: var(--r-pill);
+	background: var(--fill-soft);
 	color: var(--text-secondary);
+	font-size: var(--text-caption);
+	line-height: 1;
 	font-variant-numeric: tabular-nums;
+	overflow: visible;
+}
+
+.prov-model-input-icon {
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	align-self: center;
+	color: var(--text-dim);
+}
+
+/* 测试按钮：测试后图标变为成功/失败并着色，具体信息由 title 悬停展示 */
+.prov-model-actions .icon-button.prov-model-test-button.is-ok {
+	color: var(--ok);
+}
+
+.prov-model-actions .icon-button.prov-model-test-button.is-error {
+	color: var(--danger);
 }
 
 .prov-model-actions {

@@ -80,7 +80,11 @@ export function Composer(): JSX.Element {
 	}, [current?.meta.id, state.draftGeneration, disabled]);
 
 	const report = (error: unknown): void => {
-		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+		if (current !== undefined) {
+			dispatch({ type: "inline-notice", sessionId: current.meta.id, tone: "error", text: errorMessage(error) });
+		} else {
+			console.error(`[moros] ${errorMessage(error)}`);
+		}
 	};
 
 	const send = async (): Promise<void> => {
@@ -102,7 +106,7 @@ export function Composer(): JSX.Element {
 				const prepared = await actions.prepareTask(target, generation);
 				if (prepared === undefined || epoch !== currentNavigationEpoch()) return;
 				if (prepared.trust.required && prepared.trust.decision === null) {
-					dispatch({ type: "notice", level: "info", message: "请确认工作区信任后再次发送，输入已保留" });
+					// 信任确认由 TrustGate 界面呈现，不再额外弹提示。
 					return;
 				}
 				if (draftProject !== null && draftBranch !== undefined) {
@@ -122,7 +126,7 @@ export function Composer(): JSX.Element {
 				if (context === undefined || epoch !== currentNavigationEpoch()) return;
 				session = context.session;
 			}
-			const result = await call(
+			await call(
 				window.moros.chatSend({
 					sessionId: session.meta.id,
 					text: message,
@@ -130,9 +134,6 @@ export function Composer(): JSX.Element {
 				}),
 			);
 			dispatch({ type: "draft-sent", generation, revision, imageIds });
-			if (result.queued) {
-				dispatch({ type: "notice", level: "info", message: "已加入队列，当前回合结束后自动发送" });
-			}
 		} catch (error) {
 			report(error);
 		} finally {
@@ -161,7 +162,7 @@ export function Composer(): JSX.Element {
 		for (const file of Array.from(files)) {
 			if (!file.type.startsWith("image/")) continue;
 			if (file.size > MAX_IMAGE_BYTES) {
-				dispatch({ type: "notice", level: "warn", message: `${file.name} 超过单张图片上限` });
+				// 超过单张图片上限时跳过该文件，不再弹提示。
 				continue;
 			}
 			try {
@@ -372,7 +373,7 @@ export function Composer(): JSX.Element {
 						<div className="attach-wrap">
 							<button
 								className="add-button"
-								title="添加附件"
+								data-tooltip="添加附件"
 								aria-label="添加附件"
 								disabled={disabled}
 								onClick={() => setAttachMenu(!attachMenu)}
@@ -424,7 +425,7 @@ export function Composer(): JSX.Element {
 						/>
 						<button
 							className={`send-button ${stoppable ? "is-stop" : canSend ? "is-ready" : ""}`}
-							title={stoppable ? "停止当前回合" : "发送"}
+							data-tooltip={stoppable ? "停止当前回合" : "发送"}
 							aria-label={stoppable ? "停止当前回合" : "发送"}
 							disabled={!stoppable && (disabled || isSending || !canSend)}
 							onClick={() => {
@@ -624,7 +625,7 @@ function ModelEffortPicker({
 			className="model-picker"
 			variant="inline"
 			disabled={disabled}
-			title={title}
+			tooltip={title}
 			value={provider === undefined ? (model?.provider ?? "") : selectedValue}
 			options={provider === undefined ? providerOptions : [...modelOptions, ...effortOptions]}
 			emptyState={
@@ -645,7 +646,7 @@ function ModelEffortPicker({
 					<button
 						type="button"
 						className="dropdown-menu-back"
-						title="返回供应商列表"
+						data-tooltip="返回供应商列表"
 						onClick={() => setProviderName(undefined)}
 					>
 						<ChevronLeftIcon size={13} />
@@ -697,7 +698,7 @@ function ApprovalPicker({
 		<Dropdown
 			className={`permission ${plan ? "is-plan" : ""}`}
 			variant="inline"
-			title="权限模式（仅本会话，不回写配置）"
+			tooltip="权限模式（仅本会话，不回写配置）"
 			disabled={disabled}
 			value={plan ? "plan" : approval}
 			options={[

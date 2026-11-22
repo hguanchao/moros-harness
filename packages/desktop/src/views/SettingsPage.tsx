@@ -13,16 +13,22 @@ import { MultiSelect, type MultiSelectOption } from "../components/MultiSelect.t
 import {
 	AlertIcon,
 	CheckIcon,
+	CircleCheckIcon,
+	CircleXIcon,
 	EyeIcon,
 	EyeOffIcon,
+	FileTextIcon,
 	HelpCircleIcon,
+	ImageIcon,
 	InfoIcon,
 	MoreIcon,
 	PencilIcon,
+	PlayIcon,
 	PlusIcon,
 	RefreshIcon,
 	ServerIcon,
 	TrashIcon,
+	VideoIcon,
 	XIcon,
 } from "../components/Icons.tsx";
 import { useConfirm } from "../components/ConfirmDialog.tsx";
@@ -139,12 +145,24 @@ function ensureCapabilities(values: readonly string[]): ModelCapability[] {
 	return MODEL_CAPABILITY_OPTIONS.filter((option) => values.includes(option.value)).map((option) => option.value);
 }
 
-function inputTypeLabel(value: ModelInputType): string {
-	return MODEL_INPUT_OPTIONS.find((option) => option.value === value)?.label ?? value;
+/** 额外输入类型的图标与提示文本；文本为固有能力不在此列。 */
+function inputTypeIcon(type: ModelInputType): { icon: JSX.Element; label: string } | undefined {
+	if (type === "image") return { icon: <ImageIcon size={14} />, label: "支持图片" };
+	if (type === "video") return { icon: <VideoIcon size={14} />, label: "支持视频" };
+	if (type === "pdf") return { icon: <FileTextIcon size={14} />, label: "支持 PDF" };
+	return undefined;
 }
 
-function reasoningLabel(value: ReasoningLevel): string {
-	return REASONING_OPTIONS.find((option) => option.value === value)?.label ?? value;
+/** 紧凑显示上下文窗口：1048576 -> 1M，131072 -> 128K；非法/缺省返回 —。 */
+function formatCompactCount(value: string): string {
+	const count = Number(value);
+	if (!value.trim() || !Number.isFinite(count) || count <= 0) return "—";
+	if (count >= 1_000_000) {
+		const millions = count / 1_000_000;
+		return `${Number.isInteger(millions) ? millions : millions.toFixed(1)}M`;
+	}
+	if (count >= 1_000) return `${Math.round(count / 1_000)}K`;
+	return String(count);
 }
 
 export interface ProviderForm {
@@ -218,7 +236,7 @@ function formFromProvider(provider: ProviderView, fallbackEffort: ReasoningEffor
 	};
 }
 
-/** 字段标签 + 问号提示：悬停或键盘聚焦时在标签旁显示说明，替代行内小字。 */
+/** 字段标签 + 问号提示：悬停或键盘聚焦时由全局 Tooltip 显示说明。 */
 function FieldLabel({ children, hint }: { readonly children: ReactNode; readonly hint: string }): JSX.Element {
 	return (
 		<span className="prov-field-label">
@@ -228,12 +246,10 @@ function FieldLabel({ children, hint }: { readonly children: ReactNode; readonly
 				tabIndex={0}
 				role="img"
 				aria-label={hint}
+				data-tooltip={hint}
 				onClick={(event) => event.preventDefault()}
 			>
 				<HelpCircleIcon size={13} />
-				<span className="prov-field-tooltip" role="tooltip">
-					{hint}
-				</span>
 			</span>
 		</span>
 	);
@@ -306,6 +322,10 @@ export function ProvidersTab({
 	const [moreOpen, setMoreOpen] = useState(false);
 	const [editingName, setEditingName] = useState(false);
 	const [renameValue, setRenameValue] = useState("");
+	const [testingModelId, setTestingModelId] = useState<string | undefined>(undefined);
+	const [modelTestResult, setModelTestResult] = useState<{ modelId: string; ok: boolean; detail: string } | undefined>(
+		undefined,
+	);
 	const moreRef = useRef<HTMLDivElement>(null);
 
 	const current =
@@ -586,6 +606,48 @@ export function ProvidersTab({
 		setModelEditor(undefined);
 	};
 
+	/** 用当前供应商配置向单个模型发最小请求，结果以内联提示呈现。 */
+	const testModel = async (model: ModelForm): Promise<void> => {
+		const baseUrl = draft.baseUrl.trim();
+		if (!isHttpUrl(baseUrl)) {
+			onNotice("warn", "请先填写有效的 Base URL");
+			return;
+		}
+		const apiKey = draft.apiKey.trim();
+		const hasSavedKey = !isNew && selected !== undefined && current?.apiKey.source !== "empty";
+		if (apiKey.length === 0 && !hasSavedKey) {
+			onNotice("warn", "请先填写 API Key");
+			return;
+		}
+		const modelId = model.id.trim();
+		setTestingModelId(modelId);
+		setModelTestResult(undefined);
+		try {
+			const result = await call(
+				window.moros.settingsTestModel({
+					api: draft.api,
+					baseUrl,
+					modelId,
+					...(apiKey.length === 0 ? {} : { apiKey }),
+					...(apiKey.length === 0 && selected !== undefined ? { providerName: selected } : {}),
+					...(draft.timeoutMs.trim().length > 0 ? { timeoutMs: Number(draft.timeoutMs) } : {}),
+				}),
+			);
+			const duration = `${(result.durationMs / 1000).toFixed(1)}s`;
+			setModelTestResult({
+				modelId,
+				ok: result.ok,
+				detail: result.ok
+					? `连接成功 · ${duration}${result.text === undefined ? "" : ` · ${result.text}`}`
+					: `连接失败 · ${duration} · ${result.error ?? "未知错误"}`,
+			});
+		} catch (error) {
+			setModelTestResult({ modelId, ok: false, detail: `连接失败 · ${errorMessage(error)}` });
+		} finally {
+			setTestingModelId(undefined);
+		}
+	};
+
 	/** 从供应商 `/models` 读取可用模型，在弹窗中展示供勾选。 */
 	const discoverModels = async (): Promise<void> => {
 		const baseUrl = draft.baseUrl.trim();
@@ -756,7 +818,7 @@ export function ProvidersTab({
 					<p className="prov-page-desc">管理自定义模型供应商，配置后可在聊天时选择使用。</p>
 				</div>
 				<div className="prov-page-actions">
-					<button className="icon-button" title="刷新" onClick={() => void onRefresh()}>
+					<button className="icon-button" data-tooltip="刷新" onClick={() => void onRefresh()}>
 						<RefreshIcon size={16} />
 					</button>
 					<button className="primary-button" onClick={startNew}>
@@ -822,14 +884,18 @@ export function ProvidersTab({
 										}}
 									/>
 								) : (
-									<h2 className="prov-detail-name" title="双击重命名" onDoubleClick={startEditName}>
+									<h2 className="prov-detail-name" data-tooltip="双击重命名" onDoubleClick={startEditName}>
 										{selected}
 									</h2>
 								)}
 							</div>
 							{!isNew ? (
 								<div className="prov-more" ref={moreRef}>
-									<button className="icon-button" title="更多" onClick={() => setMoreOpen((previous) => !previous)}>
+									<button
+										className="icon-button"
+										data-tooltip="更多"
+										onClick={() => setMoreOpen((previous) => !previous)}
+									>
 										<MoreIcon size={16} />
 									</button>
 									{moreOpen ? (
@@ -893,7 +959,7 @@ export function ProvidersTab({
 									<button
 										type="button"
 										className="prov-key-eye"
-										title={showKey ? "隐藏" : "显示原始表达式"}
+										data-tooltip={showKey ? "隐藏" : "显示原始表达式"}
 										onClick={() => void toggleReveal()}
 									>
 										{showKey ? <EyeOffIcon size={15} /> : <EyeIcon size={15} />}
@@ -911,7 +977,7 @@ export function ProvidersTab({
 										value=""
 										options={[]}
 										onChange={() => undefined}
-										title="模型来源"
+										tooltip="模型来源"
 										trigger={
 											<>
 												<PlusIcon size={13} />
@@ -1018,7 +1084,7 @@ export function ProvidersTab({
 													type="button"
 													className={`prov-checkbox-button ${modelEditor.model.reasoningEfforts.length === 0 ? "is-checked" : ""}`}
 													aria-pressed={modelEditor.model.reasoningEfforts.length === 0}
-													title="关闭并清空已选推理档位"
+													data-tooltip="关闭并清空已选推理档位"
 													onClick={() => updateModelEditor({ reasoningEfforts: [] })}
 												>
 													关闭
@@ -1057,59 +1123,67 @@ export function ProvidersTab({
 								</div>
 							) : (
 								<div className="prov-model-list">
-									{draft.models.map((model, index) => (
-										<div className="prov-model-card" key={`${index}-${model.id}`}>
-											<div className="prov-model-main">
-												<div className="prov-model-title">
-													<strong>{model.id}</strong>
-													{model.name.trim().length > 0 ? <span>{model.name}</span> : null}
+									{draft.models.map((model, index) => {
+										const test = modelTestResult?.modelId === model.id ? modelTestResult : undefined;
+										const testing = testingModelId === model.id;
+										const extraInputs = model.input.filter((type) => type !== "text");
+										return (
+											<div className="prov-model-card" key={`${index}-${model.id}`}>
+												<div className="prov-model-main">
+													{/* 单行紧凑展示：模型 ID、名称、上下文窗口、额外输入能力图标 */}
+													<div className="prov-model-title">
+														<strong>{model.id}</strong>
+														{model.name.trim().length > 0 ? <span>{model.name}</span> : null}
+														<span className="prov-model-context" data-tooltip="上下文窗口">
+															{formatCompactCount(model.contextWindow)}
+														</span>
+														{extraInputs.map((type) => {
+															const info = inputTypeIcon(type);
+															return info === undefined ? null : (
+																<span className="prov-model-input-icon" key={type} data-tooltip={info.label}>
+																	{info.icon}
+																</span>
+															);
+														})}
+													</div>
 												</div>
-												<div className="prov-model-facts">
-													<span>
-														<span className="prov-fact-label">上下文</span>
-														<span className="prov-fact-value">
-															{model.contextWindow.trim().length > 0
-																? Number(model.contextWindow).toLocaleString()
-																: "—"}
-														</span>
-													</span>
-													<span>
-														<span className="prov-fact-label">最大输出</span>
-														<span className="prov-fact-value">{Number(model.maxTokens).toLocaleString()}</span>
-													</span>
-													<span>
-														<span className="prov-fact-label">输入类型</span>
-														<span className="prov-fact-value" title={model.input.map(inputTypeLabel).join(" / ")}>
-															{model.input.map(inputTypeLabel).join(" / ")}
-														</span>
-													</span>
-													<span>
-														<span className="prov-fact-label">推理强度</span>
-														<span
-															className="prov-fact-value"
-															title={
-																model.reasoningEfforts.length > 0
-																	? model.reasoningEfforts.map(reasoningLabel).join(" / ")
-																	: "不支持"
-															}
-														>
-															{model.reasoningEfforts.length > 0
-																? model.reasoningEfforts.map(reasoningLabel).join(" / ")
-																: "不支持"}
-														</span>
-													</span>
+												<div className="prov-model-actions">
+													<button
+														className={`icon-button prov-model-test-button ${
+															test === undefined ? "" : test.ok ? "is-ok" : "is-error"
+														}`}
+														data-tooltip={test === undefined ? "测试模型" : test.detail}
+														disabled={testing}
+														onClick={() => void testModel(model)}
+													>
+														{testing ? (
+															<span className="spinner small" />
+														) : test === undefined ? (
+															<PlayIcon size={14} />
+														) : test.ok ? (
+															<CircleCheckIcon size={14} />
+														) : (
+															<CircleXIcon size={14} />
+														)}
+													</button>
+													<button
+														className="icon-button"
+														data-tooltip="编辑模型"
+														onClick={() => editModel(index, model)}
+													>
+														<PencilIcon size={14} />
+													</button>
+													<button
+														className="icon-button danger"
+														data-tooltip="删除模型"
+														onClick={() => deleteModel(index)}
+													>
+														<TrashIcon size={14} />
+													</button>
 												</div>
 											</div>
-											<div className="prov-model-actions">
-												<button className="icon-button" title="编辑模型" onClick={() => editModel(index, model)}>
-													<PencilIcon size={14} />
-												</button>
-												<button className="icon-button danger" title="删除模型" onClick={() => deleteModel(index)}>
-													<TrashIcon size={14} />
-												</button>
-											</div>
-										</div>
-									))}
+										);
+									})}
 								</div>
 							)}
 						</div>
@@ -1194,10 +1268,10 @@ export function ProvidersTab({
 																onChange={() => toggleModelSelection(model.id)}
 															/>
 														</span>
-														<span className="discover-item-id" title={model.id}>
+														<span className="discover-item-id" data-tooltip={model.id}>
 															{model.id}
 														</span>
-														<span className="discover-item-name" title={model.name}>
+														<span className="discover-item-name" data-tooltip={model.name}>
 															{model.name || "—"}
 														</span>
 														<span className="discover-num">
@@ -1349,8 +1423,8 @@ export function WorkspaceTab({
 					className="ghost-button"
 					onClick={() => {
 						void call(window.moros.configSummary())
-							.then((value) => dispatch({ type: "notice", level: "info", message: JSON.stringify(value, null, 2) }))
-							.catch((error: unknown) => dispatch({ type: "notice", level: "error", message: errorMessage(error) }));
+							.then((value) => console.info(JSON.stringify(value, null, 2)))
+							.catch((error: unknown) => console.error(`[moros] ${errorMessage(error)}`));
 					}}
 				>
 					查看诊断

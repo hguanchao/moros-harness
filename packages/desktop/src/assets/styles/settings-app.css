@@ -12,12 +12,17 @@
 	color: var(--text-primary);
 }
 
-/* 返回入口放在设置导航顶部、搜索框上方 */
-.settings-back {
+/* 返回入口放在设置导航顶部。用更高优先级覆盖下方 .settings-nav > * 的定宽，
+   否则按钮被拉到整栏宽再加左右 margin，右圆角会被 nav 的 overflow 裁掉。 */
+.settings-nav > .settings-back {
+	flex: none;
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	height: 34px;
+	width: auto;
+	min-width: 0;
+	align-self: stretch;
 	margin: 10px 12px 0;
 	padding: 0 10px;
 	border: none;
@@ -28,7 +33,7 @@
 	font-size: var(--text-small);
 }
 
-.settings-back:hover {
+.settings-nav > .settings-back:hover {
 	background: var(--fill-hover);
 	color: var(--text-primary);
 }
@@ -67,42 +72,11 @@
 	opacity: 0;
 }
 
-.settings-search {
-	height: 32px;
-	display: flex;
-	align-items: center;
-	gap: 7px;
-	margin: 12px;
-	padding: 0 10px;
-	border: 1px solid var(--line);
-	border-radius: var(--r-lg);
-	background: var(--surface-chrome);
-	color: var(--text-faint);
-}
-
-.settings-search:focus-within {
-	border-color: var(--text-faint);
-}
-
-.settings-search input {
-	flex: 1;
-	min-width: 0;
-	border: none;
-	outline: none;
-	background: transparent;
-	color: var(--text-primary);
-	font-size: var(--text-small);
-}
-
-.settings-search input::placeholder {
-	color: var(--text-faint);
-}
-
 .settings-nav-scroll {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
-	padding: 0 8px 12px;
+	padding: 12px 8px 12px;
 }
 
 .settings-nav-group {
@@ -161,12 +135,6 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-
-.settings-nav-empty {
-	padding: 12px 10px;
-	color: var(--text-faint);
-	font-size: var(--text-small);
 }
 
 /* 内容区：居中固定宽度列 */
@@ -259,6 +227,27 @@
 	background: var(--fill-soft);
 	color: var(--text-secondary);
 	font-size: var(--text-small);
+}
+
+/* 常规页内联输入框：固定宽度，避免被 SettingsRow 的描述文字挤压 */
+.settings-row-control .general-input {
+	width: 220px;
+}
+
+.validated-input {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 3px;
+}
+
+.settings-row-control .general-input.is-invalid {
+	border-color: var(--danger);
+}
+
+.validated-input-error {
+	color: var(--danger);
+	font-size: var(--text-micro);
 }
 
 .settings-select {

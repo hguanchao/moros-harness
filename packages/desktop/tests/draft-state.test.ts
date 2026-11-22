@@ -555,6 +555,7 @@ describe("renderer task draft state", () => {
 		});
 		expect(overflow.draft.images).toBe(filled.draft.images);
 		expect(overflow.draftRevision).toBe(filled.draftRevision);
-		expect(overflow.notices.at(-1)).toMatchObject({ level: "warn", message: "最多附加 8 张图片" });
+		// 超出图片上限时静默忽略，不再产生任何提示消息。
+		expect(overflow).toBe(filled);
 	});
 });

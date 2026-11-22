@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { basename, join } from "node:path";
 
@@ -27,6 +28,8 @@ import {
 	type ReasoningEffort,
 	type Session,
 	type SessionExportResult,
+	type TestModelRequest,
+	type TestModelResult,
 	type SessionImageInput,
 	type SessionMeta,
 	type SessionMetrics,
@@ -356,6 +359,30 @@ export class DesktopHost {
 		const projectRoot = await this.#knownProjectRoot(root);
 		const failure = await shell.openPath(projectRoot);
 		if (failure.length > 0) throw new DesktopWorkspaceError("open-folder-failed", "无法打开项目文件夹");
+	}
+
+	/** 在已登记项目根目录打开系统终端；子进程独立运行，不阻塞主进程。 */
+	async openTerminal(root: string): Promise<void> {
+		const projectRoot = await this.#knownProjectRoot(root);
+		const platform = process.platform;
+		let command: string;
+		let args: string[];
+		if (platform === "win32") {
+			command = "cmd.exe";
+			args = ["/K", `cd /d "${projectRoot}"`];
+		} else if (platform === "darwin") {
+			command = "open";
+			args = ["-a", "Terminal", projectRoot];
+		} else {
+			command = "xdg-open";
+			args = [projectRoot];
+		}
+		const child = spawn(command, args, { cwd: projectRoot, detached: true, windowsHide: false, stdio: "ignore" });
+		child.on("error", () => {
+			// 终端启动失败只记录诊断，不阻断 UI（已通过 #knownProjectRoot 校验路径合法）。
+			console.warn(`[moros] 无法打开终端: ${command}`);
+		});
+		child.unref();
 	}
 
 	/** 复制已登记项目的规范路径到剪贴板；不切换执行工作区。 */
@@ -861,6 +888,10 @@ export class DesktopHost {
 		return this.#requiredCore().discoverModels(input);
 	}
 
+	async testModel(input: TestModelRequest): Promise<TestModelResult> {
+		return this.#requiredCore().testModel(input);
+	}
+
 	async lookupModelMetadata(id: string): Promise<CatalogModelMetadata | null> {
 		return this.#requiredCore().lookupModelMetadata(id);
 	}
@@ -883,10 +914,35 @@ export class DesktopHost {
 		if (!providerEntry?.models.some((entry) => entry.id === model)) {
 			throw new Error(`Unknown model: ${provider}/${model}`);
 		}
+		const previous = await core.getSelectedModel(session);
 		// 只改当前会话的进程内选择；不动全局默认，避免一个会话的切换扩散到所有会话。
 		await core.selectModel(session, provider, model);
+		const next = { provider, model };
+		const changed = previous === undefined || previous.provider !== provider || previous.model !== model;
+		if (changed) {
+			// 运行中切换的模型在下一轮才生效；标记该事件以便分隔线延后到下一轮显示。
+			const appliesNextTurn = this.#hasPendingWork(session.meta.id);
+			await session.append({
+				type: "model.changed",
+				payload: {
+					from: previous === undefined ? "默认模型" : this.#modelLabel(catalog, previous),
+					to: this.#modelLabel(catalog, next),
+					fromModel: previous === undefined ? "" : `${previous.provider}/${previous.model}`,
+					toModel: `${provider}/${model}`,
+					appliesNextTurn,
+				},
+			});
+		}
 		await this.#refreshCatalog();
 		await this.#pushViewIfCurrent(session.meta.id);
+	}
+
+	/** 在模型目录中解析模型显示名：优先 name，无则回退模型 ID。 */
+	#modelLabel(catalog: ModelCatalog, ref: { provider: string; model: string }): string {
+		return (
+			catalog.providers.find((entry) => entry.name === ref.provider)?.models.find((entry) => entry.id === ref.model)
+				?.name ?? ref.model
+		);
 	}
 
 	async selectEffort(effort: ReasoningEffort): Promise<void> {
@@ -900,8 +956,12 @@ export class DesktopHost {
 	async selectApproval(mode: ApprovalMode): Promise<void> {
 		const core = this.#requiredCore();
 		const session = this.#requireCurrent();
+		const sessionId = session.meta.id;
 		core.setSessionApproval(session, mode);
-		await this.#pushViewIfCurrent(session.meta.id);
+		// 切到完全访问：即时放行当前会话挂起的审批卡，避免它继续阻塞运行；
+		// 后续工具调用已由 setPolicy 切到 yolo，不再弹卡。
+		if (mode === "yolo") this.#broker.allowSession(sessionId);
+		await this.#pushViewIfCurrent(sessionId);
 	}
 
 	async setPlan(enabled: boolean): Promise<boolean> {
@@ -923,7 +983,7 @@ export class DesktopHost {
 		try {
 			await core.prepareMcp(root);
 		} catch (error) {
-			this.#notice("warn", `Could not start MCP servers: ${messageOf(error)}`);
+			console.warn(`[moros] Could not start MCP servers: ${messageOf(error)}`);
 		}
 		const trust = await this.#readTrust();
 		this.#push({ type: "trust", trust });
@@ -1011,11 +1071,7 @@ export class DesktopHost {
 	// 工作区切换与发送准备按顺序执行；等待的是创建/租约/信任检查，不是后台整轮任务。
 	/** 该会话是否有在飞、正在启动或排队的工作。 */
 	#hasPendingWork(sessionId: string): boolean {
-		return (
-			this.#runs.has(sessionId) ||
-			this.#starting.has(sessionId) ||
-			(this.#queues.get(sessionId)?.length ?? 0) > 0
-		);
+		return this.#runs.has(sessionId) || this.#starting.has(sessionId) || (this.#queues.get(sessionId)?.length ?? 0) > 0;
 	}
 
 	/** 某个工作区是否有在飞、正在启动或排队的任务（按会话归属的 projectRoot 判定）。 */
@@ -1067,7 +1123,7 @@ export class DesktopHost {
 	async #rememberProject(root: string): Promise<void> {
 		if (normalizeProjectRoot(root) === normalizeProjectRoot(this.#taskRoot)) return;
 		await this.#store.rememberProject(root).catch((error: unknown) => {
-			this.#notice("warn", `Could not save the recent project list: ${messageOf(error)}`);
+			console.warn(`[moros] Could not save the recent project list: ${messageOf(error)}`);
 		});
 	}
 
@@ -1152,7 +1208,8 @@ export class DesktopHost {
 				requestApproval: (request, sessionId, signal) => this.#requestApproval(request, sessionId, signal),
 				onWarning: (message) => {
 					this.#warnings = [...this.#warnings.slice(-(MAX_WARNINGS - 1)), message];
-					this.#notice("warn", message);
+					const sessionId = this.#current?.meta.id;
+					if (sessionId !== undefined) this.#inlineNotice(sessionId, "warn", message);
 				},
 				hostKind: "desktop",
 				...(this.#homeDir === undefined ? {} : { homeDir: this.#homeDir }),
@@ -1162,7 +1219,7 @@ export class DesktopHost {
 		try {
 			await this.#requiredCore().prepareMcp(root);
 		} catch (error) {
-			this.#notice("warn", `Could not start MCP servers: ${messageOf(error)}`);
+			console.warn(`[moros] Could not start MCP servers: ${messageOf(error)}`);
 		}
 		await this.#refreshMetas();
 		await this.#refreshCatalog();
@@ -1250,7 +1307,7 @@ export class DesktopHost {
 				await core.releaseSessionLease(id);
 			}
 			await this.#refreshMetas().catch((refreshError: unknown) =>
-				this.#notice("warn", `Could not refresh sessions: ${messageOf(refreshError)}`),
+				console.warn(`[moros] Could not refresh sessions: ${messageOf(refreshError)}`),
 			);
 			throw error;
 		}
@@ -1319,7 +1376,7 @@ export class DesktopHost {
 				const core = this.#core;
 				for (const id of [...this.#createdSessionIds]) {
 					await core.discardEmptySession(id).catch((error: unknown) => {
-						this.#notice("warn", `Could not clean up an empty session: ${messageOf(error)}`);
+						console.warn(`[moros] Could not clean up an empty session: ${messageOf(error)}`);
 					});
 				}
 				await core.dispose();
@@ -1339,7 +1396,7 @@ export class DesktopHost {
 	#startWatcher(root: string): void {
 		this.#watcher?.close();
 		this.#watcher = watchWorkspace(root, (paths) => this.#push({ type: "workspace", paths }), {
-			onError: (error) => this.#notice("warn", `Workspace watcher failed: ${messageOf(error)}`),
+			onError: (error) => console.warn(`[moros] Workspace watcher failed: ${messageOf(error)}`),
 		});
 	}
 
@@ -1426,7 +1483,7 @@ export class DesktopHost {
 					this.#dropStreams(runId);
 					this.#push({ type: "retry", sessionId, runId });
 				},
-				onWarning: (message) => this.#notice("warn", message),
+				onWarning: (message) => this.#inlineNotice(sessionId, "warn", message),
 				onToolOutput: (toolCallId, chunk) => {
 					live.toolOutputs.set(toolCallId, (live.toolOutputs.get(toolCallId) ?? "") + chunk);
 					this.#enqueueStream({
@@ -1455,9 +1512,9 @@ export class DesktopHost {
 			const aborted = controller.signal.aborted || isAbortError(error);
 			if (aborted) {
 				outcome = "aborted";
-				this.#notice("info", "Turn stopped.");
 			} else {
 				outcome = "error";
+				// run 错误由 state 的 run 分支写入对话内联提示，不再弹浮动提示。
 				this.#push({
 					type: "run",
 					sessionId,
@@ -1465,7 +1522,6 @@ export class DesktopHost {
 					state: "error",
 					error: messageOf(error),
 				});
-				this.#notice("error", messageOf(error));
 			}
 		} finally {
 			this.#flushSessionStreams(sessionId);
@@ -1479,7 +1535,7 @@ export class DesktopHost {
 			live.runId = undefined;
 			live.startedAt = undefined;
 			await this.#refreshMetas().catch((error: unknown) =>
-				this.#notice("warn", `Could not refresh sessions: ${messageOf(error)}`),
+				console.warn(`[moros] Could not refresh sessions: ${messageOf(error)}`),
 			);
 			this.#pushMeta(sessionId);
 			await this.#pushViewIfCurrent(sessionId).catch(() => undefined);
@@ -1499,7 +1555,7 @@ export class DesktopHost {
 		if (next === undefined) return;
 		this.#pushQueue(sessionId);
 		void this.#startRun(next).catch((error: unknown) => {
-			this.#notice("error", messageOf(error));
+			this.#inlineNotice(sessionId, "error", messageOf(error));
 			this.#pushQueue(sessionId);
 			void this.#drainQueue(sessionId);
 		});
@@ -1533,7 +1589,7 @@ export class DesktopHost {
 		} catch (error) {
 			if (error instanceof SessionBusyError) {
 				this.#readOnlyIds.add(session.meta.id);
-				this.#notice("warn", `Session ${session.meta.id} is open in another window; this window is read-only.`);
+				console.warn(`[moros] Session ${session.meta.id} is open in another window; this window is read-only.`);
 				return;
 			}
 			throw error;
@@ -1560,7 +1616,7 @@ export class DesktopHost {
 			this.#readOnlyIds.delete(id);
 			this.#dropSubscription(id);
 		} catch (error) {
-			this.#notice("warn", `Could not clean up an empty session: ${messageOf(error)}`);
+			console.warn(`[moros] Could not clean up an empty session: ${messageOf(error)}`);
 		}
 	}
 
@@ -1611,7 +1667,7 @@ export class DesktopHost {
 	#requestApproval(request: ApprovalRequest, sessionId: string, signal?: AbortSignal): Promise<ApprovalDecision> {
 		const card = toApprovalCard(request, sessionId);
 		this.#push({ type: "approval", card });
-		return this.#broker.request(request, signal).finally(() => {
+		return this.#broker.request(request, signal, sessionId).finally(() => {
 			this.#push({ type: "approval-cleared", id: request.id });
 		});
 	}
@@ -1622,7 +1678,7 @@ export class DesktopHost {
 		try {
 			return await core.getWorkspaceTrust(root);
 		} catch (error) {
-			this.#notice("warn", `Could not read workspace trust: ${messageOf(error)}`);
+			console.warn(`[moros] Could not read workspace trust: ${messageOf(error)}`);
 			// 读不到结论时按「需要确认」处理，宁可挡住发送也不默认信任。
 			return { required: true, decision: null, files: [], skillDirectories: [] };
 		}
@@ -1687,7 +1743,7 @@ export class DesktopHost {
 			if (this.#current?.meta.id !== session.meta.id) return;
 			this.#push({ type: "session-view", view });
 		} catch (error) {
-			this.#notice("warn", `Could not refresh session state: ${messageOf(error)}`);
+			console.warn(`[moros] Could not refresh session state: ${messageOf(error)}`);
 		}
 	}
 
@@ -1868,8 +1924,9 @@ export class DesktopHost {
 		}
 	}
 
-	#notice(level: "info" | "warn" | "error", message: string): void {
-		this.#push({ type: "notice", level, message });
+	/** 会话级警告/错误写入对话流内联提示，不再弹浮动消息。 */
+	#inlineNotice(sessionId: string, tone: "warn" | "error", text: string): void {
+		this.#push({ type: "inline-notice", sessionId, tone, text });
 	}
 
 	#requiredCore(): Core {

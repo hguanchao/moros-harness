@@ -130,7 +130,6 @@
 	align-items: center;
 	gap: 16px;
 	flex: none;
-	transform: translateY(2px);
 }
 
 .composer-right {
@@ -138,7 +137,6 @@
 	align-items: center;
 	gap: 16px;
 	min-width: 0;
-	transform: translateY(2px);
 }
 
 .add-button {

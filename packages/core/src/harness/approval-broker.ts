@@ -19,6 +19,8 @@ export type ApprovalAnswer = "once" | "always" | "deny";
 
 interface PendingApproval {
 	readonly request: ApprovalRequest;
+	/** 发起审批的会话；宿主据此在切换审批档位时精确放行该会话的挂起卡。 */
+	readonly sessionId: string;
 	readonly prompt: ApprovalPrompt;
 	readonly displayId: number;
 	readonly resolve: (decision: ApprovalDecision) => void;
@@ -35,7 +37,7 @@ interface PendingApproval {
  * 超时（默认 120 秒）与中止信号都按 deny / AbortError 收尾，避免工具永久挂起。
  */
 export interface ApprovalBroker {
-	request(request: ApprovalRequest, signal?: AbortSignal): Promise<ApprovalDecision>;
+	request(request: ApprovalRequest, signal?: AbortSignal, sessionId?: string): Promise<ApprovalDecision>;
 	current(): ApprovalRequest | undefined;
 	pending(): ApprovalPrompt | undefined;
 	pendingAll(): readonly ApprovalPrompt[];
@@ -44,6 +46,8 @@ export interface ApprovalBroker {
 	pendingId(): number | undefined;
 	resolve(answer: ApprovalAnswer, id?: number): void;
 	denyAll(): void;
+	/** 放行指定会话的全部挂起审批；用于运行中切到完全访问时自动放行当前卡。 */
+	allowSession(sessionId: string): void;
 }
 
 export interface ApprovalBrokerOptions {
@@ -80,8 +84,8 @@ export function createApprovalBroker(options: ApprovalBrokerOptions = {}): Appro
 		publish();
 	};
 
-	return {
-		request(request, signal) {
+		return {
+		request(request, signal, sessionId) {
 			if (pending.has(request.id)) return Promise.reject(new Error(`Approval ${request.id} is already pending`));
 			if (signal?.aborted) return Promise.reject(asAbortError(signal.reason));
 			return new Promise<ApprovalDecision>((resolve, reject) => {
@@ -102,6 +106,7 @@ export function createApprovalBroker(options: ApprovalBrokerOptions = {}): Appro
 				timer?.unref();
 				const entry: PendingApproval = {
 					request,
+					sessionId: sessionId ?? "",
 					prompt: toPrompt(request),
 					displayId: nextDisplayId++,
 					resolve,
@@ -132,6 +137,11 @@ export function createApprovalBroker(options: ApprovalBrokerOptions = {}): Appro
 		},
 		denyAll() {
 			for (const entry of [...pending.values()]) finish(entry.request.id, "deny");
+		},
+		allowSession(sessionId) {
+			for (const entry of [...pending.values()]) {
+				if (entry.sessionId === sessionId) finish(entry.request.id, "allow");
+			}
 		},
 	};
 }

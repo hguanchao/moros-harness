@@ -224,7 +224,9 @@
 	font-size: var(--text-micro);
 }
 
-.tool-detail-panel {
+/* 视觉样式放在内层：折叠直接子元素 .tool-detail-panel 不能带 padding/border/margin，
+   否则 grid 0fr 无法把它压到 0，收起时仍露出边框和留白 */
+.tool-detail-panel-inner {
 	margin: 3px 0 6px 29px;
 	padding: 9px 11px;
 	border: 1px solid var(--line);
@@ -332,6 +334,34 @@ pre.is-error {
 
 .inline-notice.notice-ok {
 	color: var(--ok);
+}
+
+/* 对话内的居中分隔提示（如模型切换）：两侧横线 + 图标 + 小字 */
+.inline-divider {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 6px 0;
+	color: var(--text-faint);
+	font-size: var(--text-caption);
+	white-space: nowrap;
+}
+
+.inline-divider::before,
+.inline-divider::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--line);
+}
+
+.inline-divider > svg {
+	flex: none;
+}
+
+.inline-divider > span {
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .plan-card {
@@ -638,6 +668,50 @@ pre.is-error {
 	100% {
 		background-position: -200% 0;
 	}
+}
+
+/* 回合中间步骤摘要：完成后把推理/工具压成一行，点击展开查看细节 */
+.turn-trail {
+	margin: 2px 0 12px;
+}
+
+.turn-trail-head {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 8px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-pill);
+	background: var(--fill-soft);
+	color: var(--text-faint);
+	font-size: var(--text-caption);
+	cursor: pointer;
+	transition:
+		background var(--duration-fast) var(--ease-standard),
+		color var(--duration-fast) var(--ease-standard);
+}
+
+.turn-trail-head:hover:not(:disabled) {
+	background: var(--fill-strong);
+	color: var(--text-secondary);
+}
+
+.turn-trail-head:disabled {
+	cursor: default;
+}
+
+.turn-trail-icon {
+	display: inline-flex;
+	color: var(--text-dim);
+}
+
+.turn-trail-label {
+	white-space: nowrap;
+}
+
+.turn-trail-body {
+	margin: 8px 0 2px;
+	padding-left: 6px;
 }
 
 @media (prefers-reduced-motion: reduce) {

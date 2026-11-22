@@ -6,8 +6,19 @@ import { Composer } from "../components/Composer.tsx";
 import { EmptyBrand } from "../components/EmptyBrand.tsx";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 import { useExitingItems } from "../hooks/use-exiting.ts";
-import { AlertIcon, CheckIcon, ChevronDownIcon, SparklesIcon, XIcon } from "../components/Icons.tsx";
+import {
+	AlertIcon,
+	ArrowDownIcon,
+	CheckIcon,
+	ChevronDownIcon,
+	PanelRightIcon,
+	SearchIcon,
+	SparklesIcon,
+	XIcon,
+} from "../components/Icons.tsx";
 import { Markdown } from "../components/Markdown.tsx";
+import { ConversationPanel } from "../components/ConversationPanel.tsx";
+import { ConversationSearch } from "../components/ConversationSearch.tsx";
 import { useApp } from "../store/state.tsx";
 import { buildTimeline, Transcript } from "../components/Transcript.tsx";
 
@@ -20,10 +31,17 @@ export function ChatPage(): JSX.Element {
 	const project = state.project;
 	const scrollRef = useRef<HTMLDivElement | null>(null);
 	const stickToBottom = useRef(true);
+	/** 用户向上滚动离开底部时显示「回到底部」按钮。 */
+	const [showScrollBottom, setShowScrollBottom] = useState(false);
+	/** 标题栏：对话搜索与右侧面板的开合状态。 */
+	const [searchOpen, setSearchOpen] = useState(false);
+	const [searchQuery, setSearchQuery] = useState("");
+	const [panelOpen, setPanelOpen] = useState(false);
 
 	const events = current === undefined ? [] : (state.events[current.meta.id] ?? []);
 	const live = current === undefined ? undefined : (state.live[current.meta.id] ?? current.live);
 	const subagents = current === undefined ? {} : (state.subagents[current.meta.id] ?? {});
+	const inlineNotices = current === undefined ? [] : (state.inlineNotices[current.meta.id] ?? []);
 	const turns = useMemo(
 		() => (live === undefined ? [] : buildTimeline(events, live, subagents)),
 		[events, live, subagents],
@@ -50,6 +68,7 @@ export function ChatPage(): JSX.Element {
 
 	useEffect(() => {
 		stickToBottom.current = true;
+		setShowScrollBottom(false);
 	}, [current?.meta.id]);
 
 	useEffect(() => {
@@ -62,8 +81,30 @@ export function ChatPage(): JSX.Element {
 		return () => cancelAnimationFrame(frame);
 	}, [events.length, live?.text, live?.reasoning, current?.meta.id]);
 
+	const scrollToBottom = (): void => {
+		const element = scrollRef.current;
+		if (element === null) return;
+		element.scrollTo({ top: element.scrollHeight, behavior: "smooth" });
+		stickToBottom.current = true;
+		setShowScrollBottom(false);
+	};
+
+	/** 搜索结果定位：滚动到对应回合并短暂高亮。 */
+	const jumpToTurn = (turnKey: string): void => {
+		const target = document.getElementById(turnKey);
+		if (target === null) return;
+		target.scrollIntoView({ behavior: "smooth", block: "center" });
+		target.classList.add("is-search-hit");
+		window.setTimeout(() => target.classList.remove("is-search-hit"), 1600);
+	};
+
 	const report = (error: unknown): void => {
-		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+		// 会话相关操作失败内联到当前会话对话流，不再弹浮动提示。
+		if (current !== undefined) {
+			dispatch({ type: "inline-notice", sessionId: current.meta.id, tone: "error", text: errorMessage(error) });
+		} else {
+			console.error(`[moros] ${errorMessage(error)}`);
+		}
 	};
 
 	const approvePlan = (plan: string): void => {
@@ -86,12 +127,7 @@ export function ChatPage(): JSX.Element {
 	const dock = (
 		<div className="composer-dock">
 			{approvalSlots.map((slot) => (
-				<ApprovalSlot
-					key={slot.card.id}
-					card={slot.card}
-					leaving={slot.leaving}
-					currentSessionId={current?.meta.id}
-				/>
+				<ApprovalSlot key={slot.card.id} card={slot.card} leaving={slot.leaving} currentSessionId={current?.meta.id} />
 			))}
 			<Composer />
 			{state.review !== undefined ? <ReviewModal /> : null}
@@ -105,6 +141,41 @@ export function ChatPage(): JSX.Element {
 					<div className="main-bar-left">
 						<span className="conversation-title">{current.meta.title}</span>
 						{current.readOnly === true ? <span className="pill warn">只读</span> : null}
+					</div>
+					<div className="main-bar-right">
+						<button
+							className={`icon-button ${searchOpen ? "is-active" : ""}`}
+							aria-label="搜索对话"
+							data-tooltip="搜索对话"
+							onClick={() => {
+								setSearchOpen((open) => !open);
+								setPanelOpen(false);
+							}}
+						>
+							<SearchIcon size={16} />
+						</button>
+						<button
+							className={`icon-button ${panelOpen ? "is-active" : ""}`}
+							aria-label="会话面板"
+							data-tooltip="会话面板"
+							onClick={() => {
+								setPanelOpen((open) => !open);
+								setSearchOpen(false);
+							}}
+						>
+							<PanelRightIcon size={16} />
+						</button>
+						{searchOpen ? (
+							<div className="conversation-search-popover">
+								<ConversationSearch
+									events={events}
+									query={searchQuery}
+									onQueryChange={setSearchQuery}
+									onJump={jumpToTurn}
+									onClose={() => setSearchOpen(false)}
+								/>
+							</div>
+						) : null}
 					</div>
 				</header>
 			)}
@@ -122,37 +193,50 @@ export function ChatPage(): JSX.Element {
 			) : (
 				<>
 					<div className="conversation-shell">
-						<span
-							className={`turn-lifeline ${live?.running === true ? "is-running" : ""}`}
-							aria-hidden="true"
-						/>
+						<span className={`turn-lifeline ${live?.running === true ? "is-running" : ""}`} aria-hidden="true" />
 						<div
 							className="conversation"
 							ref={scrollRef}
 							onScroll={(event) => {
 								const element = event.currentTarget;
-								stickToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+								const atBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 80;
+								stickToBottom.current = atBottom;
+								setShowScrollBottom(!atBottom);
 							}}
 						>
-						<div className="transcript">
-							{state.loadError !== undefined ? (
-								<div className="load-error">
-									<AlertIcon size={16} />
-									<span>{state.loadError}</span>
-								</div>
-							) : null}
-							<Transcript
-								turns={turns}
-								planning={current.plan === true}
-								running={current.running === true}
-								onApprovePlan={approvePlan}
-								onRevisePlan={() => {
-									if (activePlan === undefined) return;
-									document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
-								}}
-							/>
+							<div className="transcript">
+								{state.loadError !== undefined ? (
+									<div className="load-error">
+										<AlertIcon size={16} />
+										<span>{state.loadError}</span>
+									</div>
+								) : null}
+								<Transcript
+									turns={turns}
+									inlineNotices={inlineNotices}
+									planning={current.plan === true}
+									running={current.running === true}
+									onApprovePlan={approvePlan}
+									onRevisePlan={() => {
+										if (activePlan === undefined) return;
+										document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+									}}
+								/>
+							</div>
 						</div>
-					</div>
+						{panelOpen ? (
+							<ConversationPanel current={current} events={events} onClose={() => setPanelOpen(false)} />
+						) : null}
+						{showScrollBottom ? (
+							<button
+								className="scroll-bottom-button"
+								aria-label="回到底部"
+								data-tooltip="回到底部"
+								onClick={scrollToBottom}
+							>
+								<ArrowDownIcon size={17} />
+							</button>
+						) : null}
 					</div>
 					{dock}
 				</>
@@ -210,7 +294,11 @@ function ApprovalPanel({
 		try {
 			await call(window.moros.approvalRespond(card.id, decision));
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			if (currentSessionId !== undefined) {
+				dispatch({ type: "inline-notice", sessionId: currentSessionId, tone: "error", text: errorMessage(error) });
+			} else {
+				console.error(`[moros] ${errorMessage(error)}`);
+			}
 		} finally {
 			setBusy(false);
 		}
@@ -239,7 +327,7 @@ function ApprovalPanel({
 					<button
 						className="ghost-button"
 						disabled={busy}
-						title={`本会话允许 ${card.saveShort}`}
+						data-tooltip={`本会话允许 ${card.saveShort}`}
 						onClick={() => void respond("allow-session")}
 					>
 						本会话允许
@@ -265,7 +353,7 @@ function TrustGate(): JSX.Element {
 			const models = await call(window.moros.modelsList());
 			dispatch({ type: "models", models });
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			console.error(`[moros] ${errorMessage(error)}`);
 		}
 	};
 	const deny = async (): Promise<void> => {
@@ -275,7 +363,7 @@ function TrustGate(): JSX.Element {
 			const models = await call(window.moros.modelsList());
 			dispatch({ type: "models", models });
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			console.error(`[moros] ${errorMessage(error)}`);
 		}
 	};
 	return (

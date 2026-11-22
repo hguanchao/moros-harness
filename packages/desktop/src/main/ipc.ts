@@ -1,7 +1,7 @@
 import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent } from "electron";
 import { z } from "zod";
 
-import type { DiscoverModelsRequest } from "@moros/core/config/model-discovery.ts";
+import type { DiscoverModelsRequest, TestModelRequest } from "@moros/core/config/model-discovery.ts";
 import { SettingsPatchSchema } from "@moros/core/config/settings.ts";
 import { readFileBytes, readTextFile } from "@moros/core/workspace/files.ts";
 import { SessionBusyError } from "@moros/core/session/session-lease.ts";
@@ -82,6 +82,27 @@ const DiscoverModelsSchema = z
 		...(input.providerName === undefined ? {} : { providerName: input.providerName }),
 	}));
 
+const TestModelSchema = z
+	.object({
+		api: z.enum(["anthropic-messages", "chat-completions", "responses"]),
+		baseUrl: z.string().min(1).max(4096),
+		modelId: z.string().min(1).max(500),
+		apiKey: z.string().max(8192).optional(),
+		providerName: z.string().min(1).max(100).optional(),
+		timeoutMs: z.number().int().min(1000).max(300_000).optional(),
+		httpProxy: z.string().max(2048).optional(),
+	})
+	.strict()
+	.transform((input): TestModelRequest => ({
+		api: input.api,
+		baseUrl: input.baseUrl,
+		modelId: input.modelId,
+		...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
+		...(input.providerName === undefined ? {} : { providerName: input.providerName }),
+		...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+		...(input.httpProxy === undefined ? {} : { httpProxy: input.httpProxy }),
+	}));
+
 /**
  * 注册渲染进程可调用的全部方法。
  *
@@ -99,6 +120,7 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.appOpenProjectFolder, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) =>
 		host.openProjectFolder(root),
 	);
+	handle(IPC.appOpenTerminal, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) => host.openTerminal(root));
 	handle(IPC.appCopyProjectPath, getWindow, z.tuple([z.string().min(1).max(4096)]), ([root]) =>
 		host.copyProjectPath(root),
 	);
@@ -269,6 +291,7 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.settingsDiscoverModels, getWindow, z.tuple([DiscoverModelsSchema]), ([input]) =>
 		host.discoverModels(input),
 	);
+	handle(IPC.settingsTestModel, getWindow, z.tuple([TestModelSchema]), ([input]) => host.testModel(input));
 	handle(IPC.settingsLookupModelMetadata, getWindow, z.tuple([z.string().min(1).max(200)]), ([id]) =>
 		host.lookupModelMetadata(id),
 	);

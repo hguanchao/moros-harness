@@ -171,6 +171,8 @@ function eventLabel(event: EventRecord): string {
 			return "Session created";
 		case "mode.switched":
 			return "Mode switched";
+		case "model.changed":
+			return "Model changed";
 		case "error":
 			return `Error: ${event.payload.kind}`;
 		case "limit.blocked":
@@ -228,6 +230,8 @@ function eventText(event: EventRecord): string {
 			return `${event.payload.title} (${event.payload.mode})`;
 		case "mode.switched":
 			return `${event.payload.from} → ${event.payload.to}`;
+		case "model.changed":
+			return `${event.payload.from} → ${event.payload.to}${event.payload.appliesNextTurn ? " (next turn)" : ""}`;
 		case "session.renamed":
 			return event.payload.title;
 		case "session.archived":

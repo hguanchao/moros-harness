@@ -15,7 +15,13 @@ import {
 	type ModelMetadata as CatalogModelMetadata,
 	lookupModelMetadata as lookupModelMetadataInCatalog,
 } from "./config/model-catalog/metadata.ts";
-import { discoverProviderModels, type DiscoveredModel, type DiscoverModelsRequest } from "./config/model-discovery.ts";
+import {
+	discoverProviderModels,
+	type DiscoveredModel,
+	type DiscoverModelsRequest,
+	type TestModelRequest,
+	type TestModelResult,
+} from "./config/model-discovery.ts";
 import { parseModelRef } from "./config/model-ref.ts";
 import { resolveActiveProvider, type ResolvedProvider } from "./config/resolve-providers.ts";
 import { redactSecrets, runSecretCommand } from "./config/secrets.ts";
@@ -304,6 +310,8 @@ export class Core {
 	readonly #attachments: AttachmentStore;
 	readonly #loadedConfigs = new Map<string, LoadedConfig>();
 	readonly #sessionLoops = new Map<string, AgentLoop>();
+	/** 当前回合活跃的工具管线；审批/模式在运行中切换时据此即时推送新策略。 */
+	readonly #sessionPipelines = new Map<string, ToolPipeline>();
 	readonly #sessionSignals = new Map<string, AbortController>();
 	/** 在飞的会话标题任务（按会话 ID 去重）；后台锦上添花，绝不阻塞主回合。 */
 	readonly #titleTasks = new Map<string, Promise<void>>();
@@ -481,6 +489,7 @@ export class Core {
 		for (const sessionId of [...this.#sessionSignals.keys()]) this.abortSession(sessionId, "session");
 		this.#sessionSignals.clear();
 		this.#sessionLoops.clear();
+		this.#sessionPipelines.clear();
 		await Promise.allSettled([...this.#mcpManagers.values()].map((manager) => manager.close()));
 		this.#mcpManagers.clear();
 		await Promise.allSettled([...this.#sessionLeases.keys()].map((id) => this.releaseSessionLease(id)));
@@ -787,7 +796,11 @@ export class Core {
 	 */
 	setSessionApproval(session: Session, mode: ApprovalMode): void {
 		if (!APPROVAL_MODES.has(mode)) throw new Error(`Unknown approval mode: ${mode}`);
-		this.#sessionApprovals.set(session.meta.id, mode);
+		const sessionId = session.meta.id;
+		this.#sessionApprovals.set(sessionId, mode);
+		// 运行中切换：把新档位推给当前回合的管线，后续工具调用立即按新档位审批；
+		// 已经挂起或正在执行的调用不受影响（setPolicy 的语义）。
+		this.#sessionPipelines.get(sessionId)?.setPolicy(session.meta.mode, mode);
 	}
 
 	/** 读取会话内已切换的审批档位；未切换时返回 undefined，由配置默认值生效。 */
@@ -919,6 +932,56 @@ export class Core {
 	 */
 	async lookupModelMetadata(id: string): Promise<CatalogModelMetadata | null> {
 		return lookupModelMetadataInCatalog(id, { cachePath: join(this.#homeDir, "model-catalog.json") });
+	}
+
+	/**
+	 * 用当前表单中的供应商配置向指定模型发一条最小请求，验证连通性。
+	 * 复用已保存供应商密钥（当未直接提供 apiKey 时）；不写入配置、不进入会话事件流。
+	 * @returns 测试结果：成功时带回包预览，失败时带已脱敏的错误原因。
+	 */
+	async testModel(input: TestModelRequest): Promise<TestModelResult> {
+		const started = Date.now();
+		let apiKey = input.apiKey?.trim() ?? "";
+		if (apiKey.length === 0) {
+			if (input.providerName === undefined) {
+				return { ok: false, durationMs: Date.now() - started, error: "请先填写 API Key" };
+			}
+			try {
+				apiKey = (await revealProviderSecret(this.#homeDir, input.providerName)).trim();
+			} catch (error) {
+				return {
+					ok: false,
+					durationMs: Date.now() - started,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+			if (apiKey.length === 0) {
+				return { ok: false, durationMs: Date.now() - started, error: "请先填写 API Key" };
+			}
+		}
+		const client = this.#createLlmClient({ maxRetries: 0, maxDelayMs: 0 });
+		try {
+			const response = await client.complete({
+				provider: input.providerName ?? "test",
+				model: input.modelId,
+				api: input.api,
+				baseUrl: input.baseUrl,
+				...(input.httpProxy ? { httpProxy: input.httpProxy } : {}),
+				apiKey,
+				...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+				maxTokens: 16,
+				reasoningEffort: "off",
+				messages: [{ role: "user", content: "Reply with OK." }],
+			});
+			const text = response.text.trim().slice(0, 200);
+			return { ok: true, durationMs: Date.now() - started, ...(text.length > 0 ? { text } : {}) };
+		} catch (error) {
+			return {
+				ok: false,
+				durationMs: Date.now() - started,
+				error: error instanceof Error ? error.message : String(error),
+			};
+		}
 	}
 
 	/** 新增或更新供应商；`apiKey: "***"` 保留原密钥。 */
@@ -1336,6 +1399,7 @@ export class Core {
 			},
 		});
 		this.#sessionLoops.set(sessionId, loop);
+		this.#sessionPipelines.set(sessionId, pipeline);
 		const signal = options.signal;
 		const abortLoop = () => loop.abort(signal?.reason);
 		try {
@@ -1350,6 +1414,7 @@ export class Core {
 		} finally {
 			signal?.removeEventListener("abort", abortLoop);
 			if (this.#sessionLoops.get(sessionId) === loop) this.#sessionLoops.delete(sessionId);
+			if (this.#sessionPipelines.get(sessionId) === pipeline) this.#sessionPipelines.delete(sessionId);
 		}
 	}
 
@@ -2202,6 +2267,12 @@ function auditSummary(event: EventRecord): Record<string, unknown> {
 			return { title: event.payload.title, mode: event.payload.mode };
 		case "mode.switched":
 			return { from: event.payload.from, to: event.payload.to };
+		case "model.changed":
+			return {
+				from: event.payload.fromModel,
+				to: event.payload.toModel,
+				appliesNextTurn: event.payload.appliesNextTurn,
+			};
 		case "session.renamed":
 			return { title: event.payload.title };
 		case "session.archived":

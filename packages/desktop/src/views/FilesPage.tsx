@@ -80,7 +80,7 @@ export function FilesPage(): JSX.Element {
 					className="primary-button"
 					onClick={() => {
 						void actions.openProjectDialog().catch((error: unknown) => {
-							dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+							console.error(`[moros] ${errorMessage(error)}`);
 						});
 					}}
 				>
@@ -98,7 +98,7 @@ export function FilesPage(): JSX.Element {
 				actions={
 					<button
 						className="icon-button"
-						title="刷新"
+						data-tooltip="刷新"
 						aria-label="刷新"
 						onClick={() => setLocalVersion((value) => value + 1)}
 					>
@@ -145,7 +145,7 @@ export function FilesPage(): JSX.Element {
 								</div>
 								<button
 									className="icon-button"
-									title="关闭预览"
+									data-tooltip="关闭预览"
 									aria-label="关闭预览"
 									onClick={() => setSelected(undefined)}
 								>
@@ -199,7 +199,8 @@ function DirectoryNode({
 			} catch (error) {
 				if (!cancelled) {
 					setEntries([]);
-					dispatch({ type: "notice", level: "warn", message: `无法读取 ${path || "."}：${errorMessage(error)}` });
+					// 目录读取失败以空列表呈现，不再弹提示。
+					console.warn(`[moros] 无法读取 ${path || "."}：${errorMessage(error)}`);
 				}
 			} finally {
 				if (!cancelled) setLoading(false);
@@ -216,7 +217,7 @@ function DirectoryNode({
 				className="tree-row"
 				style={{ paddingLeft: 10 + depth * 14 }}
 				onClick={() => setOpen(!open)}
-				title={path || "."}
+				data-tooltip={path || "."}
 			>
 				{open ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
 				{open ? <FolderOpenIcon size={14} /> : <FolderIcon size={14} />}
@@ -248,7 +249,7 @@ function DirectoryNode({
 								key={entry.path}
 								className={`tree-row file ${selected === entry.path ? "is-selected" : ""}`}
 								style={{ paddingLeft: 37 + depth * 14 }}
-								title={entry.path}
+								data-tooltip={entry.path}
 								onClick={() => onSelect(entry.path)}
 							>
 								<FileIcon size={14} />

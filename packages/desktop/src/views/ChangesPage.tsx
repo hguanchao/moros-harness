@@ -93,7 +93,7 @@ export function ChangesPage(): JSX.Element {
 					<>
 						<button
 							className="icon-button"
-							title="刷新"
+							data-tooltip="刷新"
 							aria-label="刷新"
 							onClick={() => setVersion((value) => value + 1)}
 						>
@@ -102,7 +102,7 @@ export function ChangesPage(): JSX.Element {
 						{checkpoint !== null ? (
 							<button
 								className="icon-button"
-								title="恢复检查点"
+								data-tooltip="恢复检查点"
 								aria-label="恢复检查点"
 								onClick={async () => {
 									const confirmed = await confirm({
@@ -113,15 +113,19 @@ export function ChangesPage(): JSX.Element {
 									});
 									if (!confirmed) return;
 									try {
-										const result = await call(window.moros.sessionsRestore(checkpoint.id));
-										dispatch({
-											type: "notice",
-											level: "info",
-											message: `已恢复 ${result.restored} 个文件，删除 ${result.removed} 个`,
-										});
+										await call(window.moros.sessionsRestore(checkpoint.id));
 										setVersion((value) => value + 1);
 									} catch (restoreError) {
-										dispatch({ type: "notice", level: "error", message: errorMessage(restoreError) });
+										if (current !== undefined) {
+											dispatch({
+												type: "inline-notice",
+												sessionId: current.meta.id,
+												tone: "error",
+												text: errorMessage(restoreError),
+											});
+										} else {
+											console.error(`[moros] ${errorMessage(restoreError)}`);
+										}
 									}
 								}}
 							>
@@ -130,7 +134,7 @@ export function ChangesPage(): JSX.Element {
 						) : null}
 						<button
 							className="icon-button danger"
-							title="回滚最近一步"
+							data-tooltip="回滚最近一步"
 							aria-label="回滚最近一步"
 							onClick={async () => {
 								const confirmed = await confirm({
@@ -142,10 +146,18 @@ export function ChangesPage(): JSX.Element {
 								if (!confirmed) return;
 								try {
 									await call(window.moros.sessionsRollback());
-									dispatch({ type: "notice", level: "info", message: "已回滚最近一步改动" });
 									setVersion((value) => value + 1);
 								} catch (rollbackError) {
-									dispatch({ type: "notice", level: "error", message: errorMessage(rollbackError) });
+									if (current !== undefined) {
+										dispatch({
+											type: "inline-notice",
+											sessionId: current.meta.id,
+											tone: "error",
+											text: errorMessage(rollbackError),
+										});
+									} else {
+										console.error(`[moros] ${errorMessage(rollbackError)}`);
+									}
 								}
 							}}
 						>
@@ -164,7 +176,7 @@ export function ChangesPage(): JSX.Element {
 							key={change.seq}
 							className={`change-row ${selected === change.seq ? "is-selected" : ""}`}
 							onClick={() => setSelected(change.seq)}
-							title={change.path}
+							data-tooltip={change.path}
 						>
 							<span className={`file-op op-${change.op}`}>{opLabel(change.op)}</span>
 							<span className="change-path">{displayPath(change.path)}</span>

@@ -26,14 +26,14 @@ const marked = new Marked({
 		},
 		link({ href, title, text }) {
 			const safeHref = isSafeLink(href) ? href : "#";
-			const titleAttr = title === null || title === undefined ? "" : ` title="${escapeHtml(title)}"`;
+			const titleAttr = title === null || title === undefined ? "" : ` data-tooltip="${escapeHtml(title)}"`;
 			return `<a href="${escapeHtml(safeHref)}"${titleAttr} target="_blank" rel="noreferrer noopener">${text}</a>`;
 		},
 		image({ href, title, text }) {
 			// 模型输出不自动加载图片：远程图片会泄露访问行为，data: 图片也可能无限膨胀。
 			const label = text.length > 0 ? text : "image";
 			if (!isSafeLink(href)) return `<span>${escapeHtml(label)}</span>`;
-			const titleAttr = title === null || title === undefined ? "" : ` title="${escapeHtml(title)}"`;
+			const titleAttr = title === null || title === undefined ? "" : ` data-tooltip="${escapeHtml(title)}"`;
 			return `<a href="${escapeHtml(href)}"${titleAttr} target="_blank" rel="noreferrer noopener">${escapeHtml(label)}</a>`;
 		},
 	},
@@ -50,7 +50,7 @@ export function Markdown({ text, className }: MarkdownProps): JSX.Element {
 		const rendered = marked.parse(text, { async: false });
 		return DOMPurify.sanitize(rendered, {
 			USE_PROFILES: { html: true },
-			ADD_ATTR: ["target", "rel"],
+			ADD_ATTR: ["target", "rel", "data-tooltip"],
 			FORBID_TAGS: ["style", "iframe", "object", "embed", "form", "input", "button"],
 			FORBID_ATTR: ["style", "srcset", "formaction"],
 		});

@@ -17,7 +17,7 @@ export function PageHeader({ title, subtitle, actions }: PageHeaderProps): JSX.E
 			<button
 				className="icon-button page-back"
 				aria-label="返回对话"
-				title="返回对话"
+				data-tooltip="返回对话"
 				onClick={() => desktop.setPage("chat")}
 			>
 				<ChevronLeftIcon size={17} />

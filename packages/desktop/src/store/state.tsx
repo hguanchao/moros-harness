@@ -31,11 +31,14 @@ export type HistoryEntry = { readonly type: "new-task" } | { readonly type: "ses
 export type ThemeChoice = "auto" | "light" | "dark";
 export type ResolvedTheme = "light" | "dark";
 
-export interface Notice {
-	readonly id: number;
-	readonly level: "info" | "warn" | "error";
-	readonly message: string;
+/** 会话级内联提示：警告/错误直接显示在对应会话的对话流顶部。 */
+export interface InlineNotice {
+	readonly tone: "warn" | "error";
+	readonly text: string;
 }
+
+/** 单条会话最多保留的内联提示条数，避免长期积累拖慢渲染。 */
+const MAX_INLINE_NOTICES = 20;
 
 export interface ReviewState {
 	readonly runId: string;
@@ -78,7 +81,7 @@ export interface AppState {
 	readonly queue: Readonly<Record<string, readonly QueuedMessage[]>>;
 	readonly subagents: Readonly<Record<string, Readonly<Record<string, SubagentProgressView>>>>;
 	readonly approvals: readonly ApprovalCard[];
-	readonly notices: readonly Notice[];
+	readonly inlineNotices: Readonly<Record<string, readonly InlineNotice[]>>;
 	readonly runStates: Readonly<Record<string, "running" | "paused" | "idle" | "error">>;
 	readonly settings: SettingsSnapshot | undefined;
 	readonly models: ModelCatalog;
@@ -149,8 +152,12 @@ export type Action =
 	| { readonly type: "theme"; readonly theme: ThemeChoice }
 	| { readonly type: "trust"; readonly trust: WorkspaceTrustView }
 	| { readonly type: "sessions-changed" }
-	| { readonly type: "notice"; readonly level: Notice["level"]; readonly message: string }
-	| { readonly type: "dismiss-notice"; readonly id: number }
+	| {
+			readonly type: "inline-notice";
+			readonly sessionId: string;
+			readonly tone: InlineNotice["tone"];
+			readonly text: string;
+	  }
 	| { readonly type: "clear-review" }
 	| { readonly type: "error"; readonly message: string };
 
@@ -189,7 +196,7 @@ export const initialState: AppState = {
 	queue: {},
 	subagents: {},
 	approvals: [],
-	notices: [],
+	inlineNotices: {},
 	runStates: {},
 	models: { providers: [] },
 	theme: "auto",
@@ -198,8 +205,6 @@ export const initialState: AppState = {
 	workspaceVersion: 0,
 	windowMaximized: false,
 };
-
-let noticeSequence = 0;
 
 export function reducer(state: AppState, action: Action): AppState {
 	switch (action.type) {
@@ -275,7 +280,8 @@ export function reducer(state: AppState, action: Action): AppState {
 				return state;
 			}
 			if (state.draft.images.length >= MAX_DRAFT_IMAGES) {
-				return { ...state, notices: pushNotice(state.notices, "warn", `最多附加 ${MAX_DRAFT_IMAGES} 张图片`) };
+				// 超出图片上限时静默忽略，不再弹提示。
+				return state;
 			}
 			return {
 				...state,
@@ -433,13 +439,11 @@ export function reducer(state: AppState, action: Action): AppState {
 			};
 		case "sessions-changed":
 			return { ...state, sessionsVersion: state.sessionsVersion + 1 };
-		case "notice":
+		case "inline-notice":
 			return {
 				...state,
-				notices: [...state.notices.slice(-4), { id: ++noticeSequence, level: action.level, message: action.message }],
+				inlineNotices: appendInlineNotice(state.inlineNotices, action.sessionId, action.tone, action.text),
 			};
-		case "dismiss-notice":
-			return { ...state, notices: state.notices.filter((notice) => notice.id !== action.id) };
 		case "clear-review":
 			return { ...state, review: undefined };
 		case "error":
@@ -544,7 +548,7 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 						}
 					: {}),
 				...(message.state === "error" && message.error !== undefined
-					? { notices: pushNotice(state.notices, "error", message.error) }
+					? { inlineNotices: appendInlineNotice(state.inlineNotices, message.sessionId, "error", message.error) }
 					: {}),
 			};
 		}
@@ -590,8 +594,11 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 			return { ...state, sessionsVersion: state.sessionsVersion + 1 };
 		case "workspace":
 			return { ...state, workspaceVersion: state.workspaceVersion + 1 };
-		case "notice":
-			return { ...state, notices: pushNotice(state.notices, message.level, message.message) };
+		case "inline-notice":
+			return {
+				...state,
+				inlineNotices: appendInlineNotice(state.inlineNotices, message.sessionId, message.tone, message.text),
+			};
 		case "project":
 			return state.project?.root === message.project.root ? updateWorkspace(state, message.project) : state;
 		case "trust":
@@ -715,8 +722,14 @@ function themeFromSettings(settings: SettingsSnapshot | undefined): ThemeChoice 
 	return settings?.config.ui.theme;
 }
 
-function pushNotice(notices: readonly Notice[], level: Notice["level"], message: string): readonly Notice[] {
-	return [...notices.slice(-4), { id: ++noticeSequence, level, message }];
+function appendInlineNotice(
+	notices: Readonly<Record<string, readonly InlineNotice[]>>,
+	sessionId: string,
+	tone: InlineNotice["tone"],
+	text: string,
+): Readonly<Record<string, readonly InlineNotice[]>> {
+	const current = notices[sessionId] ?? [];
+	return { ...notices, [sessionId]: [...current, { tone, text }].slice(-MAX_INLINE_NOTICES) };
 }
 
 function upsertMeta(sessions: readonly SessionMeta[], meta: SessionMeta): readonly SessionMeta[] {

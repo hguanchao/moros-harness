@@ -29,7 +29,7 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.E
 	const canGoBack = state.historyIndex > 0;
 	const canGoForward = state.historyIndex < state.history.length - 1;
 	const report = (error: unknown): void => {
-		dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+		console.error(`[moros] ${errorMessage(error)}`);
 	};
 
 	useEffect(() => {
@@ -52,7 +52,7 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.E
 				<button
 					className={`titlebar-toggle ${sidebarOpen ? "is-active" : ""}`}
 					aria-label={sidebarOpen ? "收起侧栏" : "展开侧栏"}
-					title={sidebarOpen ? "收起侧栏" : "展开侧栏"}
+					data-tooltip={sidebarOpen ? "收起侧栏" : "展开侧栏"}
 					onClick={onToggleSidebar}
 				>
 					<PanelIcon size={16} />
@@ -62,7 +62,6 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.E
 						<button
 							className="titlebar-action"
 							aria-label="后退"
-							title="后退"
 							disabled={!canGoBack}
 							onClick={() => void actions.goBack().catch(report)}
 						>
@@ -71,13 +70,12 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.E
 						<button
 							className="titlebar-action"
 							aria-label="前进"
-							title="前进"
 							disabled={!canGoForward}
 							onClick={() => void actions.goForward().catch(report)}
 						>
 							<ArrowRightIcon size={16} />
 						</button>
-						<button className="titlebar-action" aria-label="搜索" title="搜索（即将推出）" disabled>
+						<button className="titlebar-action" aria-label="搜索" disabled>
 							<SearchIcon size={16} />
 						</button>
 					</div>
@@ -85,28 +83,17 @@ export function TitleBar({ sidebarOpen, onToggleSidebar }: TitleBarProps): JSX.E
 			</div>
 			{isMac ? null : (
 				<div className="caption-group">
-					<button
-						className="caption"
-						aria-label="最小化"
-						title="最小化"
-						onClick={() => void window.moros.windowMinimize()}
-					>
+					<button className="caption" aria-label="最小化" onClick={() => void window.moros.windowMinimize()}>
 						<MinusIcon size={14} />
 					</button>
 					<button
 						className="caption"
 						aria-label={state.windowMaximized ? "向下还原" : "最大化"}
-						title={state.windowMaximized ? "向下还原" : "最大化"}
 						onClick={() => void window.moros.windowToggleMaximize()}
 					>
 						{state.windowMaximized ? <RestoreIcon size={14} /> : <MaximizeIcon size={14} />}
 					</button>
-					<button
-						className="caption caption-close"
-						aria-label="关闭"
-						title="关闭"
-						onClick={() => void window.moros.windowClose()}
-					>
+					<button className="caption caption-close" aria-label="关闭" onClick={() => void window.moros.windowClose()}>
 						<XIcon size={14} />
 					</button>
 				</div>

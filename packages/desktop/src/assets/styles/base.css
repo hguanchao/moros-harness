@@ -5,8 +5,9 @@
 	--surface-chrome: #262626;
 	--surface-raised: #333333;
 	--surface-sunken: #0f0f0f;
-	--text-primary: #ffffff;
-	--text-secondary: #ededed;
+	/* 深色主题正文略降亮度，避免纯白在深色背景上的光晕/刺眼；--accent 保持纯白用于反色强调 */
+	--text-primary: #e6e6e6;
+	--text-secondary: #d6d6d6;
 	--text-muted: #c4c4c4;
 	--text-dim: #9a9a9a;
 	--text-faint: #6e6e6e;
@@ -322,23 +323,21 @@ button:disabled {
 	background: var(--surface-sidebar);
 }
 
-/* ---------- 主题切换：View Transitions 圆形扩散（不支持时由 JS 直接应用，无过渡） ---------- */
+/* ---------- 主题切换：颜色短过渡 ---------- */
 
-::view-transition-old(root),
-::view-transition-new(root) {
-	animation: none;
-	mix-blend-mode: normal;
-}
-
-::view-transition-new(root) {
-	animation: theme-reveal var(--duration-slow) var(--ease-out);
-}
-
-@keyframes theme-reveal {
-	from {
-		clip-path: circle(0% at 50% 0%);
-	}
-	to {
-		clip-path: circle(150% at 50% 0%);
-	}
+/* 仅在切换瞬间由 JS 临时挂上 data-theme-transition，150ms 后移除。
+   只过渡颜色相关属性，不碰布局/尺寸；避免常驻 transition 干扰折叠、形变等其它动效。 */
+html[data-theme-transition] *,
+html[data-theme-transition] *::before,
+html[data-theme-transition] *::after {
+	transition-property:
+		color,
+		background-color,
+		border-color,
+		fill,
+		stroke,
+		box-shadow,
+		text-decoration-color !important;
+	transition-duration: 150ms !important;
+	transition-timing-function: ease !important;
 }

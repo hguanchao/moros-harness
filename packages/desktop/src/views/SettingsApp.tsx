@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from "react";
 
 import type { SettingsPatch, SettingsSnapshot } from "@moros/core/config/settings.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
@@ -17,10 +17,9 @@ import {
 	PlusIcon,
 	PuzzleIcon,
 	RefreshIcon,
-	SearchIcon,
+	ServerIcon,
 	SettingsIcon,
 	SlidersHorizontalIcon,
-	SlidersIcon,
 	SunIcon,
 	UserCogIcon,
 } from "../components/Icons.tsx";
@@ -40,7 +39,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 		items: [
 			["general", "常规", SlidersHorizontalIcon],
 			["appearance", "外观", PaletteIcon],
-			["providers", "供应商", SlidersIcon],
+			["providers", "供应商", ServerIcon],
 		],
 	},
 	{
@@ -63,7 +62,6 @@ const NAV_GROUPS: readonly NavGroup[] = [
 export function SettingsApp(): JSX.Element {
 	const { state, dispatch } = useApp();
 	const [active, setActive] = useState("appearance");
-	const [query, setQuery] = useState("");
 	const [settings, setSettings] = useState<SettingsSnapshot | undefined>(undefined);
 	const [summary, setSummary] = useState<ConfigSummary | undefined>(undefined);
 	const [skills, setSkills] = useState<readonly SkillSummary[]>([]);
@@ -92,32 +90,24 @@ export function SettingsApp(): JSX.Element {
 		void refresh();
 	}, [refresh]);
 
-	const update = async (patch: SettingsPatch, message?: string): Promise<SettingsSnapshot | undefined> => {
+	const update = async (patch: SettingsPatch, _message?: string): Promise<SettingsSnapshot | undefined> => {
 		try {
 			const next = await call(window.moros.settingsUpdate(patch));
 			setSettings(next);
 			dispatch({ type: "settings", settings: next });
 			await refresh();
-			if (message !== undefined) dispatch({ type: "notice", level: "info", message });
 			return next;
 		} catch (error) {
-			dispatch({ type: "notice", level: "error", message: errorMessage(error) });
+			console.error(`[moros] ${errorMessage(error)}`);
 			return undefined;
 		}
 	};
 
+	// 设置页不再弹提示：错误写入控制台，其余信息类提示静默丢弃。
 	const notice = (level: "info" | "warn" | "error", message: string): void => {
-		dispatch({ type: "notice", level, message });
+		if (level === "error") console.error(`[moros] ${message}`);
+		else if (level === "warn") console.warn(`[moros] ${message}`);
 	};
-
-	const filteredGroups = useMemo(() => {
-		const needle = query.trim().toLowerCase();
-		if (needle.length === 0) return NAV_GROUPS;
-		return NAV_GROUPS.map((group) => ({
-			title: group.title,
-			items: group.items.filter(([, label]) => label.toLowerCase().includes(needle)),
-		})).filter((group) => group.items.length > 0);
-	}, [query]);
 
 	const activeLabel = useMemo(
 		() => NAV_GROUPS.flatMap((group) => group.items).find(([key]) => key === active)?.[1] ?? "外观",
@@ -136,7 +126,7 @@ export function SettingsApp(): JSX.Element {
 					<ProvidersTab settings={settings} onRefresh={refresh} onNotice={(level, message) => notice(level, message)} />
 				);
 			case "general":
-				return <GeneralSettings settings={settings} summary={summary} />;
+				return <GeneralSettings settings={settings} onUpdate={update} />;
 			case "extensions":
 				return (
 					<ExtensionsPanel
@@ -198,17 +188,8 @@ export function SettingsApp(): JSX.Element {
 						<ArrowLeftIcon size={15} />
 						<span>返回工作区</span>
 					</button>
-					<div className="settings-search">
-						<SearchIcon size={15} />
-						<input
-							value={query}
-							onChange={(event) => setQuery(event.target.value)}
-							placeholder="搜索设置"
-							aria-label="搜索设置"
-						/>
-					</div>
 					<div className="settings-nav-scroll">
-						{filteredGroups.map((group) => (
+						{NAV_GROUPS.map((group) => (
 							<div className="settings-nav-group" key={group.title}>
 								<div className="settings-nav-group-title">{group.title}</div>
 								{group.items.map(([key, label, Icon]) => (
@@ -223,7 +204,6 @@ export function SettingsApp(): JSX.Element {
 								))}
 							</div>
 						))}
-						{filteredGroups.length === 0 ? <div className="settings-nav-empty">没有匹配的设置项</div> : null}
 					</div>
 				</nav>
 				<main className="settings-content">
@@ -242,41 +222,58 @@ function NumberStepper({
 	value,
 	min,
 	max,
+	step: stepSize = 1,
+	decimals = 0,
+	percent = false,
 	suffix,
 	onChange,
 }: {
 	readonly value: number;
 	readonly min: number;
 	readonly max: number;
+	readonly step?: number;
+	readonly decimals?: number;
+	/** 百分比模式：以 0–100 显示（后缀 %），写回时换算为 0–1 比例。 */
+	readonly percent?: boolean;
 	readonly suffix?: string;
 	readonly onChange: (value: number) => void;
 }): JSX.Element {
-	const [text, setText] = useState(String(value));
-	useEffect(() => setText(String(value)), [value]);
+	// 显示值：百分比模式下把 0–1 比例放大 100 倍，其余模式直接显示。
+	const toDisplay = (v: number): number => round(v * (percent ? 100 : 1));
+	const round = (n: number): number => Number(n.toFixed(decimals));
+	const [text, setText] = useState(String(toDisplay(value)));
+	useEffect(() => setText(String(toDisplay(value))), [value]);
 
 	const commit = (): void => {
 		const parsed = Number(text);
-		if (Number.isInteger(parsed) && parsed >= min && parsed <= max) {
-			onChange(parsed);
+		const displayMin = percent ? min * 100 : min;
+		const displayMax = percent ? max * 100 : max;
+		if (Number.isFinite(parsed) && parsed >= displayMin && parsed <= displayMax) {
+			const displayValue = round(parsed);
+			// 百分比模式下比例需保留小数（如 85% -> 0.85），用独立精度而非 decimals。
+			const real = percent ? Number((displayValue / 100).toFixed(4)) : displayValue;
+			setText(String(displayValue));
+			if (real !== value) onChange(real);
 		} else {
-			setText(String(value));
+			setText(String(toDisplay(value)));
 		}
 	};
 
-	const step = (delta: number): void => {
-		const next = Math.min(max, Math.max(min, value + delta));
+	const step = (direction: number): void => {
+		const raw = Math.min(max, Math.max(min, value + direction * stepSize));
+		const next = percent ? Number(raw.toFixed(4)) : round(raw);
 		if (next !== value) onChange(next);
 	};
 
 	return (
 		<span className="settings-stepper">
-			<button type="button" aria-label="减小" title="减小" disabled={value <= min} onClick={() => step(-1)}>
+			<button type="button" aria-label="减小" data-tooltip="减小" disabled={value <= min} onClick={() => step(-1)}>
 				<MinusIcon size={13} />
 			</button>
 			<input
 				className="settings-stepper-input"
 				type="text"
-				inputMode="numeric"
+				inputMode={decimals > 0 || percent ? "decimal" : "numeric"}
 				value={text}
 				onChange={(event) => setText(event.target.value)}
 				onBlur={commit}
@@ -284,8 +281,12 @@ function NumberStepper({
 					if (event.key === "Enter") commit();
 				}}
 			/>
-			{suffix !== undefined ? <span className="settings-stepper-suffix">{suffix}</span> : null}
-			<button type="button" aria-label="增大" title="增大" disabled={value >= max} onClick={() => step(1)}>
+			{percent ? (
+				<span className="settings-stepper-suffix">%</span>
+			) : suffix === undefined ? null : (
+				<span className="settings-stepper-suffix">{suffix}</span>
+			)}
+			<button type="button" aria-label="增大" data-tooltip="增大" disabled={value >= max} onClick={() => step(1)}>
 				<PlusIcon size={13} />
 			</button>
 		</span>
@@ -400,40 +401,279 @@ function AppearanceSettings({
 	);
 }
 
+const APPROVAL_OPTIONS: ReadonlyArray<{ readonly value: "ask" | "auto" | "yolo"; readonly label: string }> = [
+	{ value: "ask", label: "每次询问" },
+	{ value: "auto", label: "自动（高危审查）" },
+	{ value: "yolo", label: "完全访问" },
+];
+
+const NOTIFY_OPTIONS: ReadonlyArray<{ readonly value: "auto" | "bell" | "desktop" | "off"; readonly label: string }> = [
+	{ value: "auto", label: "自动" },
+	{ value: "bell", label: "提示音" },
+	{ value: "desktop", label: "桌面通知" },
+	{ value: "off", label: "关闭" },
+];
+
+/** 校验函数：返回 undefined 表示合法，否则返回面向用户的错误原因。 */
+type FieldValidator = (value: string) => string | undefined;
+
+function validateHttpProxy(value: string): string | undefined {
+	if (!value.trim()) return undefined;
+	try {
+		const url = new URL(value);
+		if (url.protocol !== "http:" && url.protocol !== "https:") return "仅支持 http / https";
+	} catch {
+		return "URL 格式不正确";
+	}
+	return undefined;
+}
+
+function validateShellPath(value: string): string | undefined {
+	const trimmed = value.trim();
+	if (trimmed.length === 0) return undefined;
+	// 应为可执行文件路径：绝对路径或含路径分隔符；不允许包含空字节。
+	if (trimmed.includes("\0")) return "路径不合法";
+	if (!trimmed.includes("/") && !trimmed.includes("\\")) return "需为可执行文件的完整路径";
+	return undefined;
+}
+
+/** 通用自动保存输入框：本地草稿 + 校验 + 防抖提交；非法值不保存并在失焦时回退。 */
+function AutoSaveInput({
+	value,
+	validate,
+	onCommit,
+	placeholder,
+}: {
+	readonly value: string;
+	readonly validate: FieldValidator;
+	readonly onCommit: (value: string) => void;
+	readonly placeholder?: string;
+}): JSX.Element {
+	const [draft, setDraft] = useState(value);
+	const timer = useRef<number | undefined>(undefined);
+	useEffect(() => setDraft(value), [value]);
+	useEffect(() => () => window.clearTimeout(timer.current), []);
+	const error = validate(draft);
+	const onChange = (next: string): void => {
+		setDraft(next);
+		window.clearTimeout(timer.current);
+		if (validate(next) !== undefined) return;
+		timer.current = window.setTimeout(() => onCommit(next), 500);
+	};
+	return (
+		<div className="validated-input">
+			<input
+				className={`text-input general-input ${error === undefined ? "" : "is-invalid"}`}
+				value={draft}
+				placeholder={placeholder}
+				aria-invalid={error !== undefined}
+				onChange={(event) => onChange(event.target.value)}
+				onBlur={() => {
+					window.clearTimeout(timer.current);
+					if (validate(draft) === undefined) onCommit(draft);
+					else setDraft(value);
+				}}
+			/>
+			{error === undefined ? null : <span className="validated-input-error">{error}</span>}
+		</div>
+	);
+}
+
+/** 常规页：会话默认行为、运行环境与运行参数；均为用户日常可改的全局默认值。 */
 function GeneralSettings({
 	settings,
-	summary,
+	onUpdate,
 }: {
 	readonly settings: SettingsSnapshot;
-	readonly summary: ConfigSummary | undefined;
+	readonly onUpdate: (patch: SettingsPatch, message?: string) => Promise<SettingsSnapshot | undefined>;
 }): JSX.Element {
+	const config = settings.config;
+
 	return (
-		<SettingsSection title="概览" description="当前工作区与应用的基础信息，详细配置请从左侧进入对应分组。">
-			<SettingsCard>
-				<SettingsRow
-					label="默认模型"
-					description="新会话使用的模型。"
-					control={<code>{settings.config.model || "未设置"}</code>}
-				/>
-				<SettingsRow
-					label="供应商"
-					description="当前默认模型所属供应商。"
-					control={<code>{settings.config.provider || "未设置"}</code>}
-				/>
-				<SettingsRow
-					label="审批档位"
-					description="新建会话的默认审批策略。"
-					control={<code>{settings.config.approval}</code>}
-				/>
-				{summary !== undefined ? (
+		<>
+			<SettingsSection title="默认行为" description="新建会话时采用的审批与通知默认值；修改后自动保存。">
+				<SettingsCard>
 					<SettingsRow
-						label="配置文件"
-						description={settings.configPath}
-						control={<code>{settings.providersPath}</code>}
+						label="审批档位"
+						description="工具调用前是否询问：每次询问、自动执行（高危交由审查模型）、完全访问。"
+						control={
+							<Dropdown
+								value={config.approval}
+								options={APPROVAL_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+								onChange={(value) => void onUpdate({ approval: value as SettingsPatch["approval"] })}
+							/>
+						}
 					/>
-				) : null}
-			</SettingsCard>
-		</SettingsSection>
+					<SettingsRow
+						label="通知方式"
+						description="任务结束时的提醒方式；自动按系统能力选择。"
+						control={
+							<Dropdown
+								value={config.ui.notify}
+								options={NOTIFY_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+								onChange={(value) =>
+									void onUpdate({
+										ui: { notify: value as "auto" | "bell" | "desktop" | "off" },
+									})
+								}
+							/>
+						}
+					/>
+				</SettingsCard>
+			</SettingsSection>
+
+			<SettingsSection title="运行环境" description="Shell 与网络代理；修改代理后需重启应用生效，修改后自动保存。">
+				<SettingsCard>
+					<SettingsRow
+						label="终端 Shell"
+						description="留空使用系统默认 Shell。"
+						control={
+							<AutoSaveInput
+								value={config.shellPath ?? ""}
+								validate={validateShellPath}
+								onCommit={(value) => void onUpdate({ shellPath: value.trim().length === 0 ? null : value.trim() })}
+								placeholder="留空使用系统默认"
+							/>
+						}
+					/>
+					<SettingsRow
+						label="HTTP 代理"
+						description="例如 http://127.0.0.1:7890；留空则不使用代理。"
+						control={
+							<AutoSaveInput
+								value={config.httpProxy ?? ""}
+								validate={validateHttpProxy}
+								onCommit={(value) => void onUpdate({ httpProxy: value.trim().length === 0 ? null : value.trim() })}
+								placeholder="http://127.0.0.1:7890"
+							/>
+						}
+					/>
+				</SettingsCard>
+			</SettingsSection>
+
+			<SettingsSection
+				title="运行限制"
+				description="单回合步数上限、工具输出落盘阈值与流式空闲超时（秒）；0 表示使用默认或不限制。修改后自动保存。"
+			>
+				<SettingsCard>
+					<SettingsRow
+						label="最大步数"
+						description="单回合最多执行的步数；0 为不限制。"
+						control={
+							<NumberStepper
+								value={config.limits.maxTurns}
+								min={0}
+								max={1000}
+								onChange={(value) => void onUpdate({ limits: { maxTurns: value } })}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="输出落盘阈值"
+						description="工具输出超过该 Token 数时写入文件而非内联；0 为不落盘。"
+						control={
+							<NumberStepper
+								value={config.limits.spillThreshold}
+								min={0}
+								max={100_000_000}
+								step={1024}
+								onChange={(value) => void onUpdate({ limits: { spillThreshold: value } })}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="流式空闲超时（秒）"
+						description="流式响应无增量的等待上限；0 为使用默认。"
+						control={
+							<NumberStepper
+								value={config.limits.streamIdleTimeoutSec}
+								min={0}
+								max={3600}
+								onChange={(value) => void onUpdate({ limits: { streamIdleTimeoutSec: value } })}
+							/>
+						}
+					/>
+				</SettingsCard>
+			</SettingsSection>
+
+			<SettingsSection title="重试" description="模型请求失败时的重试次数与最大退避间隔；修改后自动保存。">
+				<SettingsCard>
+					<SettingsRow
+						label="最大重试次数"
+						description="单次请求失败后的重试上限。"
+						control={
+							<NumberStepper
+								value={config.retry.maxRetries}
+								min={0}
+								max={10}
+								onChange={(value) => void onUpdate({ retry: { maxRetries: value } })}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="最大退避（毫秒）"
+						description="重试间隔的上限。"
+						control={
+							<NumberStepper
+								value={config.retry.maxDelayMs}
+								min={0}
+								max={600_000}
+								step={1000}
+								onChange={(value) => void onUpdate({ retry: { maxDelayMs: value } })}
+							/>
+						}
+					/>
+				</SettingsCard>
+			</SettingsSection>
+
+			<SettingsSection
+				title="上下文压缩"
+				description="上下文占用达到阈值时自动压缩；保留最近比例用于避免丢失近期信息。修改后自动保存。"
+			>
+				<SettingsCard>
+					<SettingsRow
+						label="压缩阈值"
+						description="上下文占用达到该百分比时自动压缩，如 80%。"
+						control={
+							<NumberStepper
+								value={config.compaction.compactAt}
+								min={0}
+								max={1}
+								step={0.05}
+								percent
+								onChange={(value) => void onUpdate({ compaction: { compactAt: value } })}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="保留最近比例"
+						description="压缩时保留的最近上下文百分比。"
+						control={
+							<NumberStepper
+								value={config.compaction.keepRecent}
+								min={0}
+								max={1}
+								step={0.05}
+								percent
+								onChange={(value) => void onUpdate({ compaction: { keepRecent: value } })}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="摘要超时（秒）"
+						description="压缩摘要的模型调用时限；0 为使用默认。"
+						control={
+							<NumberStepper
+								value={config.compaction.summaryTimeoutSec}
+								min={0}
+								max={600}
+								onChange={(value) => void onUpdate({ compaction: { summaryTimeoutSec: value } })}
+							/>
+						}
+					/>
+				</SettingsCard>
+			</SettingsSection>
+		</>
 	);
 }
 

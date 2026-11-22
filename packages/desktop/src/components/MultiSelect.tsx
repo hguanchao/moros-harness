@@ -126,7 +126,9 @@ export function MultiSelect({
 				aria-haspopup="listbox"
 				aria-expanded={open}
 				aria-label={ariaLabel}
-				title={selectedOptions.length === 0 ? undefined : selectedOptions.map((option) => option.label).join("、")}
+				data-tooltip={
+					selectedOptions.length === 0 ? undefined : selectedOptions.map((option) => option.label).join("、")
+				}
 				onClick={toggleMenu}
 				onKeyDown={onTriggerKeyDown}
 			>
@@ -154,7 +156,10 @@ export function MultiSelect({
 								</span>
 							))}
 							{hiddenOptions.length === 0 ? null : (
-								<span className="multi-select-count" title={hiddenOptions.map((option) => option.label).join("、")}>
+								<span
+									className="multi-select-count"
+									data-tooltip={hiddenOptions.map((option) => option.label).join("、")}
+								>
 									+{hiddenOptions.length}
 								</span>
 							)}

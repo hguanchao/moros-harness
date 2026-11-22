@@ -75,7 +75,7 @@ export function TracePage(): JSX.Element {
 						</span>
 						<button
 							className="icon-button"
-							title="刷新"
+							data-tooltip="刷新"
 							aria-label="刷新"
 							onClick={() => setVersion((value) => value + 1)}
 						>

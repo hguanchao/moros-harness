@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type JSX } from "react";
+import { useEffect, useRef, useState, type JSX, type ReactNode } from "react";
 
 import type { EventRecord } from "@moros/core/events/schema.ts";
 import type { LiveState } from "../shared/contract.ts";
 import { displayPath, firstLine, formatDuration } from "../utils/format.ts";
+import { describeToolGroup, toolVerb } from "../utils/tool-labels.ts";
 import {
 	AlertIcon,
 	CheckIcon,
@@ -11,12 +12,14 @@ import {
 	ClockIcon,
 	FileIcon,
 	FolderOpenIcon,
+	InfoIcon,
+	ListTreeIcon,
 	SparklesIcon,
 	TerminalIcon,
 } from "./Icons.tsx";
 import { EmptyBrand } from "./EmptyBrand.tsx";
 import { Markdown } from "./Markdown.tsx";
-import type { SubagentProgressView } from "../store/state.tsx";
+import type { InlineNotice, SubagentProgressView } from "../store/state.tsx";
 
 export interface ToolBlock {
 	kind: "tool";
@@ -54,6 +57,12 @@ export interface NoticeBlock {
 	readonly text: string;
 }
 
+/** 对话中的居中分隔提示，如模型切换。 */
+export interface DividerBlock {
+	readonly kind: "divider";
+	readonly text: string;
+}
+
 export interface PlanBlock {
 	readonly kind: "plan";
 	readonly text: string;
@@ -66,13 +75,20 @@ export interface FileBlock {
 	readonly seq: number;
 }
 
-export type Block = AssistantBlock | LiveBlock | ToolBlock | NoticeBlock | PlanBlock | FileBlock;
+export type Block = AssistantBlock | LiveBlock | ToolBlock | NoticeBlock | DividerBlock | PlanBlock | FileBlock;
 
 export interface TurnView {
 	readonly key: string;
 	readonly prompt: string;
 	readonly images: number;
 	readonly blocks: readonly Block[];
+	/** 本回合从用户输入到结束的时长（毫秒）；用于完成态的「已工作 X」摘要。 */
+	readonly durationMs?: number;
+}
+
+/** 推理内容是否含实质文本：排除供应商在结束时回传的纯空白占位（如单个空格）。 */
+function hasReasoningText(value: string | undefined): boolean {
+	return value !== undefined && value.trim().length > 0;
 }
 
 /**
@@ -90,6 +106,14 @@ export function buildTimeline(
 	let current: MutableTurn | undefined;
 	const tools = new Map<string, ToolBlock>();
 	const planCalls = new Set<string>();
+	/** 运行中切换模型时，分隔线延后到下一轮开头显示；连续切换只保留最后一条。 */
+	let pendingModelDivider: DividerBlock | undefined;
+	/** 同一位置覆盖：连续的分隔块合并为一条，避免堆叠。 */
+	const pushDivider = (turn: MutableTurn, divider: DividerBlock): void => {
+		const last = turn.blocks.at(-1);
+		if (last?.kind === "divider") turn.blocks[turn.blocks.length - 1] = divider;
+		else turn.blocks.push(divider);
+	};
 	const ensureCurrent = (): MutableTurn => {
 		if (current !== undefined) return current;
 		current = { key: `turn-orphan-${turns.length + 1}`, prompt: "", images: 0, blocks: [] };
@@ -98,6 +122,8 @@ export function buildTimeline(
 	};
 
 	for (const event of events) {
+		// 记录回合首末时间戳；首事件即 user.input，后续事件持续刷新 endedTs
+		if (event.type !== "user.input" && current !== undefined) current.endedTs = event.ts;
 		switch (event.type) {
 			case "user.input": {
 				current = {
@@ -105,17 +131,25 @@ export function buildTimeline(
 					prompt: event.payload.text,
 					images: event.payload.images?.length ?? 0,
 					blocks: [],
+					startedTs: event.ts,
+					endedTs: event.ts,
 				};
+				// 运行中切换的模型在下一轮发送后才显示分隔线。
+				if (pendingModelDivider !== undefined) {
+					current.blocks.push(pendingModelDivider);
+					pendingModelDivider = undefined;
+				}
 				turns.push(current);
 				tools.clear();
 				break;
 			}
 			case "llm.response": {
-				if (event.payload.text.length > 0 || event.payload.reasoning !== undefined) {
+				const reasoning = hasReasoningText(event.payload.reasoning) ? event.payload.reasoning : undefined;
+				if (event.payload.text.length > 0 || reasoning !== undefined) {
 					ensureCurrent().blocks.push({
 						kind: "assistant",
 						text: event.payload.text,
-						...(event.payload.reasoning === undefined ? {} : { reasoning: event.payload.reasoning }),
+						...(reasoning === undefined ? {} : { reasoning }),
 					});
 				}
 				break;
@@ -255,6 +289,19 @@ export function buildTimeline(
 				});
 				break;
 			}
+			case "model.changed": {
+				const divider: DividerBlock = {
+					kind: "divider",
+					text: `模型已从 ${event.payload.from} 更改为 ${event.payload.to}`,
+				};
+				if (event.payload.appliesNextTurn) {
+					// 运行中切换：延后到下一轮，连续切换只保留最后一条。
+					pendingModelDivider = divider;
+				} else {
+					pushDivider(ensureCurrent(), divider);
+				}
+				break;
+			}
 			case "approval.granted":
 			case "approval.denied":
 			case "approval.reviewed":
@@ -276,9 +323,10 @@ export function buildTimeline(
 		}
 	}
 
-	if (live.text.length > 0 || live.reasoning.length > 0) {
+	if (live.text.length > 0 || hasReasoningText(live.reasoning)) {
 		const last = turns.at(-1);
-		const block: LiveBlock = { kind: "live", text: live.text, reasoning: live.reasoning };
+		const reasoning = hasReasoningText(live.reasoning) ? live.reasoning : "";
+		const block: LiveBlock = { kind: "live", text: live.text, reasoning };
 		if (last === undefined) {
 			turns.push({ key: "turn-live", prompt: "", images: 0, blocks: [block] });
 		} else {
@@ -295,6 +343,12 @@ export function buildTimeline(
 		}
 	}
 
+	for (const turn of turns) {
+		if (turn.startedTs === undefined || turn.endedTs === undefined) continue;
+		const elapsed = Date.parse(turn.endedTs) - Date.parse(turn.startedTs);
+		if (Number.isFinite(elapsed) && elapsed >= 0) turn.durationMs = elapsed;
+	}
+
 	return turns;
 }
 
@@ -303,6 +357,10 @@ interface MutableTurn {
 	readonly prompt: string;
 	readonly images: number;
 	readonly blocks: Block[];
+	/** 事件时间戳字符串，末事件减首事件得到回合时长。 */
+	startedTs?: string;
+	endedTs?: string;
+	durationMs?: number;
 }
 
 function replaceBlock(turns: readonly MutableTurn[], oldBlock: ToolBlock, next: ToolBlock): void {
@@ -317,24 +375,46 @@ function replaceBlock(turns: readonly MutableTurn[], oldBlock: ToolBlock, next: 
 
 export interface TranscriptProps {
 	readonly turns: readonly TurnView[];
+	/** 会话级警告/错误，直接显示在对话流顶部。 */
+	readonly inlineNotices: readonly InlineNotice[];
 	readonly planning: boolean;
 	readonly running: boolean;
 	readonly onApprovePlan: (plan: string) => void;
 	readonly onRevisePlan: () => void;
 }
 
-export function Transcript({ turns, planning, running, onApprovePlan, onRevisePlan }: TranscriptProps): JSX.Element {
+export function Transcript({
+	turns,
+	inlineNotices,
+	planning,
+	running,
+	onApprovePlan,
+	onRevisePlan,
+}: TranscriptProps): JSX.Element {
+	const noticeBlocks =
+		inlineNotices.length === 0 ? null : (
+			<div className="inline-notices">
+				{inlineNotices.map((notice, index) => (
+					<div className={`inline-notice notice-${notice.tone}`} key={`inline-${index}`}>
+						<AlertIcon size={13} />
+						<span>{notice.text}</span>
+					</div>
+				))}
+			</div>
+		);
 	if (turns.length === 0) {
 		return (
 			<div className="chat-empty">
+				{noticeBlocks}
 				<EmptyBrand />
 			</div>
 		);
 	}
 	return (
 		<div className="turns">
+			{noticeBlocks}
 			{turns.map((turn, index) => (
-				<div className="turn" key={turn.key}>
+				<div className="turn" id={turn.key} key={turn.key}>
 					{turn.prompt.length > 0 || turn.images > 0 ? (
 						<div className="user-message">
 							<div className="bubble">
@@ -346,8 +426,10 @@ export function Transcript({ turns, planning, running, onApprovePlan, onRevisePl
 					<div className="assistant-column">
 						<BlockList
 							blocks={turn.blocks}
+							{...(turn.durationMs === undefined ? {} : { durationMs: turn.durationMs })}
 							planning={planning}
 							running={running}
+							isActive={running && index === turns.length - 1}
 							runningHint={running && index === turns.length - 1}
 							onApprovePlan={onApprovePlan}
 							onRevisePlan={onRevisePlan}
@@ -361,43 +443,77 @@ export function Transcript({ turns, planning, running, onApprovePlan, onRevisePl
 
 function BlockList({
 	blocks,
+	durationMs,
 	planning,
 	running,
+	isActive = false,
 	runningHint = false,
 	onApprovePlan,
 	onRevisePlan,
 }: {
 	readonly blocks: readonly Block[];
+	readonly durationMs?: number;
 	readonly planning: boolean;
 	readonly running: boolean;
+	/** 活跃回合（最后一个且会话运行中）：过程全程平铺，完成后才折叠。 */
+	readonly isActive?: boolean;
 	/** 仅最后一个回合显示：运行中且尚无流式输出时给出「正在推理」占位。 */
 	readonly runningHint?: boolean;
 	readonly onApprovePlan: (plan: string) => void;
 	readonly onRevisePlan: () => void;
 }): JSX.Element {
 	const rendered: JSX.Element[] = [];
+	/** 最终答案之前的过程（含中间正文、推理、工具、文件）压进摘要。 */
+	const trail: JSX.Element[] = [];
 	let toolBuffer: ToolBlock[] = [];
 	let key = 0;
 	let hasLive = false;
-	// 流式推理默认展开；用户手动收起后不再被增量重渲染强行打开
-	const [liveCollapsed, setLiveCollapsed] = useState(false);
+	// 活跃回合推理保持展开（图1的过程平铺）；回合完成后正文出现才自动折叠。
+	// 用户手动展开后由 onToggle 记录，不被后续增量重渲染强行改回。
+	const liveHasText = blocks.some((block) => block.kind === "live" && block.text.length > 0);
+	const shouldCollapseLive = liveHasText && !isActive;
+	const [liveCollapsed, setLiveCollapsed] = useState(shouldCollapseLive);
+	const liveManuallyToggled = useRef(false);
+	useEffect(() => {
+		if (!liveManuallyToggled.current && shouldCollapseLive) setLiveCollapsed(true);
+	}, [shouldCollapseLive]);
+
+	// 最终答案 = 最后一块含正文的 assistant/live。它之前的所有内容（包括中间正文）都收进过程摘要。
+	let lastAnswerIndex = -1;
+	for (let i = blocks.length - 1; i >= 0; i -= 1) {
+		const block = blocks[i];
+		if (block === undefined) continue;
+		if ((block.kind === "assistant" || block.kind === "live") && block.text.length > 0) {
+			lastAnswerIndex = i;
+			break;
+		}
+	}
 
 	const flushTools = (): void => {
 		if (toolBuffer.length === 0) return;
-		rendered.push(<ToolGroup key={`tools-${key++}`} blocks={toolBuffer} />);
+		const group = toolBuffer;
+		trail.push(<ToolGroup key={`tools-${key++}`} blocks={group} />);
 		toolBuffer = [];
 	};
 
-	for (const block of blocks) {
+	const pushTrail = (element: JSX.Element): void => {
+		flushTools();
+		trail.push(element);
+	};
+
+	for (let index = 0; index < blocks.length; index += 1) {
+		const block = blocks[index];
+		if (block === undefined) continue;
+		// 最终答案之前的所有块都进过程摘要；计划卡片始终单独展开（需交互批准）
+		const isProcess = index < lastAnswerIndex && block.kind !== "plan";
 		if (block.kind === "tool") {
 			toolBuffer.push(block);
 			continue;
 		}
-		flushTools();
 		switch (block.kind) {
-			case "assistant":
-				if (block.reasoning !== undefined && block.reasoning.length > 0) {
-					rendered.push(
+			case "assistant": {
+				if (hasReasoningText(block.reasoning)) {
+					pushTrail(
 						<details className="thinking" key={`think-${key++}`}>
 							<summary>
 								<SparklesIcon size={13} />
@@ -408,17 +524,28 @@ function BlockList({
 						</details>,
 					);
 				}
-				rendered.push(<Markdown key={`md-${key++}`} text={block.text} />);
+				flushTools();
+				if (block.text.length > 0) {
+					const markdown = <Markdown key={`md-${key++}`} text={block.text} />;
+					if (isProcess) trail.push(markdown);
+					else rendered.push(markdown);
+				}
 				break;
+			}
 			case "live":
 				hasLive = true;
+				// live 是当前回合的流式答案，始终展开在摘要之后
+				flushTools();
 				rendered.push(
 					<div className="live-block" key={`live-${key++}`}>
-						{block.reasoning.length > 0 ? (
+						{hasReasoningText(block.reasoning) ? (
 							<details
 								className="thinking"
 								open={!liveCollapsed}
-								onToggle={(event) => setLiveCollapsed(!(event.currentTarget as HTMLDetailsElement).open)}
+								onToggle={(event) => {
+									liveManuallyToggled.current = true;
+									setLiveCollapsed(!(event.currentTarget as HTMLDetailsElement).open);
+								}}
 							>
 								<summary>
 									<SparklesIcon size={13} className="thinking-live-icon" />
@@ -432,15 +559,35 @@ function BlockList({
 					</div>,
 				);
 				break;
-			case "notice":
-				rendered.push(
+			case "notice": {
+				const notice = (
 					<div className={`inline-notice notice-${block.tone}`} key={`notice-${key++}`}>
 						{block.tone === "error" ? <AlertIcon size={13} /> : <ClockIcon size={13} />}
+						<span>{block.text}</span>
+					</div>
+				);
+				// 警告/错误始终可见，不折叠进「已工作 X」过程摘要。
+				if (block.tone === "warn" || block.tone === "error") {
+					flushTools();
+					rendered.push(notice);
+				} else {
+					pushTrail(notice);
+				}
+				break;
+			}
+			case "divider":
+				// 模型切换分隔线始终可见，不折叠进过程摘要
+				flushTools();
+				rendered.push(
+					<div className="inline-divider" key={`divider-${key++}`}>
+						<InfoIcon size={13} />
 						<span>{block.text}</span>
 					</div>,
 				);
 				break;
 			case "plan":
+				// 计划卡片需要用户批准，属于交互内容，不折叠进过程摘要
+				flushTools();
 				rendered.push(
 					<PlanCard
 						key={`plan-${key++}`}
@@ -453,7 +600,7 @@ function BlockList({
 				);
 				break;
 			case "file":
-				rendered.push(
+				pushTrail(
 					<div className="file-row" key={`file-${key++}`}>
 						<FileIcon size={14} />
 						<span className={`file-op op-${block.op}`}>{opLabel(block.op)}</span>
@@ -476,7 +623,65 @@ function BlockList({
 			</div>,
 		);
 	}
-	return <>{rendered}</>;
+
+	const trailContent = trail.length > 0;
+	const toolsForSummary = blocks.filter((block): block is ToolBlock => block.kind === "tool");
+	return (
+		<>
+			{/* 活跃回合过程全程平铺；回合完成后才压成「已工作 X」摘要 */}
+			{isActive ? (
+				trail
+			) : trailContent ? (
+				<TurnTrail tools={toolsForSummary} {...(durationMs === undefined ? {} : { durationMs })}>
+					{trail}
+				</TurnTrail>
+			) : null}
+			{rendered}
+		</>
+	);
+}
+
+/** 中文时长：1m 59s -> "1分59秒"，不足 1 分钟显示秒。 */
+function formatWorkDuration(ms: number | undefined): string {
+	if (ms === undefined || ms < 1_000) return "刚刚";
+	const seconds = Math.round(ms / 1_000);
+	if (seconds < 60) return `${seconds}秒`;
+	return `${Math.floor(seconds / 60)}分${seconds % 60}秒`;
+}
+
+/**
+ * 回合过程摘要：把最终答案之前的正文、推理、工具压成一行「已工作 X」，
+ * 点击展开看明细（参考 Codex/Claude Code 的折叠视图）。
+ * 仅用于已完成回合；活跃回合由调用方直接平铺，不套这层摘要。
+ */
+function TurnTrail({
+	tools,
+	durationMs,
+	children,
+}: {
+	readonly tools: readonly ToolBlock[];
+	readonly durationMs?: number;
+	readonly children: ReactNode;
+}): JSX.Element {
+	const [open, setOpen] = useState(false);
+	const expanded = open;
+	const names = tools.map((tool) => tool.name);
+	const toolsSummary = describeToolGroup(names, false);
+	const label = toolsSummary
+		? `已工作 ${formatWorkDuration(durationMs)} · ${toolsSummary}`
+		: `已工作 ${formatWorkDuration(durationMs)}`;
+	return (
+		<div className={`turn-trail ${expanded ? "is-open" : ""}`}>
+			<button className="turn-trail-head" onClick={() => setOpen(!open)}>
+				<span className="turn-trail-icon">
+					<ListTreeIcon size={13} />
+				</span>
+				<span className="turn-trail-label">{label}</span>
+				{expanded ? <ChevronDownIcon size={13} /> : <ChevronRightIcon size={13} />}
+			</button>
+			{expanded ? <div className="turn-trail-body">{children}</div> : null}
+		</div>
+	);
 }
 
 function ToolGroup({ blocks }: { readonly blocks: readonly ToolBlock[] }): JSX.Element {
@@ -486,7 +691,10 @@ function ToolGroup({ blocks }: { readonly blocks: readonly ToolBlock[] }): JSX.E
 	useEffect(() => {
 		if (hasRunning) setOpen(true);
 	}, [hasRunning]);
-	const label = hasRunning ? `正在调用 ${blocks.length} 个工具` : `已调用 ${blocks.length} 个工具`;
+	const label = describeToolGroup(
+		blocks.map((block) => block.name),
+		hasRunning,
+	);
 	return (
 		<div className={`tool-group ${hasRunning ? "is-running" : ""}`}>
 			<button className={`tool-group-head ${hasError ? "has-error" : ""}`} onClick={() => setOpen(!open)}>
@@ -533,7 +741,7 @@ function ToolRow({ block }: { readonly block: ToolBlock }): JSX.Element {
 		<div className={`tool-row status-${status}`}>
 			<button className="tool-row-main" onClick={() => setOpen(!open)}>
 				<span className="tool-icon">{iconForTool(block.name)}</span>
-				<span className="tool-name">{block.subagent === undefined ? block.name : "subagent"}</span>
+				<span className="tool-name">{block.subagent === undefined ? toolVerb(block.name) : "子任务"}</span>
 				<span className="tool-detail">{detail}</span>
 				{status === "running" ? <span className="spinner small" /> : null}
 				{status === "error" ? <AlertIcon size={13} className="tool-status-error" /> : null}
@@ -552,19 +760,21 @@ function ToolRow({ block }: { readonly block: ToolBlock }): JSX.Element {
 					) : null}
 				</div>
 			) : null}
-			{/* 面板常驻挂载，grid-rows 折叠过渡展开/收起 */}
+			{/* 面板常驻挂载，grid-rows 折叠过渡展开/收起；视觉样式放内层，折叠层保持零尺寸 */}
 			<div className={`tool-detail-wrap ${open ? "is-open" : ""}`}>
 				<div className="tool-detail-panel">
-					<div className="detail-label">参数</div>
-					<pre>{formatArgs(block.args)}</pre>
-					{result !== undefined ? (
-						<>
-							<div className="detail-label">{block.isError === true ? "错误" : "结果"}</div>
-							<pre ref={resultRef} className={block.isError === true ? "is-error" : ""}>
-								{truncateText(result, 6_000)}
-							</pre>
-						</>
-					) : null}
+					<div className="tool-detail-panel-inner">
+						<div className="detail-label">参数</div>
+						<pre>{formatArgs(block.args)}</pre>
+						{result !== undefined ? (
+							<>
+								<div className="detail-label">{block.isError === true ? "错误" : "结果"}</div>
+								<pre ref={resultRef} className={block.isError === true ? "is-error" : ""}>
+									{truncateText(result, 6_000)}
+								</pre>
+							</>
+						) : null}
+					</div>
 				</div>
 			</div>
 		</div>

@@ -1,6 +1,7 @@
 import type { JSX, SVGProps } from "react";
 import {
 	Archive,
+	ArrowDown,
 	ArrowLeft,
 	ArrowRight,
 	ArrowUp,
@@ -11,7 +12,9 @@ import {
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
+	CircleCheck,
 	CircleHelp,
+	CircleX,
 	Clock,
 	Copy,
 	Database,
@@ -21,6 +24,7 @@ import {
 	Eye,
 	EyeOff,
 	File,
+	FileText,
 	Folder,
 	FolderOpen,
 	FolderPlus,
@@ -32,6 +36,7 @@ import {
 	Keyboard,
 	Lightbulb,
 	Link,
+	ListChecks,
 	ListChevronsDownUp,
 	ListChevronsUpDown,
 	ListTree,
@@ -43,10 +48,12 @@ import {
 	Palette,
 	Paperclip,
 	PanelLeft,
+	PanelRight,
 	Pencil,
 	Pin,
 	PinOff,
 	Plug,
+	Play,
 	Plus,
 	Pointer,
 	Puzzle,
@@ -69,6 +76,7 @@ import {
 	Trash2,
 	TriangleAlert,
 	UserCog,
+	Video,
 	X,
 	type LucideIcon,
 } from "lucide-react";
@@ -88,9 +96,11 @@ function wrap(Lucide: LucideIcon): (props: IconProps) => JSX.Element {
 
 export const PlusIcon = wrap(Plus);
 export const PanelIcon = wrap(PanelLeft);
+export const PanelRightIcon = wrap(PanelRight);
 export const FolderIcon = wrap(Folder);
 export const FolderOpenIcon = wrap(FolderOpen);
 export const FileIcon = wrap(File);
+export const FileTextIcon = wrap(FileText);
 export const SettingsIcon = wrap(Settings);
 export const SendIcon = wrap(Send);
 export const StopIcon = wrap(Square);
@@ -107,8 +117,12 @@ export const XIcon = wrap(X);
 export const RefreshIcon = wrap(RefreshCw);
 export const AlertIcon = wrap(TriangleAlert);
 export const CheckIcon = wrap(Check);
+export const CircleCheckIcon = wrap(CircleCheck);
+export const CircleXIcon = wrap(CircleX);
+export const PlayIcon = wrap(Play);
 export const ClockIcon = wrap(Clock);
 export const ImageIcon = wrap(Image);
+export const VideoIcon = wrap(Video);
 export const SlidersIcon = wrap(SlidersHorizontal);
 export const ArchiveIcon = wrap(Archive);
 export const DownloadIcon = wrap(Download);
@@ -120,6 +134,7 @@ export const SunIcon = wrap(Sun);
 export const MoonIcon = wrap(Moon);
 export const MoreIcon = wrap(Ellipsis);
 export const ListTreeIcon = wrap(ListTree);
+export const ListChecksIcon = wrap(ListChecks);
 export const ListChevronsDownUpIcon = wrap(ListChevronsDownUp);
 export const ListChevronsUpDownIcon = wrap(ListChevronsUpDown);
 export const DiffIcon = wrap(Diff);
@@ -135,6 +150,7 @@ export const PointerIcon = wrap(Pointer);
 export const ShieldCheckIcon = wrap(ShieldCheck);
 export const ShieldAlertIcon = wrap(ShieldAlert);
 export const ArrowUpIcon = wrap(ArrowUp);
+export const ArrowDownIcon = wrap(ArrowDown);
 export const ArrowLeftIcon = wrap(ArrowLeft);
 export const ArrowRightIcon = wrap(ArrowRight);
 export const MessagePlusIcon = wrap(MessageCirclePlus);

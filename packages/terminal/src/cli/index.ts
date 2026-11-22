@@ -88,7 +88,7 @@ export async function runCli(args: readonly string[], deps: CliDependencies = {}
 	const core =
 		deps.core ??
 		new Core({
-			requestApproval: (request, _sessionId, signal) => approvals.request(request, signal),
+			requestApproval: (request, sessionId, signal) => approvals.request(request, signal, sessionId),
 			onWarning: (message) => warnings.emit(message),
 		});
 	try {
