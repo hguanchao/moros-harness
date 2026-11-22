@@ -3,12 +3,6 @@ import type { ProjectRef, PreparedImage, SessionView } from "../shared/contract.
 /** 输入框附件上限；与新任务草稿共用，避免异步添加超过 UI 限制。 */
 export const MAX_DRAFT_IMAGES = 8;
 
-/** 引用 chip：选区原文快照（发送时才格式化为 `> ` 引用块）。 */
-export interface DraftQuote {
-	readonly id: string;
-	readonly text: string;
-}
-
 /**
  * 尚未发送的任务输入；项目关联仅在创建会话时生效，不迁移已有会话。
  * 模型与推理强度由 newTaskState 注入上一会话的选择；审批档位与计划模式不继承，
@@ -17,8 +11,6 @@ export interface DraftQuote {
 export interface TaskDraft {
 	readonly text: string;
 	readonly images: readonly PreparedImage[];
-	/** 划词引用 chip；发送时格式化为 `> ` 块并入正文。 */
-	readonly quotes: readonly DraftQuote[];
 	readonly project: ProjectRef | null;
 	/** 首次发送前切换到的本地分支；仅在选择 Git 项目并选择分支后存在。 */
 	readonly branch: string | undefined;
@@ -43,7 +35,6 @@ export function createTaskDraft(
 	return {
 		text: "",
 		images: [],
-		quotes: [],
 		project: null,
 		branch: undefined,
 		model: seed.model,

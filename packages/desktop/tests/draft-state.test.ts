@@ -122,7 +122,6 @@ describe("renderer task draft state", () => {
 			draft: {
 				text: "Old input",
 				images: [makeImage("old-image")],
-				quotes: [],
 				project: PROJECT_REF,
 				branch: "feature/old",
 				model: { provider: "fixture", model: "chosen-model" },
@@ -139,7 +138,6 @@ describe("renderer task draft state", () => {
 		expect(next.draft).toEqual({
 			text: "",
 			images: [],
-			quotes: [],
 			branch: undefined,
 			project: null,
 			model: SESSION.model,
@@ -563,45 +561,16 @@ describe("renderer task draft state", () => {
 	});
 });
 
-describe("draft-quote 引用消息 chip", () => {
-	it("加入引用 chip 并递增 revision，不动正文", () => {
+describe("draft-text-append 划词引用", () => {
+	it("追加引用文本到草稿末尾并递增 revision", () => {
 		const base = reducer(reducer(activeState(), { type: "new-task" }), { type: "draft-text", text: "问题：" });
-		const added = reducer(base, {
-			type: "draft-quote-added",
-			quote: { id: "q1", text: "引用原文" },
-		});
-
-		expect(added.draft.quotes).toEqual([{ id: "q1", text: "引用原文" }]);
-		expect(added.draft.text).toBe("问题：");
-		expect(added.draftRevision).toBe(base.draftRevision + 1);
-	});
-
-	it("移除引用 chip", () => {
-		const added = reducer(reducer(activeState(), { type: "new-task" }), {
-			type: "draft-quote-added",
-			quote: { id: "q1", text: "引用原文" },
-		});
-		const removed = reducer(added, { type: "draft-quote-removed", id: "q1" });
-		expect(removed.draft.quotes).toEqual([]);
-		expect(removed.draftRevision).toBe(added.draftRevision + 1);
+		const appended = reducer(base, { type: "draft-text-append", text: "> 引用原文\n\n" });
+		expect(appended.draft.text).toBe("问题：> 引用原文\n\n");
+		expect(appended.draftRevision).toBe(base.draftRevision + 1);
 	});
 
 	it("空文本不产生变化", () => {
 		const base = reducer(activeState(), { type: "new-task" });
-		expect(reducer(base, { type: "draft-quote-added", quote: { id: "q1", text: "   " } })).toBe(base);
-	});
-
-	it("发送后清空引用 chip", () => {
-		const added = reducer(reducer(activeState(), { type: "new-task" }), {
-			type: "draft-quote-added",
-			quote: { id: "q1", text: "引用原文" },
-		});
-		const sent = reducer(added, {
-			type: "draft-sent",
-			generation: added.draftGeneration,
-			revision: added.draftRevision,
-			imageIds: [],
-		});
-		expect(sent.draft.quotes).toEqual([]);
+		expect(reducer(base, { type: "draft-text-append", text: "" })).toBe(base);
 	});
 });

@@ -26,7 +26,6 @@ import {
 	PlugIcon,
 	PlusIcon,
 	PointerIcon,
-	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
 	StopIcon,
@@ -36,8 +35,6 @@ import {
 import { useApp } from "../store/state.tsx";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
-import { buildQuote } from "../utils/message-actions.ts";
-import { firstLine } from "../utils/format.ts";
 import {
 	filterCommands,
 	filterFiles,
@@ -107,7 +104,7 @@ export function Composer(): JSX.Element {
 	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
-	const { text, images, quotes } = state.draft;
+	const { text, images } = state.draft;
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
@@ -144,7 +141,7 @@ export function Composer(): JSX.Element {
 		current !== undefined && state.runStates[current.meta.id] === "paused" && current.running !== true;
 	const stoppable = running || awaitingApproval;
 	const disabled = !state.ready || state.isNavigating || readOnly || trustBlocked;
-	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0 || quotes.length > 0);
+	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
 	const model =
 		current === undefined
@@ -215,9 +212,7 @@ export function Composer(): JSX.Element {
 
 	const send = async (): Promise<void> => {
 		if (disabled || isSending || isSubmitting.current) return;
-		// 引用 chip 在发送时才序列化为 `> ` 块；@path / $name 已是正文内联文本。
-		const quoteText = quotes.map((quote) => buildQuote(quote.text)).join("");
-		const message = `${quoteText}${text.trim()}`;
+		const message = text.trim();
 		if (message.length === 0 && images.length === 0) return;
 		const epoch = currentNavigationEpoch();
 		const generation = state.draftGeneration;
@@ -571,24 +566,6 @@ export function Composer(): JSX.Element {
 									<XIcon size={12} />
 								</button>
 							</div>
-						))}
-					</div>
-				) : null}
-				{quotes.length > 0 ? (
-					<div className="quote-chips">
-						{quotes.map((quote) => (
-							<span className="quote-chip" key={quote.id} data-tooltip={quote.text}>
-								<QuoteIcon size={10} />
-								<span className="quote-chip-text">引用：{firstLine(quote.text, 20)}</span>
-								<button
-									type="button"
-									className="quote-chip-remove"
-									aria-label="移除引用"
-									onClick={() => dispatch({ type: "draft-quote-removed", id: quote.id })}
-								>
-									<XIcon size={9} />
-								</button>
-							</span>
 						))}
 					</div>
 				) : null}
