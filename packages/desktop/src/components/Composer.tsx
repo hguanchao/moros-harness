@@ -50,6 +50,7 @@ import {
 import { DESKTOP_COMMANDS } from "../utils/command-list.ts";
 import { runDesktopCommand, type CommandHandlers } from "../utils/command-runner.ts";
 import { InlineCompletion, type CompletionOption, type CompletionTrigger } from "./InlineCompletion.tsx";
+import { tokenizeForDisplay } from "../utils/input-chips.ts";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -112,6 +113,7 @@ export function Composer(): JSX.Element {
 	const [imageUrl, setImageUrl] = useState("");
 	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
+	const mirror = useRef<HTMLDivElement | null>(null);
 	const isSubmitting = useRef(false);
 	// 行内补全状态；Esc 关闭后记住 dismissed，输入变化才重置。
 	const [completion, setCompletion] = useState<
@@ -268,6 +270,11 @@ export function Composer(): JSX.Element {
 	/** 根据当前输入与光标重算补全浮层。 */
 	const updateCompletion = (value: string, cursor: number): void => {
 		if (completionDismissed.current) return;
+		// 光标紧跟空白时视为无活动 token：插入 @path/$name 后的尾随空格不该再弹补全。
+		if (cursor > 0 && /\s/.test(value[cursor - 1] ?? "")) {
+			setCompletion(undefined);
+			return;
+		}
 		const detected = findSlashToken(value, cursor) ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
 		if (detected === undefined) {
 			setCompletion(undefined);
@@ -312,7 +319,9 @@ export function Composer(): JSX.Element {
 		if (option === undefined) return;
 		const { trigger, token } = completion;
 		setCompletion(undefined);
-		completionDismissed.current = false;
+		// 选中后关闭补全，直到用户下一次真实输入（onChange 会重置）；
+		// 避免光标复位触发的 onSelect 重新弹出含尾随空格的幽灵 token。
+		completionDismissed.current = true;
 		if (trigger === "/") {
 			// 命令：清理触发文本后立即执行。
 			const cleaned = removeTriggerText(text, token);
@@ -570,34 +579,50 @@ export function Composer(): JSX.Element {
 					</div>
 				) : null}
 
-				<textarea
-					className="composer-input"
-					ref={textarea}
-					value={text}
-					rows={1}
-					disabled={disabled}
-					placeholder={
-						trustBlocked
-							? "请先确认工作区信任"
-							: readOnly
-								? "该会话正在另一个窗口中使用，当前为只读"
-								: "描述你的任务，/调用指令，@文件，$技能"
-					}
-					onChange={(event) => {
-						const value = event.target.value;
-						dispatch({ type: "draft-text", text: value });
-						completionDismissed.current = false;
-						updateCompletion(value, event.target.selectionStart);
-					}}
-					onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
-					onPaste={onPaste}
-					onKeyDown={(event) => {
-						if (handleCompletionKeyDown(event)) return;
-						if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-						event.preventDefault();
-						void send();
-					}}
-				/>
+				<div className="composer-input-wrap">
+					<textarea
+						className="composer-input"
+						ref={textarea}
+						value={text}
+						rows={1}
+						disabled={disabled}
+						placeholder={
+							trustBlocked
+								? "请先确认工作区信任"
+								: readOnly
+									? "该会话正在另一个窗口中使用，当前为只读"
+									: "描述你的任务，/调用指令，@文件，$技能"
+						}
+						onChange={(event) => {
+							const value = event.target.value;
+							dispatch({ type: "draft-text", text: value });
+							completionDismissed.current = false;
+							updateCompletion(value, event.target.selectionStart);
+						}}
+						onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
+						onScroll={(event) => {
+							if (mirror.current !== null) mirror.current.scrollTop = event.currentTarget.scrollTop;
+						}}
+						onPaste={onPaste}
+						onKeyDown={(event) => {
+							if (handleCompletionKeyDown(event)) return;
+							if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+							event.preventDefault();
+							void send();
+						}}
+					/>
+					<div className="input-mirror" ref={mirror} aria-hidden="true">
+						{tokenizeForDisplay(text).map((segment, index) =>
+							segment.chip === false ? (
+								<span key={index}>{segment.text}</span>
+							) : (
+								<span className={`input-chip input-chip-${segment.chip}`} key={index}>
+									{segment.text}
+								</span>
+							),
+						)}
+					</div>
+				</div>
 				{completion === undefined ? null : (
 					<InlineCompletion
 						trigger={completion.trigger}
