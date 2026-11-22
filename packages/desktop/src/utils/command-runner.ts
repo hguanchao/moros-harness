@@ -9,15 +9,8 @@ import { findDesktopCommand } from "./command-list.ts";
 
 /** 命令处理器集合；键为命令名。Composer 实现具体行为。 */
 export interface CommandHandlers {
-	readonly model: (args: string) => void | Promise<void>;
-	readonly effort: (args: string) => void | Promise<void>;
-	readonly approval: (args: string) => void | Promise<void>;
-	readonly plan: (args: string) => void | Promise<void>;
 	readonly compact: (args: string) => void | Promise<void>;
-	readonly undo: (args: string) => void | Promise<void>;
 	readonly review: (args: string) => void | Promise<void>;
-	readonly export: (args: string) => void | Promise<void>;
-	readonly session: (args: string) => void | Promise<void>;
 }
 
 /**

@@ -109,37 +109,30 @@ describe("写回与清理", () => {
 });
 
 describe("命令清单与分派", () => {
-	it("核心命令齐全且描述为中文", () => {
-		for (const name of ["model", "effort", "approval", "plan", "compact", "undo", "review", "export", "session"]) {
-			expect(findDesktopCommand(name)?.description).toBeTruthy();
+	it("只保留 compact 与 review 两条命令", () => {
+		expect(findDesktopCommand("compact")?.description).toBeTruthy();
+		expect(findDesktopCommand("review")?.description).toBeTruthy();
+		// 其余操作桌面端都有专门 UI 入口，不再作为命令
+		for (const name of ["model", "effort", "approval", "plan", "undo", "export", "session", "skills", "mcps"]) {
+			expect(findDesktopCommand(name)).toBeUndefined();
 		}
-		// TUI 专属命令不在清单
-		expect(findDesktopCommand("skills")).toBeUndefined();
-		expect(findDesktopCommand("mcps")).toBeUndefined();
 	});
 
 	it("splitCommand 按首个空格拆分", () => {
-		expect(splitCommand("/model deepseek/v4")).toEqual({ name: "/model", args: "deepseek/v4" });
+		expect(splitCommand("/review 检查登录逻辑")).toEqual({ name: "/review", args: "检查登录逻辑" });
 		expect(splitCommand("  /compact  ")).toEqual({ name: "/compact", args: "" });
 	});
 
 	it("runDesktopCommand 分派到对应 handler", async () => {
 		let called = "";
 		const handlers = {
-			model: () => {
-				called = "model";
+			compact: () => {
+				called = "compact";
 			},
-			effort: () => undefined,
-			approval: () => undefined,
-			plan: () => undefined,
-			compact: () => undefined,
-			undo: () => undefined,
 			review: () => undefined,
-			export: () => undefined,
-			session: () => undefined,
 		};
-		expect(await runDesktopCommand("model", "", handlers)).toBe(true);
-		expect(called).toBe("model");
+		expect(await runDesktopCommand("compact", "", handlers)).toBe(true);
+		expect(called).toBe("compact");
 		expect(await runDesktopCommand("unknown", "", handlers)).toBe(false);
 	});
 });

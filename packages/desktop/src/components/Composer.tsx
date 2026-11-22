@@ -207,69 +207,13 @@ export function Composer(): JSX.Element {
 		return found;
 	}, []);
 
-	/** 命令处理器：每个命令直接调用对应 IPC / 现有 picker。 */
+	/** 命令处理器：只保留桌面端没有专门 UI 入口的两条命令。 */
 	const commandHandlers: CommandHandlers = {
-		model: (args) => {
-			if (args.length === 0) {
-				setCompletion(undefined);
-				return;
-			}
-			const [provider, model] = args.split("/");
-			if (provider === undefined || model === undefined) return void report(new Error("用法：/model provider/model"));
-			void (
-				current === undefined
-					? Promise.resolve(dispatch({ type: "draft-options", options: { model: { provider, model } } }))
-					: call(window.moros.sessionSelectModel(provider, model))
-			).catch(report);
-		},
-		effort: (args) => {
-			if (args.length === 0) return;
-			const EFFORTS = ["off", "minimal", "low", "medium", "high", "max"];
-			if (!EFFORTS.includes(args)) return void report(new Error(`无效的推理强度：${args}`));
-			void (
-				current === undefined
-					? Promise.resolve(dispatch({ type: "draft-options", options: { effort: args as SessionView["effort"] } }))
-					: call(window.moros.sessionSelectEffort(args as never))
-			).catch(report);
-		},
-		approval: (args) => {
-			if (args === "yolo") {
-				setYoloConfirmOpen(true);
-				return;
-			}
-			if (args !== "ask" && args !== "auto") return void report(new Error("用法：/approval ask|auto|yolo"));
-			void (
-				current === undefined
-					? Promise.resolve(dispatch({ type: "draft-options", options: { approval: args } }))
-					: call(window.moros.sessionSelectApproval(args))
-			).catch(report);
-		},
-		plan: () => {
-			void call(window.moros.sessionSetPlan(true)).catch(report);
-		},
 		compact: () => {
 			void call(window.moros.sessionsCompact()).catch(report);
 		},
-		undo: () => {
-			void call(window.moros.sessionsRollback()).catch(report);
-		},
 		review: (args) => {
 			void call(window.moros.sessionsReview(args)).catch(report);
-		},
-		export: () => {
-			if (current === undefined) return void report(new Error("当前没有可导出的会话"));
-			void call(window.moros.sessionsExport(current.meta.id)).catch(report);
-		},
-		session: (args) => {
-			if (args.length === 0) return void report(new Error("用法：/session <会话ID> 或 /session fork"));
-			if (args === "fork") {
-				if (current === undefined) return void report(new Error("当前没有可 fork 的会话"));
-				void call(window.moros.sessionsFork(current.meta.id))
-					.then(() => actions.setPage("chat"))
-					.catch(report);
-			} else {
-				void actions.activateSession(args).catch(report);
-			}
 		},
 	};
 
