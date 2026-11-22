@@ -29,7 +29,6 @@ import {
 	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
-	SparklesIcon,
 	StopIcon,
 	TerminalIcon,
 	XIcon,
@@ -108,7 +107,7 @@ export function Composer(): JSX.Element {
 	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
-	const { text, images, quotes, mentions } = state.draft;
+	const { text, images, quotes } = state.draft;
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
@@ -145,10 +144,7 @@ export function Composer(): JSX.Element {
 		current !== undefined && state.runStates[current.meta.id] === "paused" && current.running !== true;
 	const stoppable = running || awaitingApproval;
 	const disabled = !state.ready || state.isNavigating || readOnly || trustBlocked;
-	const canSend =
-		!disabled &&
-		!isSending &&
-		(text.trim().length > 0 || images.length > 0 || quotes.length > 0 || mentions.length > 0);
+	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0 || quotes.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
 	const model =
 		current === undefined
@@ -219,14 +215,9 @@ export function Composer(): JSX.Element {
 
 	const send = async (): Promise<void> => {
 		if (disabled || isSending || isSubmitting.current) return;
-		// 引用 chip 在发送时才序列化：`> ` 引用块 + `@path` / `$name`，拼在正文之前。
+		// 引用 chip 在发送时才序列化为 `> ` 块；@path / $name 已是正文内联文本。
 		const quoteText = quotes.map((quote) => buildQuote(quote.text)).join("");
-		const mentionText = mentions
-			.map((mention) =>
-				mention.kind === "file" ? formatFileReference(mention.value) : formatSkillReference(mention.value),
-			)
-			.join(" ");
-		const message = `${quoteText}${mentionText.length === 0 ? "" : `${mentionText}\n`}${text.trim()}`;
+		const message = `${quoteText}${text.trim()}`;
 		if (message.length === 0 && images.length === 0) return;
 		const epoch = currentNavigationEpoch();
 		const generation = state.draftGeneration;
@@ -319,32 +310,28 @@ export function Composer(): JSX.Element {
 		})();
 	};
 
-	/** 选中补全项：命令立即执行（不留 chip）；文件/技能加入 mention chip。 */
+	/** 选中补全项：命令立即执行；文件/技能以内联文本插入光标处。 */
 	const selectCompletion = (index: number): void => {
 		if (completion === undefined) return;
 		const option = completion.options[index];
 		if (option === undefined) return;
 		const { trigger, token } = completion;
-		const cleaned = removeTriggerText(text, token);
-		dispatch({ type: "draft-text", text: cleaned.text });
 		setCompletion(undefined);
 		completionDismissed.current = false;
 		if (trigger === "/") {
+			// 命令：清理触发文本后立即执行。
+			const cleaned = removeTriggerText(text, token);
+			dispatch({ type: "draft-text", text: cleaned.text });
+			requestAnimationFrame(() => elementFocusAndCursor(cleaned.cursor));
 			void runDesktopCommand(option.value, "", commandHandlers);
 		} else {
-			dispatch({
-				type: "draft-mention-added",
-				mention: {
-					id: crypto.randomUUID(),
-					kind: trigger === "@" ? "file" : "skill",
-					value: option.value,
-					label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
-				},
-			});
+			// 文件/技能：把 @path / $name 内联替换到触发片段处，后跟一个空格。
+			const reference = trigger === "@" ? formatFileReference(option.value) : formatSkillReference(option.value);
+			const next = text.slice(0, token.start) + reference + " " + text.slice(token.end);
+			const cursor = token.start + reference.length + 1;
+			dispatch({ type: "draft-text", text: next });
+			requestAnimationFrame(() => elementFocusAndCursor(cursor));
 		}
-		requestAnimationFrame(() => {
-			elementFocusAndCursor(cleaned.cursor);
-		});
 	};
 
 	/** textarea 键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
@@ -598,27 +585,6 @@ export function Composer(): JSX.Element {
 									className="quote-chip-remove"
 									aria-label="移除引用"
 									onClick={() => dispatch({ type: "draft-quote-removed", id: quote.id })}
-								>
-									<XIcon size={9} />
-								</button>
-							</span>
-						))}
-					</div>
-				) : null}
-				{mentions.length > 0 ? (
-					<div className="quote-chips">
-						{mentions.map((mention) => (
-							<span className="quote-chip" key={mention.id} data-tooltip={mention.value}>
-								{mention.kind === "file" ? <FolderIcon size={10} /> : <SparklesIcon size={10} />}
-								<span className="quote-chip-text">
-									{mention.kind === "file" ? "@" : "$"}
-									{firstLine(mention.label, 20)}
-								</span>
-								<button
-									type="button"
-									className="quote-chip-remove"
-									aria-label="移除引用"
-									onClick={() => dispatch({ type: "draft-mention-removed", id: mention.id })}
 								>
 									<XIcon size={9} />
 								</button>

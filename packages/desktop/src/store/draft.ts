@@ -9,16 +9,6 @@ export interface DraftQuote {
 	readonly text: string;
 }
 
-/** @ 文件 / $ 技能引用 chip：发送时格式化为 `@path` / `$name` 并入正文。 */
-export interface DraftMention {
-	readonly id: string;
-	readonly kind: "file" | "skill";
-	/** 用于序列化的值（文件路径 / 技能名）。 */
-	readonly value: string;
-	/** chip 上显示的短标签。 */
-	readonly label: string;
-}
-
 /**
  * 尚未发送的任务输入；项目关联仅在创建会话时生效，不迁移已有会话。
  * 模型与推理强度由 newTaskState 注入上一会话的选择；审批档位与计划模式不继承，
@@ -29,8 +19,6 @@ export interface TaskDraft {
 	readonly images: readonly PreparedImage[];
 	/** 划词引用 chip；发送时格式化为 `> ` 块并入正文。 */
 	readonly quotes: readonly DraftQuote[];
-	/** @ 文件 / $ 技能引用 chip。 */
-	readonly mentions: readonly DraftMention[];
 	readonly project: ProjectRef | null;
 	/** 首次发送前切换到的本地分支；仅在选择 Git 项目并选择分支后存在。 */
 	readonly branch: string | undefined;
@@ -56,7 +44,6 @@ export function createTaskDraft(
 		text: "",
 		images: [],
 		quotes: [],
-		mentions: [],
 		project: null,
 		branch: undefined,
 		model: seed.model,

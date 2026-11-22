@@ -21,7 +21,7 @@ import type {
 	WorkspaceTrustView,
 } from "../shared/contract.ts";
 import { DEFAULT_SIDEBAR_WIDTH } from "../shared/contract.ts";
-import { createTaskDraft, MAX_DRAFT_IMAGES, type DraftMention, type DraftQuote, type TaskDraft } from "./draft.ts";
+import { createTaskDraft, MAX_DRAFT_IMAGES, type DraftQuote, type TaskDraft } from "./draft.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
 export type Page = "chat" | "files" | "changes" | "trace" | "sessions" | "settings";
@@ -110,8 +110,6 @@ export type Action =
 	/** 划词引用 chip：加入 / 移除；引用原文发送时才格式化为 `> ` 块。 */
 	| { readonly type: "draft-quote-added"; readonly quote: DraftQuote }
 	| { readonly type: "draft-quote-removed"; readonly id: string }
-	| { readonly type: "draft-mention-added"; readonly mention: DraftMention }
-	| { readonly type: "draft-mention-removed"; readonly id: string }
 	| { readonly type: "draft-image-added"; readonly image: PreparedImage; readonly generation: number }
 	| { readonly type: "draft-image-removed"; readonly id: string }
 	| { readonly type: "draft-project"; readonly project: ProjectRef | null }
@@ -290,19 +288,6 @@ export function reducer(state: AppState, action: Action): AppState {
 				draft: { ...state.draft, quotes: state.draft.quotes.filter((quote) => quote.id !== action.id) },
 				draftRevision: state.draftRevision + 1,
 			};
-		case "draft-mention-added":
-			if (action.mention.value.trim().length === 0) return state;
-			return {
-				...state,
-				draft: { ...state.draft, mentions: [...state.draft.mentions, action.mention] },
-				draftRevision: state.draftRevision + 1,
-			};
-		case "draft-mention-removed":
-			return {
-				...state,
-				draft: { ...state.draft, mentions: state.draft.mentions.filter((mention) => mention.id !== action.id) },
-				draftRevision: state.draftRevision + 1,
-			};
 		case "draft-image-added": {
 			if (
 				action.generation !== state.draftGeneration ||
@@ -363,7 +348,6 @@ export function reducer(state: AppState, action: Action): AppState {
 					images,
 					// 引用随本次发送一起清空；发送期间新加的引用（revision 已变）保留。
 					quotes: action.revision === state.draftRevision ? [] : state.draft.quotes,
-					mentions: action.revision === state.draftRevision ? [] : state.draft.mentions,
 				},
 				draftRevision: state.draftRevision + 1,
 			};

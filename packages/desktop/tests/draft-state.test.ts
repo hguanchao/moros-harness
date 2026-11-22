@@ -123,7 +123,6 @@ describe("renderer task draft state", () => {
 				text: "Old input",
 				images: [makeImage("old-image")],
 				quotes: [],
-				mentions: [],
 				project: PROJECT_REF,
 				branch: "feature/old",
 				model: { provider: "fixture", model: "chosen-model" },
@@ -141,7 +140,6 @@ describe("renderer task draft state", () => {
 			text: "",
 			images: [],
 			quotes: [],
-			mentions: [],
 			branch: undefined,
 			project: null,
 			model: SESSION.model,
@@ -605,41 +603,5 @@ describe("draft-quote 引用消息 chip", () => {
 			imageIds: [],
 		});
 		expect(sent.draft.quotes).toEqual([]);
-	});
-});
-
-describe("draft-mention 文件/技能引用 chip", () => {
-	it("加入 mention chip 并递增 revision，不动正文", () => {
-		const base = reducer(activeState(), { type: "new-task" });
-		const added = reducer(base, {
-			type: "draft-mention-added",
-			mention: { id: "m1", kind: "file", value: "src/a.ts", label: "a.ts" },
-		});
-		expect(added.draft.mentions).toEqual([{ id: "m1", kind: "file", value: "src/a.ts", label: "a.ts" }]);
-		expect(added.draft.text).toBe("");
-		expect(added.draftRevision).toBe(base.draftRevision + 1);
-	});
-
-	it("移除 mention chip", () => {
-		const added = reducer(reducer(activeState(), { type: "new-task" }), {
-			type: "draft-mention-added",
-			mention: { id: "m1", kind: "skill", value: "deploy", label: "deploy" },
-		});
-		const removed = reducer(added, { type: "draft-mention-removed", id: "m1" });
-		expect(removed.draft.mentions).toEqual([]);
-	});
-
-	it("发送后清空 mention chip", () => {
-		const added = reducer(reducer(activeState(), { type: "new-task" }), {
-			type: "draft-mention-added",
-			mention: { id: "m1", kind: "file", value: "a.ts", label: "a.ts" },
-		});
-		const sent = reducer(added, {
-			type: "draft-sent",
-			generation: added.draftGeneration,
-			revision: added.draftRevision,
-			imageIds: [],
-		});
-		expect(sent.draft.mentions).toEqual([]);
 	});
 });
