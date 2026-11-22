@@ -15,6 +15,10 @@ const KEY_ALIASES: Readonly<Record<string, string>> = {
 	review_model: "reviewModel",
 	font_size: "fontSize",
 	font_family: "fontFamily",
+	work_step_detail: "workStepDetail",
+	collapse_timing: "collapseTiming",
+	collapsed_replies: "collapsedReplies",
+	code_workspace: "codeWorkspace",
 	mcp_servers: "mcpServers",
 };
 

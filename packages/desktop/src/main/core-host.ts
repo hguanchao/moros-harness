@@ -19,6 +19,7 @@ import {
 	type ApprovalDecision,
 	type ApprovalMode,
 	type ApprovalRequest,
+	type ChangeStats,
 	type DiscoveredModel,
 	type DiscoverModelsRequest,
 	type FileChangeDiff,
@@ -651,6 +652,19 @@ export class DesktopHost {
 		});
 	}
 
+	/**
+	 * 对某条 llm.response 事件写入点赞/点踩反馈。
+	 * 先校验 targetSeq 确实指向一条 llm.response，避免渲染层伪造反馈到任意事件。
+	 */
+	async messageFeedback(sessionId: string, targetSeq: number, rating: "up" | "down" | "none"): Promise<void> {
+		const core = this.#requiredCore();
+		const session = await this.#sessionFor(sessionId);
+		const events = await core.readEvents(session);
+		const target = events.find((event) => event.seq === targetSeq);
+		if (target?.type !== "llm.response") throw new Error(`Feedback target is not a response: ${targetSeq}`);
+		await session.append({ type: "message.feedback", payload: { targetSeq, rating } });
+	}
+
 	async sessionChanges(id?: string): Promise<readonly FileChangeSummary[]> {
 		const core = this.#requiredCore();
 		const session = id === undefined ? this.#requireCurrent() : await this.#sessionFor(id);
@@ -662,6 +676,11 @@ export class DesktopHost {
 			}
 		}
 		return changes.slice(-500);
+	}
+
+	/** 会话级净变更统计（按文件去重），供对话区摘要条展示。 */
+	async changeStats(id: string): Promise<ChangeStats> {
+		return this.#requiredCore().changeStats(id);
 	}
 
 	async checkpoint(): Promise<CheckpointView | null> {
@@ -682,6 +701,15 @@ export class DesktopHost {
 		const session = this.#requireCurrent();
 		if (this.#hasPendingWork(session.meta.id)) throw new Error("A turn is running; wait for it to finish");
 		await core.rollbackStep(session);
+		await this.#pushViewIfCurrent(session.meta.id);
+	}
+
+	/** 撤销本次会话的全部文件改动（整任务回滚）。 */
+	async rollbackTask(): Promise<void> {
+		const core = this.#requiredCore();
+		const session = this.#requireCurrent();
+		if (this.#hasPendingWork(session.meta.id)) throw new Error("A turn is running; wait for it to finish");
+		await core.rollbackTask(session);
 		await this.#pushViewIfCurrent(session.meta.id);
 	}
 

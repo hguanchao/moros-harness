@@ -356,6 +356,90 @@ function AppearanceSettings({
 				</SettingsCard>
 			</SettingsSection>
 
+			<SettingsSection title="工作步骤与视图" description="控制对话流中工具调用细节、步骤折叠行为与代码工作视图。">
+				<SettingsCard>
+					<SettingsRow
+						label="工作步骤展示"
+						description="选择希望看到多少工具调用细节。"
+						control={
+							<Dropdown
+								value={ui.workStepDetail}
+								options={[
+									{ value: "minimal", label: "简洁" },
+									{ value: "standard", label: "标准" },
+									{ value: "detailed", label: "详细" },
+									{ value: "full", label: "全部" },
+								]}
+								onChange={(value) => {
+									void onUpdate(
+										{ ui: { workStepDetail: value as "minimal" | "standard" | "detailed" | "full" } },
+										"工作步骤展示已更新",
+									);
+								}}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="工作步骤收起时机"
+						description="选择何时自动收起工作步骤。"
+						control={
+							<Dropdown
+								value={ui.collapseTiming}
+								options={[
+									{ value: "never", label: "不自动收起" },
+									{ value: "immediately", label: "立即" },
+									{ value: "afterToolCall", label: "每次工具调用后" },
+									{ value: "afterAnswer", label: "回答结束后" },
+								]}
+								onChange={(value) => {
+									void onUpdate(
+										{
+											ui: {
+												collapseTiming: value as "never" | "immediately" | "afterToolCall" | "afterAnswer",
+											},
+										},
+										"收起时机已更新",
+									);
+								}}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="收起后显示的回复"
+						description="工作步骤收起后，保留哪些助手回复（关键回复即将支持）。"
+						control={
+							<Dropdown
+								value={ui.collapsedReplies}
+								options={[
+									{ value: "all", label: "全部回复" },
+									{ value: "last", label: "仅最后一条" },
+									{ value: "key", label: "仅关键回复" },
+									{ value: "none", label: "无" },
+								]}
+								onChange={(value) => {
+									void onUpdate(
+										{ ui: { collapsedReplies: value as "all" | "last" | "key" | "none" } },
+										"收起后回复已更新",
+									);
+								}}
+							/>
+						}
+					/>
+					<SettingsRow
+						label="显示代码工作视图"
+						description="开启后，在工作台显示轨迹与本轮代码差异入口，可切换 Agent 预设。"
+						control={
+							<Toggle
+								checked={ui.codeWorkspace}
+								onChange={(checked) => {
+									void onUpdate({ ui: { codeWorkspace: checked } }, "代码工作视图已更新");
+								}}
+							/>
+						}
+					/>
+				</SettingsCard>
+			</SettingsSection>
+
 			<SettingsSection title="编辑器" description="代码区的配色与排版，独立于界面字号设置。">
 				<SettingsCard>
 					<SettingsRow
@@ -917,11 +1001,30 @@ function DisabledSelect({ label }: { readonly label: string }): JSX.Element {
 	);
 }
 
-function Toggle({ checked, disabled }: { readonly checked: boolean; readonly disabled?: boolean }): JSX.Element {
+function Toggle({
+	checked,
+	disabled,
+	onChange,
+}: {
+	readonly checked: boolean;
+	readonly disabled?: boolean;
+	/** 提供时开关可点击；缺省时保持只读展示（编辑器预览等占位项使用）。 */
+	readonly onChange?: (checked: boolean) => void;
+}): JSX.Element {
+	const readOnly = disabled === true || onChange === undefined;
 	return (
-		<span className={`settings-toggle ${checked ? "is-on" : ""} ${disabled === true ? "is-disabled" : ""}`}>
+		<button
+			type="button"
+			role="switch"
+			aria-checked={checked}
+			disabled={readOnly}
+			className={`settings-toggle ${checked ? "is-on" : ""} ${readOnly ? "is-disabled" : ""}`}
+			onClick={() => {
+				if (!readOnly) onChange(!checked);
+			}}
+		>
 			<span className="settings-toggle-knob" />
-		</span>
+		</button>
 	);
 }
 

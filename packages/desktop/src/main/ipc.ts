@@ -213,11 +213,19 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 		]),
 		([id, beforeSeq, limit]) => host.eventsPage(id, beforeSeq, limit),
 	);
+	handle(
+		IPC.messageFeedback,
+		getWindow,
+		z.tuple([z.string().min(1).max(200), z.number().int().positive(), z.enum(["up", "down", "none"])]),
+		([sessionId, targetSeq, rating]) => host.messageFeedback(sessionId, targetSeq, rating),
+	);
 	handle(IPC.sessionsChanges, getWindow, z.tuple([z.string().min(1).max(200).optional()]), ([id]) =>
 		host.sessionChanges(id),
 	);
+	handle(IPC.sessionsChangeStats, getWindow, z.tuple([z.string().min(1).max(200)]), ([id]) => host.changeStats(id));
 	handle(IPC.sessionsCheckpoint, getWindow, z.tuple([]), () => host.checkpoint());
 	handle(IPC.sessionsRollback, getWindow, z.tuple([]), () => host.rollbackStep());
+	handle(IPC.sessionsRollbackTask, getWindow, z.tuple([]), () => host.rollbackTask());
 	handle(IPC.sessionsRestore, getWindow, z.tuple([z.string().min(1).max(200)]), ([id]) => host.restoreCheckpoint(id));
 	handle(IPC.sessionsCompact, getWindow, z.tuple([]), () => host.compactSession());
 	handle(IPC.sessionsReview, getWindow, z.tuple([z.string().max(20_000)]), ([prompt]) => host.reviewSession(prompt));

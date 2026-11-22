@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type JSX } from "react";
+import {
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+	type ClipboardEvent,
+	type DragEvent,
+	type JSX,
+	type KeyboardEvent,
+} from "react";
 import { createPortal } from "react-dom";
 
 import type { PreparedImage, SessionView } from "../shared/contract.ts";
@@ -17,8 +26,10 @@ import {
 	PlugIcon,
 	PlusIcon,
 	PointerIcon,
+	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
+	SparklesIcon,
 	StopIcon,
 	TerminalIcon,
 	XIcon,
@@ -26,8 +37,70 @@ import {
 import { useApp } from "../store/state.tsx";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
+import { buildQuote } from "../utils/message-actions.ts";
+import { firstLine } from "../utils/format.ts";
+import {
+	filterCommands,
+	filterFiles,
+	filterSkills,
+	findAtToken,
+	findSkillToken,
+	findSlashToken,
+	formatFileReference,
+	formatSkillReference,
+	removeTriggerText,
+	type TriggerToken,
+} from "../utils/inline-completion.ts";
+import { DESKTOP_COMMANDS } from "../utils/command-list.ts";
+import { runDesktopCommand, type CommandHandlers } from "../utils/command-runner.ts";
+import { InlineCompletion, type CompletionOption, type CompletionTrigger } from "./InlineCompletion.tsx";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** 用镜像元素量出 textarea 中 [start,end) 片段的屏幕矩形。 */
+function tokenRect(
+	element: HTMLTextAreaElement,
+	start: number,
+	end: number,
+): { left: number; bottom: number; top: number } {
+	const computed = window.getComputedStyle(element);
+	const mirror = document.createElement("div");
+	for (const property of [
+		"fontFamily",
+		"fontSize",
+		"fontWeight",
+		"lineHeight",
+		"letterSpacing",
+		"paddingTop",
+		"paddingRight",
+		"paddingBottom",
+		"paddingLeft",
+		"borderTopWidth",
+		"borderLeftWidth",
+		"whiteSpace",
+		"wordWrap",
+		"wordBreak",
+	] as const) {
+		mirror.style[property] = computed[property];
+	}
+	mirror.style.position = "absolute";
+	mirror.style.visibility = "hidden";
+	mirror.style.whiteSpace = "pre-wrap";
+	mirror.style.overflowWrap = "break-word";
+	mirror.style.width = `${element.clientWidth}px`;
+	mirror.textContent = element.value.slice(0, start);
+	const marker = document.createElement("span");
+	marker.textContent = element.value.slice(start, Math.max(start + 1, end));
+	mirror.appendChild(marker);
+	document.body.appendChild(mirror);
+	const parentRect = element.getBoundingClientRect();
+	const markerRect = marker.getBoundingClientRect();
+	const mirrorRect = mirror.getBoundingClientRect();
+	const left = parentRect.left + (markerRect.left - mirrorRect.left);
+	const top = parentRect.top + (markerRect.top - mirrorRect.top);
+	document.body.removeChild(mirror);
+	return { left, top, bottom: top + markerRect.height };
+}
 
 /** 输入框与首发/运行控制；信任页由 ChatPage 负责，新任务首次有效发送才创建会话。 */
 export function Composer(): JSX.Element {
@@ -35,7 +108,7 @@ export function Composer(): JSX.Element {
 	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
-	const { text, images } = state.draft;
+	const { text, images, quotes, mentions } = state.draft;
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
@@ -44,6 +117,20 @@ export function Composer(): JSX.Element {
 	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
 	const isSubmitting = useRef(false);
+	// 行内补全状态；Esc 关闭后记住 dismissed，输入变化才重置。
+	const [completion, setCompletion] = useState<
+		| {
+				readonly trigger: CompletionTrigger;
+				readonly token: TriggerToken;
+				readonly options: readonly CompletionOption[];
+				readonly activeIndex: number;
+				readonly rect: { left: number; bottom: number; top: number };
+		  }
+		| undefined
+	>(undefined);
+	const completionDismissed = useRef(false);
+	/** @ 文件数据源缓存（会话内复用）。 */
+	const fileListCache = useRef<readonly string[] | undefined>(undefined);
 	const platform = state.app?.platform ?? "win32";
 	const isDraftPrepared =
 		state.draftWorkspace !== undefined &&
@@ -58,7 +145,10 @@ export function Composer(): JSX.Element {
 		current !== undefined && state.runStates[current.meta.id] === "paused" && current.running !== true;
 	const stoppable = running || awaitingApproval;
 	const disabled = !state.ready || state.isNavigating || readOnly || trustBlocked;
-	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0);
+	const canSend =
+		!disabled &&
+		!isSending &&
+		(text.trim().length > 0 || images.length > 0 || quotes.length > 0 || mentions.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
 	const model =
 		current === undefined
@@ -87,9 +177,112 @@ export function Composer(): JSX.Element {
 		}
 	};
 
+	// ---------- 行内补全（/ @ $）----------
+	const IGNORED_DIRS = new Set(["node_modules", ".git", ".moros", "dist", "build", "coverage"]);
+
+	/** 递归列举项目文件（深度≤3、全局上限 2000、忽略常见目录），结果缓存复用。 */
+	const listProjectFiles = useCallback(async (): Promise<readonly string[]> => {
+		if (fileListCache.current !== undefined) return fileListCache.current;
+		const found: string[] = [];
+		const walk = async (dir: string, depth: number): Promise<void> => {
+			if (depth > 3 || found.length >= 2000) return;
+			let entries;
+			try {
+				entries = await call(window.moros.workspaceList(dir));
+			} catch {
+				return;
+			}
+			for (const entry of entries) {
+				if (found.length >= 2000) break;
+				if (entry.kind === "directory") {
+					if (IGNORED_DIRS.has(entry.name)) continue;
+					await walk(entry.path, depth + 1);
+				} else if (entry.kind === "file") {
+					found.push(entry.path);
+				}
+			}
+		};
+		await walk("", 0);
+		fileListCache.current = found;
+		return found;
+	}, []);
+
+	/** 命令处理器：每个命令直接调用对应 IPC / 现有 picker。 */
+	const commandHandlers: CommandHandlers = {
+		model: (args) => {
+			if (args.length === 0) {
+				setCompletion(undefined);
+				return;
+			}
+			const [provider, model] = args.split("/");
+			if (provider === undefined || model === undefined) return void report(new Error("用法：/model provider/model"));
+			void (
+				current === undefined
+					? Promise.resolve(dispatch({ type: "draft-options", options: { model: { provider, model } } }))
+					: call(window.moros.sessionSelectModel(provider, model))
+			).catch(report);
+		},
+		effort: (args) => {
+			if (args.length === 0) return;
+			const EFFORTS = ["off", "minimal", "low", "medium", "high", "max"];
+			if (!EFFORTS.includes(args)) return void report(new Error(`无效的推理强度：${args}`));
+			void (
+				current === undefined
+					? Promise.resolve(dispatch({ type: "draft-options", options: { effort: args as SessionView["effort"] } }))
+					: call(window.moros.sessionSelectEffort(args as never))
+			).catch(report);
+		},
+		approval: (args) => {
+			if (args === "yolo") {
+				setYoloConfirmOpen(true);
+				return;
+			}
+			if (args !== "ask" && args !== "auto") return void report(new Error("用法：/approval ask|auto|yolo"));
+			void (
+				current === undefined
+					? Promise.resolve(dispatch({ type: "draft-options", options: { approval: args } }))
+					: call(window.moros.sessionSelectApproval(args))
+			).catch(report);
+		},
+		plan: () => {
+			void call(window.moros.sessionSetPlan(true)).catch(report);
+		},
+		compact: () => {
+			void call(window.moros.sessionsCompact()).catch(report);
+		},
+		undo: () => {
+			void call(window.moros.sessionsRollback()).catch(report);
+		},
+		review: (args) => {
+			void call(window.moros.sessionsReview(args)).catch(report);
+		},
+		export: () => {
+			if (current === undefined) return void report(new Error("当前没有可导出的会话"));
+			void call(window.moros.sessionsExport(current.meta.id)).catch(report);
+		},
+		session: (args) => {
+			if (args.length === 0) return void report(new Error("用法：/session <会话ID> 或 /session fork"));
+			if (args === "fork") {
+				if (current === undefined) return void report(new Error("当前没有可 fork 的会话"));
+				void call(window.moros.sessionsFork(current.meta.id))
+					.then(() => actions.setPage("chat"))
+					.catch(report);
+			} else {
+				void actions.activateSession(args).catch(report);
+			}
+		},
+	};
+
 	const send = async (): Promise<void> => {
 		if (disabled || isSending || isSubmitting.current) return;
-		const message = text.trim();
+		// 引用 chip 在发送时才序列化：`> ` 引用块 + `@path` / `$name`，拼在正文之前。
+		const quoteText = quotes.map((quote) => buildQuote(quote.text)).join("");
+		const mentionText = mentions
+			.map((mention) =>
+				mention.kind === "file" ? formatFileReference(mention.value) : formatSkillReference(mention.value),
+			)
+			.join(" ");
+		const message = `${quoteText}${mentionText.length === 0 ? "" : `${mentionText}\n`}${text.trim()}`;
 		if (message.length === 0 && images.length === 0) return;
 		const epoch = currentNavigationEpoch();
 		const generation = state.draftGeneration;
@@ -140,6 +333,111 @@ export function Composer(): JSX.Element {
 			isSubmitting.current = false;
 			dispatch({ type: "sending", isSending: false });
 		}
+	};
+
+	/** 根据当前输入与光标重算补全浮层。 */
+	const updateCompletion = (value: string, cursor: number): void => {
+		if (completionDismissed.current) return;
+		const detected = findSlashToken(value, cursor) ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
+		if (detected === undefined) {
+			setCompletion(undefined);
+			return;
+		}
+		const trigger: CompletionTrigger = value[detected.start] === "/" ? "/" : value[detected.start] === "@" ? "@" : "$";
+		const element = textarea.current;
+		if (element === null) return;
+		// 用镜像元素量出 trigger 片段的屏幕位置（textarea 无法直接量局部文本）。
+		const rect = tokenRect(element, detected.start, detected.end);
+		void (async () => {
+			let options: CompletionOption[] = [];
+			if (trigger === "/") {
+				options = filterCommands(DESKTOP_COMMANDS, detected.query).map((command) => ({
+					value: command.name,
+					label: `/${command.name}`,
+					description: command.description,
+				}));
+			} else if (trigger === "@") {
+				const files = await listProjectFiles();
+				options = filterFiles(files, detected.query).map((path) => ({ value: path, label: path }));
+			} else {
+				try {
+					const skills = await call(window.moros.skillsList());
+					options = filterSkills(skills, detected.query).map((skill) => ({
+						value: skill.name,
+						label: skill.name,
+						description: skill.description || skill.scope,
+					}));
+				} catch {
+					options = [];
+				}
+			}
+			setCompletion({ trigger, token: detected, options, activeIndex: 0, rect });
+		})();
+	};
+
+	/** 选中补全项：命令立即执行（不留 chip）；文件/技能加入 mention chip。 */
+	const selectCompletion = (index: number): void => {
+		if (completion === undefined) return;
+		const option = completion.options[index];
+		if (option === undefined) return;
+		const { trigger, token } = completion;
+		const cleaned = removeTriggerText(text, token);
+		dispatch({ type: "draft-text", text: cleaned.text });
+		setCompletion(undefined);
+		completionDismissed.current = false;
+		if (trigger === "/") {
+			void runDesktopCommand(option.value, "", commandHandlers);
+		} else {
+			dispatch({
+				type: "draft-mention-added",
+				mention: {
+					id: crypto.randomUUID(),
+					kind: trigger === "@" ? "file" : "skill",
+					value: option.value,
+					label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
+				},
+			});
+		}
+		requestAnimationFrame(() => {
+			elementFocusAndCursor(cleaned.cursor);
+		});
+	};
+
+	/** textarea 键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
+	const handleCompletionKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+		if (completion === undefined) return false;
+		if (event.key === "ArrowDown") {
+			event.preventDefault();
+			setCompletion({
+				...completion,
+				activeIndex: Math.min(completion.activeIndex + 1, Math.max(0, completion.options.length - 1)),
+			});
+			return true;
+		}
+		if (event.key === "ArrowUp") {
+			event.preventDefault();
+			setCompletion({ ...completion, activeIndex: Math.max(completion.activeIndex - 1, 0) });
+			return true;
+		}
+		if (event.key === "Enter" || event.key === "Tab") {
+			event.preventDefault();
+			selectCompletion(completion.activeIndex);
+			return true;
+		}
+		if (event.key === "Escape") {
+			event.preventDefault();
+			setCompletion(undefined);
+			completionDismissed.current = true;
+			return true;
+		}
+		return false;
+	};
+
+	const elementFocusAndCursor = (cursor: number): void => {
+		const element = textarea.current;
+		if (element === null) return;
+		element.focus();
+		element.setSelectionRange(cursor, cursor);
 	};
 
 	const addImage = (image: PreparedImage, generation: number): void => {
@@ -345,6 +643,45 @@ export function Composer(): JSX.Element {
 						))}
 					</div>
 				) : null}
+				{quotes.length > 0 ? (
+					<div className="quote-chips">
+						{quotes.map((quote) => (
+							<span className="quote-chip" key={quote.id} data-tooltip={quote.text}>
+								<QuoteIcon size={10} />
+								<span className="quote-chip-text">引用：{firstLine(quote.text, 20)}</span>
+								<button
+									type="button"
+									className="quote-chip-remove"
+									aria-label="移除引用"
+									onClick={() => dispatch({ type: "draft-quote-removed", id: quote.id })}
+								>
+									<XIcon size={9} />
+								</button>
+							</span>
+						))}
+					</div>
+				) : null}
+				{mentions.length > 0 ? (
+					<div className="quote-chips">
+						{mentions.map((mention) => (
+							<span className="quote-chip" key={mention.id} data-tooltip={mention.value}>
+								{mention.kind === "file" ? <FolderIcon size={10} /> : <SparklesIcon size={10} />}
+								<span className="quote-chip-text">
+									{mention.kind === "file" ? "@" : "$"}
+									{firstLine(mention.label, 20)}
+								</span>
+								<button
+									type="button"
+									className="quote-chip-remove"
+									aria-label="移除引用"
+									onClick={() => dispatch({ type: "draft-mention-removed", id: mention.id })}
+								>
+									<XIcon size={9} />
+								</button>
+							</span>
+						))}
+					</div>
+				) : null}
 
 				<textarea
 					className="composer-input"
@@ -357,16 +694,34 @@ export function Composer(): JSX.Element {
 							? "请先确认工作区信任"
 							: readOnly
 								? "该会话正在另一个窗口中使用，当前为只读"
-								: "描述你的任务，/调用指令，@文件或对话"
+								: "描述你的任务，/调用指令，@文件，$技能"
 					}
-					onChange={(event) => dispatch({ type: "draft-text", text: event.target.value })}
+					onChange={(event) => {
+						const value = event.target.value;
+						dispatch({ type: "draft-text", text: value });
+						completionDismissed.current = false;
+						updateCompletion(value, event.target.selectionStart);
+					}}
+					onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
 					onPaste={onPaste}
 					onKeyDown={(event) => {
-						if (event.key !== "Enter" || event.shiftKey || (event.nativeEvent as KeyboardEvent).isComposing) return;
+						if (handleCompletionKeyDown(event)) return;
+						if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
 						event.preventDefault();
 						void send();
 					}}
 				/>
+				{completion === undefined ? null : (
+					<InlineCompletion
+						trigger={completion.trigger}
+						token={completion.token}
+						options={completion.options}
+						activeIndex={completion.activeIndex}
+						rect={completion.rect}
+						onSelect={selectCompletion}
+						onHover={(index) => setCompletion({ ...completion, activeIndex: index })}
+					/>
+				)}
 
 				<div className="composer-toolbar">
 					<div className="composer-left">

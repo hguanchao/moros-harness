@@ -1,7 +1,12 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { normalizeConfigKeys } from "@moros/core/config/keys.ts";
 import { ModelSchema, parseConfig } from "@moros/core/config/schema.ts";
+import { readSettings, writeSettings } from "@moros/core/config/settings.ts";
 
 describe("辅助模型配置", () => {
 	it("接受顶层的 compact_model 与 review_model", () => {
@@ -57,6 +62,61 @@ describe("外观配置键别名", () => {
 
 		expect(config.ui.fontFamily).toBe("maple");
 		expect(skipped).toEqual([]);
+	});
+});
+
+describe("工作步骤配置", () => {
+	it("snake_case 别名归一为 camelCase", () => {
+		expect(
+			normalizeConfigKeys({
+				ui: {
+					work_step_detail: "detailed",
+					collapse_timing: "immediately",
+					collapsed_replies: "last",
+					code_workspace: false,
+				},
+			}),
+		).toEqual({
+			ui: {
+				workStepDetail: "detailed",
+				collapseTiming: "immediately",
+				collapsedReplies: "last",
+				codeWorkspace: false,
+			},
+		});
+	});
+
+	it("缺省时各档位为 schema 默认值", () => {
+		const { config, skipped } = parseConfig({});
+
+		expect(config.ui.workStepDetail).toBe("standard");
+		expect(config.ui.collapseTiming).toBe("afterAnswer");
+		expect(config.ui.collapsedReplies).toBe("all");
+		expect(config.ui.codeWorkspace).toBe(true);
+		expect(skipped).toEqual([]);
+	});
+
+	it("写补丁后读回生效，且四个键都不按未知键剥离", async () => {
+		const home = await mkdtemp(join(tmpdir(), "moros-work-steps-"));
+		try {
+			await writeSettings(home, {
+				ui: {
+					workStepDetail: "full",
+					collapseTiming: "never",
+					collapsedReplies: "none",
+					codeWorkspace: false,
+				},
+			});
+			const snapshot = await readSettings(home);
+
+			expect(snapshot.config.ui.workStepDetail).toBe("full");
+			expect(snapshot.config.ui.collapseTiming).toBe("never");
+			expect(snapshot.config.ui.collapsedReplies).toBe("none");
+			expect(snapshot.config.ui.codeWorkspace).toBe(false);
+			expect(snapshot.skipped).toEqual([]);
+		} finally {
+			await rm(home, { recursive: true, force: true });
+		}
 	});
 });
 

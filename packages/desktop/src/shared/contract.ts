@@ -6,7 +6,7 @@ import type {
 } from "@moros/core/config/model-discovery.ts";
 import type { ModelMetadata as CatalogModelMetadata } from "@moros/core/config/model-catalog/fill.ts";
 import type { SettingsPatch, SettingsSnapshot, ProviderDraft } from "@moros/core/config/settings.ts";
-import type { ApprovalMode, FileChangeDiff, ModelCatalog, SessionMetrics } from "@moros/core/core.ts";
+import type { ApprovalMode, ChangeStats, FileChangeDiff, ModelCatalog, SessionMetrics } from "@moros/core/core.ts";
 import type { EventRecord } from "@moros/core/events/schema.ts";
 import type { ReasoningEffort } from "@moros/core/llm/types.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
@@ -53,9 +53,12 @@ export const IPC = {
 	sessionsExport: "moros:sessions-export",
 	sessionsReplay: "moros:sessions-replay",
 	sessionsEvents: "moros:sessions-events",
+	messageFeedback: "moros:message-feedback",
 	sessionsChanges: "moros:sessions-changes",
+	sessionsChangeStats: "moros:sessions-change-stats",
 	sessionsCheckpoint: "moros:sessions-checkpoint",
 	sessionsRollback: "moros:sessions-rollback",
+	sessionsRollbackTask: "moros:sessions-rollback-task",
 	sessionsRestore: "moros:sessions-restore",
 	sessionsCompact: "moros:sessions-compact",
 	sessionsReview: "moros:sessions-review",
@@ -475,9 +478,15 @@ export interface DesktopBridge {
 	sessionsExport(id: string): Promise<RpcResult<SessionExportResult | null>>;
 	sessionsReplay(id: string): Promise<RpcResult<readonly EventRecord[]>>;
 	sessionsEvents(id: string, beforeSeq?: number, limit?: number): Promise<RpcResult<readonly EventRecord[]>>;
+	/** 对某条 llm.response 事件点赞/点踩/撤销；写入会话事件流，跨重启保留。 */
+	messageFeedback(sessionId: string, targetSeq: number, rating: "up" | "down" | "none"): Promise<RpcResult<void>>;
 	sessionsChanges(id?: string): Promise<RpcResult<readonly FileChangeSummary[]>>;
+	/** 会话级净变更统计（按文件去重）。 */
+	sessionsChangeStats(id: string): Promise<RpcResult<ChangeStats>>;
 	sessionsCheckpoint(): Promise<RpcResult<CheckpointView | null>>;
 	sessionsRollback(): Promise<RpcResult<void>>;
+	/** 撤销本次会话的全部文件改动。 */
+	sessionsRollbackTask(): Promise<RpcResult<void>>;
 	sessionsRestore(id: string): Promise<RpcResult<{ restored: number; removed: number }>>;
 	sessionsCompact(): Promise<
 		RpcResult<{ compacted: boolean; covered: number; tokensBefore: number; tokensAfter: number }>

@@ -359,6 +359,8 @@ function summarize(event: EventRecord): string {
 			return event.payload.archived ? "归档" : "取消归档";
 		case "mode.switched":
 			return `${event.payload.from} → ${event.payload.to}`;
+		case "message.feedback":
+			return `消息 ${event.payload.targetSeq}: ${event.payload.rating === "up" ? "赞" : event.payload.rating === "down" ? "踩" : "撤销"}`;
 		case "model.changed":
 			return `${event.payload.from} → ${event.payload.to}`;
 		case "subagent.started":

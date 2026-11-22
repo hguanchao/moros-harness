@@ -174,3 +174,100 @@ describe("buildTimeline 模型切换分隔线", () => {
 		expect(blocks.some((block) => block.kind === "divider")).toBe(false);
 	});
 });
+
+describe("buildTimeline 任务列表与子代理", () => {
+	function todoCall(seq: number, todos: readonly { content: string; status: string }[]): EventRecord {
+		return {
+			seq,
+			ts: "2026-11-21T16:10:00.000Z",
+			type: "tool.call",
+			payload: { tool: "todo", args: { todos }, toolCallId: `todo-${seq}` },
+		};
+	}
+
+	function subagentStarted(seq: number, callId: string, task: string): EventRecord {
+		return {
+			seq,
+			ts: "2026-11-21T16:10:00.000Z",
+			type: "subagent.started",
+			payload: { toolCallId: callId, task },
+		};
+	}
+
+	function subagentFinished(seq: number, callId: string): EventRecord {
+		return {
+			seq,
+			ts: "2026-11-21T16:10:05.000Z",
+			type: "subagent.finished",
+			payload: {
+				toolCallId: callId,
+				steps: 3,
+				totalTokens: 1200,
+				durationMs: 5000,
+				ok: true,
+				paused: false,
+				preview: "done",
+			},
+		};
+	}
+
+	it("todo 工具调用生成 TodoBlock", () => {
+		const events = [
+			todoCall(1, [
+				{ content: "设计", status: "completed" },
+				{ content: "实现", status: "in_progress" },
+			]),
+		];
+		const blocks = buildTimeline(events, emptyLive, {}).flatMap((turn) => turn.blocks);
+		const todo = blocks.find((block) => block.kind === "todo");
+		expect(todo).toMatchObject({ kind: "todo", finished: false, seq: 1 });
+		expect(todo).not.toHaveProperty("result");
+	});
+
+	it("todo 全部完成标记为 finished", () => {
+		const events = [todoCall(1, [{ content: "实现", status: "completed" }])];
+		const blocks = buildTimeline(events, emptyLive, {}).flatMap((turn) => turn.blocks);
+		expect(blocks.find((block) => block.kind === "todo")).toMatchObject({ kind: "todo", finished: true });
+	});
+
+	it("todo 工具结果不产生普通工具行", () => {
+		const events: EventRecord[] = [
+			todoCall(1, [{ content: "实现", status: "in_progress" }]),
+			{
+				seq: 2,
+				ts: "2026-11-21T16:10:01.000Z",
+				type: "tool.result",
+				payload: { tool: "todo", result: "Task list updated (1 tasks).", isError: false, toolCallId: "todo-1" },
+			},
+		];
+		const blocks = buildTimeline(events, emptyLive, {}).flatMap((turn) => turn.blocks);
+		expect(blocks.some((block) => block.kind === "tool")).toBe(false);
+		expect(blocks.filter((block) => block.kind === "todo")).toHaveLength(1);
+	});
+
+	it("形状不合法的 todo 回退为普通工具行", () => {
+		const events: EventRecord[] = [
+			{
+				seq: 1,
+				ts: "2026-11-21T16:10:00.000Z",
+				type: "tool.call",
+				payload: { tool: "todo", args: { todos: "bad" }, toolCallId: "todo-bad" },
+			},
+		];
+		const blocks = buildTimeline(events, emptyLive, {}).flatMap((turn) => turn.blocks);
+		expect(blocks.find((block) => block.kind === "tool")).toMatchObject({ name: "todo" });
+	});
+
+	it("subagent 事件在工具块上挂 subagent 元数据", () => {
+		const events = [subagentStarted(1, "call-a", "调查登录逻辑"), subagentFinished(2, "call-a")];
+		const blocks = buildTimeline(events, emptyLive, {}).flatMap((turn) => turn.blocks);
+		const tool = blocks.find((block) => block.kind === "tool");
+		expect(tool).toMatchObject({ kind: "tool", name: "task" });
+		expect((tool as { subagent?: unknown }).subagent).toMatchObject({
+			task: "调查登录逻辑",
+			status: "done",
+			steps: 3,
+			totalTokens: 1200,
+		});
+	});
+});

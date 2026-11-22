@@ -38,6 +38,15 @@ export const EventSchema = z.discriminatedUnion("type", [
 	}),
 	EventBaseSchema.extend({ type: z.literal("mode.switched"), payload: z.object({ from: modeSchema, to: modeSchema }) }),
 	EventBaseSchema.extend({
+		type: z.literal("message.feedback"),
+		payload: z.object({
+			/** 被评价的 llm.response 事件 seq（会话内唯一且持久）。 */
+			targetSeq: z.number().int().positive(),
+			/** up=点赞；down=点踩；none=撤销此前评价。 */
+			rating: z.enum(["up", "down", "none"]),
+		}),
+	}),
+	EventBaseSchema.extend({
 		type: z.literal("model.changed"),
 		payload: z.object({
 			/** 旧模型的显示名（模型配置的 name，缺省为 ID）。 */
@@ -212,6 +221,7 @@ export const EventSchema = z.discriminatedUnion("type", [
 export const EVENT_TYPES = [
 	"session.created",
 	"mode.switched",
+	"message.feedback",
 	"model.changed",
 	"session.renamed",
 	"session.archived",

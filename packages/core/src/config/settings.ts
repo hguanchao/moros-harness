@@ -85,6 +85,10 @@ export const SettingsPatchSchema = z
 				notify: z.enum(["auto", "bell", "desktop", "off"]).optional(),
 				fontSize: z.number().int().min(12).max(20).optional(),
 				fontFamily: z.enum(["system", "wenkai", "maple"]).optional(),
+				workStepDetail: z.enum(["minimal", "standard", "detailed", "full"]).optional(),
+				collapseTiming: z.enum(["never", "immediately", "afterToolCall", "afterAnswer"]).optional(),
+				collapsedReplies: z.enum(["all", "last", "key", "none"]).optional(),
+				codeWorkspace: z.boolean().optional(),
 			})
 			.optional(),
 	})

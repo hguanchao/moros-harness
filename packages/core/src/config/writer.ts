@@ -205,6 +205,10 @@ const SECTION_KEYS = {
 		notify: ["notify"],
 		fontSize: ["fontSize", "font_size"],
 		fontFamily: ["fontFamily", "font_family"],
+		workStepDetail: ["workStepDetail", "work_step_detail"],
+		collapseTiming: ["collapseTiming", "collapse_timing"],
+		collapsedReplies: ["collapsedReplies", "collapsed_replies"],
+		codeWorkspace: ["codeWorkspace", "code_workspace"],
 	},
 } as const;
 
@@ -238,11 +242,14 @@ const SCALAR_CANONICAL: Readonly<Record<keyof ScalarSettingsPatch, string>> = {
 	httpProxy: "http_proxy",
 };
 
+/** 可写入 TOML 的设置值；布尔用于 ui.codeWorkspace 等开关。 */
+type SettingValue = string | number | boolean;
+
 /** 嵌套表设置补丁；null 表示删除该键。 */
 export type SectionSettingsPatch = {
 	readonly [S in SectionName]?:
 		| {
-				readonly [K in keyof (typeof SECTION_KEYS)[S]]?: string | number | null | undefined;
+				readonly [K in keyof (typeof SECTION_KEYS)[S]]?: SettingValue | null | undefined;
 		  }
 		| undefined;
 };
@@ -326,7 +333,7 @@ function applySectionValue(
 	section: SectionName,
 	spellings: readonly string[],
 	canonical: string,
-	value: string | number | null,
+	value: SettingValue | null,
 ): boolean {
 	let start = -1;
 	let end = lines.length;
@@ -378,11 +385,20 @@ const SECTION_CANONICAL: Readonly<Record<SectionName, Readonly<Record<string, st
 	limits: { maxTurns: "max_turns", spillThreshold: "spill_threshold", streamIdleTimeoutSec: "stream_idle_timeout_sec" },
 	retry: { maxRetries: "max_retries", maxDelayMs: "max_delay_ms" },
 	compaction: { compactAt: "compact_at", keepRecent: "keep_recent", summaryTimeoutSec: "summary_timeout_sec" },
-	ui: { theme: "theme", notify: "notify", fontSize: "font_size", fontFamily: "font_family" },
+	ui: {
+		theme: "theme",
+		notify: "notify",
+		fontSize: "font_size",
+		fontFamily: "font_family",
+		workStepDetail: "work_step_detail",
+		collapseTiming: "collapse_timing",
+		collapsedReplies: "collapsed_replies",
+		codeWorkspace: "code_workspace",
+	},
 };
 
 /** 借助 smol-toml 序列化生成带正确转义的右侧值。 */
-function formatValue(value: string | number): string {
+function formatValue(value: SettingValue): string {
 	const serialized = stringifyToml({ value }).trimEnd();
 	return serialized.slice(serialized.indexOf("=") + 1).trim();
 }

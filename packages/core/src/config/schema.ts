@@ -91,8 +91,25 @@ const ConfigSchema = z.object({
 			fontSize: z.number().int().min(12).max(20).default(14),
 			/** 界面字体：system 用平台栈；wenkai/maple 使用应用内置的web字体。 */
 			fontFamily: z.enum(["system", "wenkai", "maple"]).default("system"),
+			/** 工作步骤展示的详细程度：minimal 仅摘要；standard 工具名+关键参数；detailed 展开参数与结果；full 额外含原始事件。 */
+			workStepDetail: z.enum(["minimal", "standard", "detailed", "full"]).default("standard"),
+			/** 工作步骤自动收起时机：never 不收起；immediately 工具完成即收起；afterToolCall 每步完成后收起；afterAnswer 回答结束后收起。 */
+			collapseTiming: z.enum(["never", "immediately", "afterToolCall", "afterAnswer"]).default("afterAnswer"),
+			/** 收起后保留的助手回复：all 全部；last 仅最后一条；key 关键回复（当前等同 last）；none 不保留。 */
+			collapsedReplies: z.enum(["all", "last", "key", "none"]).default("all"),
+			/** 是否显示代码工作视图（轨迹、本轮代码差异、Agent 预设切换入口）。 */
+			codeWorkspace: z.boolean().default(true),
 		})
-		.default({ theme: "auto", notify: "auto", fontSize: 14, fontFamily: "system" }),
+		.default({
+			theme: "auto",
+			notify: "auto",
+			fontSize: 14,
+			fontFamily: "system",
+			workStepDetail: "standard",
+			collapseTiming: "afterAnswer",
+			collapsedReplies: "all",
+			codeWorkspace: true,
+		}),
 	/** 按项目路径记录的工作区信任决定；键为归一化路径（win32 小写）。 */
 	trusts: z.record(z.string(), z.boolean()).optional(),
 });
@@ -231,7 +248,19 @@ export function parseConfig(
 		["limits", ["maxTurns", "spillThreshold", "streamIdleTimeoutSec", "reviewTimeoutSec"]],
 		["retry", ["maxRetries", "maxDelayMs"]],
 		["compaction", ["compactAt", "keepRecent", "summaryTimeoutSec"]],
-		["ui", ["theme", "notify", "fontSize", "fontFamily"]],
+		[
+			"ui",
+			[
+				"theme",
+				"notify",
+				"fontSize",
+				"fontFamily",
+				"workStepDetail",
+				"collapseTiming",
+				"collapsedReplies",
+				"codeWorkspace",
+			],
+		],
 	];
 	for (const [group, keys] of groups) {
 		const raw = isRecord(source[group]) ? source[group] : {};

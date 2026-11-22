@@ -59,6 +59,7 @@ import {
 	Puzzle,
 	RefreshCw,
 	Route,
+	RotateCcw,
 	Search,
 	Send,
 	Server,
@@ -73,8 +74,11 @@ import {
 	Square,
 	Sun,
 	Terminal,
+	ThumbsDown,
+	ThumbsUp,
 	Trash2,
 	TriangleAlert,
+	Quote,
 	UserCog,
 	Video,
 	X,
@@ -175,6 +179,10 @@ export const ArchiveIcon2 = wrap(Archive);
 export const PinIcon = wrap(Pin);
 export const PinOffIcon = wrap(PinOff);
 export const CopyIcon = wrap(Copy);
+export const ThumbsUpIcon = wrap(ThumbsUp);
+export const ThumbsDownIcon = wrap(ThumbsDown);
+export const QuoteIcon = wrap(Quote);
+export const RotateCcwIcon = wrap(RotateCcw);
 
 /** Meta 品牌 ∞ 标志（来自 @lobehub/icons，用作应用标识；lucide 无此品牌图标）。 */
 export function MetaIcon(props: IconProps): JSX.Element {

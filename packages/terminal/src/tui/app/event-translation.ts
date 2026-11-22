@@ -196,6 +196,9 @@ export function mapCoreEvent(event: EventRecord, state: CoreEventStreamState): r
 			];
 		case "mode.switched":
 			return [notice(`Mode: ${event.payload.from} → ${event.payload.to}`)];
+		case "message.feedback":
+			// 反馈是桌面端交互语义，TUI 无对应操作栏，忽略即可（事件仍持久化在会话流）。
+			return [];
 		case "model.changed":
 			return [
 				notice(

@@ -184,6 +184,19 @@
 	font-size: var(--text-caption);
 }
 
+/* 全部档位：显示原始工具调用 ID，便于诊断对照轨迹/审计事件 */
+.tool-raw-id {
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+	font-family: var(--font-mono, monospace);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 120px;
+	flex: none;
+	opacity: 0.75;
+}
+
 .tool-duration {
 	color: var(--text-faint);
 	font-size: var(--text-micro);

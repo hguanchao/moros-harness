@@ -171,6 +171,8 @@ function eventLabel(event: EventRecord): string {
 			return "Session created";
 		case "mode.switched":
 			return "Mode switched";
+		case "message.feedback":
+			return "Message feedback";
 		case "model.changed":
 			return "Model changed";
 		case "error":
@@ -230,6 +232,8 @@ function eventText(event: EventRecord): string {
 			return `${event.payload.title} (${event.payload.mode})`;
 		case "mode.switched":
 			return `${event.payload.from} → ${event.payload.to}`;
+		case "message.feedback":
+			return `seq ${event.payload.targetSeq}: ${event.payload.rating}`;
 		case "model.changed":
 			return `${event.payload.from} → ${event.payload.to}${event.payload.appliesNextTurn ? " (next turn)" : ""}`;
 		case "session.renamed":

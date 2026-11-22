@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState, type JSX } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from "react";
 
 import type { ApprovalCard } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { Composer } from "../components/Composer.tsx";
 import { EmptyBrand } from "../components/EmptyBrand.tsx";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
+import { resolveFeedbacks } from "../utils/message-actions.ts";
 import { useExitingItems } from "../hooks/use-exiting.ts";
 import {
 	AlertIcon,
@@ -20,7 +21,9 @@ import { Markdown } from "../components/Markdown.tsx";
 import { ConversationPanel } from "../components/ConversationPanel.tsx";
 import { ConversationSearch } from "../components/ConversationSearch.tsx";
 import { useApp } from "../store/state.tsx";
-import { buildTimeline, Transcript } from "../components/Transcript.tsx";
+import { buildTimeline, currentTodoView, Transcript, type WorkStepsConfig } from "../components/Transcript.tsx";
+import { TodoPanel } from "../components/TodoPanel.tsx";
+import { SelectionQuote } from "../components/SelectionQuote.tsx";
 
 const IMPLEMENTATION_PREFIX = "Implement this plan:\n\n";
 const IMPLEMENTATION_SUFFIX = "\n\nRe-read the files you need before changing them.";
@@ -42,9 +45,39 @@ export function ChatPage(): JSX.Element {
 	const live = current === undefined ? undefined : (state.live[current.meta.id] ?? current.live);
 	const subagents = current === undefined ? {} : (state.subagents[current.meta.id] ?? {});
 	const inlineNotices = current === undefined ? [] : (state.inlineNotices[current.meta.id] ?? []);
+	// 工作步骤展示设置来自全局 ui 配置；缺省值由 Transcript 的 DEFAULT_WORK_STEPS 兜底。
+	const uiConfig = state.settings?.config.ui;
+	const workSteps: WorkStepsConfig | undefined =
+		uiConfig === undefined
+			? undefined
+			: {
+					detailLevel: uiConfig.workStepDetail,
+					collapseTiming: uiConfig.collapseTiming,
+					collapsedReplies: uiConfig.collapsedReplies,
+				};
 	const turns = useMemo(
 		() => (live === undefined ? [] : buildTimeline(events, live, subagents)),
 		[events, live, subagents],
+	);
+	// 当前未收尾任务列表（底部常驻面板）；已收尾的由 TodoCard 落入对话流。
+	const currentTodo = useMemo(() => currentTodoView(turns), [turns]);
+	// 反馈状态由事件流还原（唯一事实源），随事件推送自动刷新。
+	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
+	const handleQuote = useCallback(
+		(text: string): void => {
+			dispatch({ type: "draft-quote-added", quote: { id: crypto.randomUUID(), text } });
+			document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+		},
+		[dispatch],
+	);
+	const handleFeedback = useCallback(
+		(seq: number, rating: "up" | "down" | "none"): void => {
+			if (current === undefined) return;
+			void call(window.moros.messageFeedback(current.meta.id, seq, rating)).catch((error: unknown) =>
+				console.error(errorMessage(error)),
+			);
+		},
+		[current],
 	);
 	const approvals = [...state.approvals].sort((left, right) => {
 		const leftCurrent = current !== undefined && left.sessionId === current.meta.id ? 0 : 1;
@@ -129,6 +162,7 @@ export function ChatPage(): JSX.Element {
 			{approvalSlots.map((slot) => (
 				<ApprovalSlot key={slot.card.id} card={slot.card} leaving={slot.leaving} currentSessionId={current?.meta.id} />
 			))}
+			<TodoPanel view={currentTodo} running={current?.running === true} />
 			<Composer />
 			{state.review !== undefined ? <ReviewModal /> : null}
 		</div>
@@ -204,25 +238,31 @@ export function ChatPage(): JSX.Element {
 								setShowScrollBottom(!atBottom);
 							}}
 						>
-							<div className="transcript">
-								{state.loadError !== undefined ? (
-									<div className="load-error">
-										<AlertIcon size={16} />
-										<span>{state.loadError}</span>
-									</div>
-								) : null}
-								<Transcript
-									turns={turns}
-									inlineNotices={inlineNotices}
-									planning={current.plan === true}
-									running={current.running === true}
-									onApprovePlan={approvePlan}
-									onRevisePlan={() => {
-										if (activePlan === undefined) return;
-										document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
-									}}
-								/>
-							</div>
+							<SelectionQuote onQuote={handleQuote}>
+								<div className="transcript">
+									{state.loadError !== undefined ? (
+										<div className="load-error">
+											<AlertIcon size={16} />
+											<span>{state.loadError}</span>
+										</div>
+									) : null}
+									<Transcript
+										turns={turns}
+										inlineNotices={inlineNotices}
+										planning={current.plan === true}
+										running={current.running === true}
+										{...(workSteps === undefined ? {} : { workSteps })}
+										feedbacks={feedbacks}
+										onFeedback={handleFeedback}
+										{...(project === undefined ? {} : { projectRoot: project.root })}
+										onApprovePlan={approvePlan}
+										onRevisePlan={() => {
+											if (activePlan === undefined) return;
+											document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+										}}
+									/>
+								</div>
+							</SelectionQuote>
 						</div>
 						{panelOpen ? (
 							<ConversationPanel current={current} events={events} onClose={() => setPanelOpen(false)} />

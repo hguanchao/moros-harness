@@ -420,3 +420,289 @@
 	color: var(--text-faint);
 	font-size: var(--text-small);
 }
+
+/* 每条最终回答下方的消息操作栏：复制 / 点赞点踩 / 引用 / 时间戳。
+   默认半透明，hover 整回合时完全显现（参考 .session-table-actions）。 */
+.answer-block {
+	display: flex;
+	flex-direction: column;
+}
+
+.message-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 2px;
+	margin-top: 2px;
+	min-height: 24px;
+	opacity: 0.45;
+	transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.turn:hover .message-actions,
+.message-actions:focus-within {
+	opacity: 1;
+}
+
+.message-actions.is-disabled {
+	opacity: 0.3;
+	pointer-events: none;
+}
+
+.message-actions .icon-button {
+	width: 24px;
+	height: 24px;
+}
+
+.message-actions .icon-button.is-active-up {
+	color: var(--accent);
+}
+
+.message-actions .icon-button.is-active-down {
+	color: var(--danger);
+}
+
+.message-time {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin-left: 4px;
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* 会话变更摘要条：对话区顶部的净改动统计 + 双粒度撤销 */
+.changes-bar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	flex: none;
+	padding: 5px 10px;
+	border-bottom: 1px solid var(--line);
+	background: var(--surface-sunken);
+	font-size: var(--text-caption);
+}
+
+.changes-bar-summary {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	min-width: 0;
+	padding: 2px 4px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+}
+
+.changes-bar-summary:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.changes-bar-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex: none;
+}
+
+.changes-bar-actions .ghost-button.small {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+/* 轮结束后页脚：分割线 + 本轮改动（可展开收起）+ 消息操作栏 */
+.turn-footer {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 10px;
+}
+
+.turn-footer-divider {
+	height: 1px;
+	background: var(--line);
+}
+
+.turn-changes-card {
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--fill-soft);
+	padding: 3px 8px;
+}
+
+.turn-changes-head {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 2px 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	text-align: left;
+}
+
+.turn-changes-head:hover {
+	color: var(--text-primary);
+}
+
+.turn-changes-count {
+	font-size: var(--text-caption);
+}
+
+.turn-changes-head > svg:last-child {
+	margin-left: auto;
+}
+
+.turn-changes-body {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	/* 内容区固定浅灰背景，标题区保持卡片原背景不变 */
+	background: #f5f5f5;
+	margin: 2px -8px -3px;
+	padding: 5px 8px;
+	border-radius: 0 0 var(--r-md) var(--r-md);
+}
+
+.turn-change-file {
+	border-radius: var(--r-sm);
+}
+
+.turn-change-file-head {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	/* 左右 padding 与标题行一致，保证两端对齐 */
+	padding: 3px 0;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	text-align: left;
+}
+
+.turn-change-file-head:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.turn-change-file-head .file-path {
+	flex: 1;
+	min-width: 0;
+}
+
+/* 文件名链接样式：悬停显示完整路径（data-tooltip），不实际跳转 */
+.turn-change-file-link {
+	color: var(--accent);
+	text-decoration: none;
+	cursor: pointer;
+}
+
+.turn-change-file-link:hover {
+	text-decoration: underline;
+}
+
+.turn-change-file-head .diff-stats {
+	flex: none;
+}
+
+.turn-change-diff {
+	margin: 2px 0 6px;
+	/* 不再包裹第二层边框：diff-hunk 自带边框，避免双重盒子 */
+}
+
+.turn-change-diff .diff-content {
+	overflow-x: auto;
+	padding-bottom: 0;
+}
+
+/* 覆盖 ChangesPage 的大容器 margin，让 hunk 贴合小卡片 */
+.turn-change-diff .diff-hunk {
+	margin: 4px 0;
+}
+
+/* 小卡片内收窄行号列，避免内容区被挤压 */
+.turn-change-diff .diff-line {
+	grid-template-columns: 30px 30px 16px 1fr;
+}
+
+.turn-change-diff-loading {
+	padding: 8px 10px;
+	color: var(--text-faint);
+	font-size: var(--text-caption);
+}
+
+/* 划词引用浮层：选中对话文字后浮现「引用」按钮 */
+.selection-quote-host {
+	position: relative;
+	min-height: 0;
+}
+
+/* 划词工具栏：视觉与全局 Tooltip 一致（surface-chrome 气泡 + 阴影 + 小箭头）。 */
+.selection-toolbar {
+	position: fixed;
+	z-index: 200;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	padding: 3px;
+	transform: translate(-50%, calc(-100% - 8px));
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	background: var(--surface-chrome);
+	box-shadow: var(--shadow);
+	animation: tooltip-in 0.1s ease-out;
+}
+
+/* 向下的小箭头，指向选区中心 */
+.selection-toolbar::after {
+	content: "";
+	position: absolute;
+	left: 50%;
+	bottom: -5px;
+	width: 8px;
+	height: 8px;
+	transform: translateX(-50%) rotate(45deg);
+	border-right: 1px solid var(--line-strong);
+	border-bottom: 1px solid var(--line-strong);
+	background: var(--surface-chrome);
+}
+
+.selection-toolbar-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 2px 6px;
+	border: 0;
+	border-radius: var(--r-sm);
+	background: transparent;
+	color: var(--text-secondary);
+	/* button 默认不继承字体，显式对齐工具类尺寸 */
+	font-family: inherit;
+	font-size: var(--text-micro);
+	line-height: 1.4;
+	cursor: pointer;
+}
+
+.selection-toolbar-button:hover {
+	background: var(--fill-hover);
+	color: var(--accent);
+}
+
+.selection-toolbar-sep {
+	width: 1px;
+	height: 14px;
+	margin: 0 2px;
+	background: var(--line-strong);
+}

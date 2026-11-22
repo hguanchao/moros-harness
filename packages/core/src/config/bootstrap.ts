@@ -49,6 +49,12 @@ const CONFIG_TEMPLATE = `# Moros Harness global configuration
 # compact_model = "qwen2.5"  # context summarization
 # review_model = "qwen2.5"   # high-risk review in auto mode
 #
+# [ui]
+# work_step_detail = "standard"   # minimal | standard | detailed | full
+# collapse_timing = "afterAnswer" # never | immediately | afterToolCall | afterAnswer
+# collapsed_replies = "all"       # all | last | key | none
+# code_workspace = true           # show trajectory / diff / agent preset entry
+#
 # MCP servers live here, in the user-level config only. A project config cannot add
 # or replace them: MCP decides which local process starts.
 #

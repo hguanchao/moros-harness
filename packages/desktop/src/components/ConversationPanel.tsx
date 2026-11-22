@@ -15,6 +15,7 @@ import {
 	FolderOpenIcon,
 	GlobeIcon,
 	PlusIcon,
+	RouteIcon,
 	TerminalIcon,
 	XIcon,
 } from "./Icons.tsx";
@@ -80,6 +81,9 @@ export function ConversationPanel({
 		void call(window.moros.openTerminal(root)).catch((error: unknown) => console.error(errorMessage(error)));
 	};
 	const viewChanges = (): void => dispatch({ type: "page", page: "changes" });
+	const viewTrace = (): void => dispatch({ type: "page", page: "trace" });
+	// 代码工作视图开启时才显示轨迹与本轮代码差异入口；缺省（设置未加载）按开启处理。
+	const codeWorkspace = state.settings?.config.ui.codeWorkspace ?? true;
 
 	return (
 		<aside className="conversation-panel conv-workbench">
@@ -102,10 +106,18 @@ export function ConversationPanel({
 						<FolderOpenIcon size={17} />
 						<span>查看文件夹</span>
 					</button>
-					<button className="conv-wb-action-row" onClick={viewChanges}>
-						<DiffIcon size={17} />
-						<span>查看变更</span>
-					</button>
+					{codeWorkspace ? (
+						<>
+							<button className="conv-wb-action-row" onClick={viewTrace}>
+								<RouteIcon size={17} />
+								<span>查看轨迹</span>
+							</button>
+							<button className="conv-wb-action-row" onClick={viewChanges}>
+								<DiffIcon size={17} />
+								<span>本轮代码差异</span>
+							</button>
+						</>
+					) : null}
 					<button className="conv-wb-action-row" onClick={openTerminal} disabled={root === undefined}>
 						<TerminalIcon size={17} />
 						<span>打开终端</span>

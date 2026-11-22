@@ -9,7 +9,7 @@ import { z } from "zod";
 import { atomicWriteFile } from "./atomic-file.ts";
 import type { EventRecord, UserInputImage } from "./events/schema.ts";
 import { ContextCompactor } from "./compaction/compactor.ts";
-import { decodeDiffText, diffLines, type DiffResult } from "./diff/line-diff.ts";
+import { decodeDiffText, diffLines, summarizeChangeStats, type DiffResult } from "./diff/line-diff.ts";
 import { loadConfig as loadConfigFiles, type LoadedConfig } from "./config/loader.ts";
 import {
 	type ModelMetadata as CatalogModelMetadata,
@@ -170,6 +170,16 @@ export interface FileChangeDiff extends DiffResult {
 	readonly seq: number;
 	readonly path: string;
 	readonly op: "create" | "modify" | "delete";
+}
+
+/** 会话级文件变更汇总：按 path 去重后的净变化统计。 */
+export interface ChangeStats {
+	/** 净发生变化的文件数（内容最终回到原样的不计）。 */
+	readonly files: number;
+	/** 累计新增行数。 */
+	readonly added: number;
+	/** 累计删除行数。 */
+	readonly removed: number;
 }
 
 /** 面向 UI 的模型目录；不包含密钥或端点凭据。 */
@@ -657,6 +667,21 @@ export class Core {
 	}
 
 	/**
+	 * 回滚整个会话的全部文件变更（整任务回滚）；回滚本身会追加反向快照，可再次回滚。
+	 * @throws 会话无快照记录或快照对象损坏时抛出错误。
+	 */
+	async rollbackTask(session: Session): Promise<void> {
+		return this.#withSessionLease(session, async () => {
+			const pipeline = await this.createPipeline({
+				session,
+				projectRoot: session.meta.projectRoot,
+				mode: session.meta.mode,
+			});
+			await pipeline.rollbackTask();
+		});
+	}
+
+	/**
 	 * 读取会话最近一个可恢复的检查点：最后一条 after/rollback 快照记录。
 	 * @returns 检查点 id、事件序号、写入时间与涉及的文件；无记录时返回 undefined。
 	 */
@@ -731,6 +756,23 @@ export class Core {
 			afterBytes: after.bytes,
 		});
 		return { seq, path: change.path, op: change.op, ...diff };
+	}
+
+	/**
+	 * 会话级变更汇总：按 path 去重的净变化（首个 before → 末个 after），批量计算增删行。
+	 *
+	 * 只读取一次事件流，避免逐文件调用 diffChange 带来的重复读取；单个文件的快照缺失
+	 * 或损坏时跳过该文件，不影响整体统计。二进制/超大文件沿用 diffLines 的降级行为。
+	 */
+	async changeStats(sessionId: string): Promise<ChangeStats> {
+		const session = await this.#sessions.open(sessionId);
+		const events = await session.events.read();
+		const entries = events.flatMap((event) =>
+			event.type === "file.changed"
+				? [{ path: event.payload.path, before: event.payload.before, after: event.payload.after }]
+				: [],
+		);
+		return summarizeChangeStats(entries, (hash) => this.#snapshots.get(hash));
 	}
 
 	/**
@@ -2267,6 +2309,8 @@ function auditSummary(event: EventRecord): Record<string, unknown> {
 			return { title: event.payload.title, mode: event.payload.mode };
 		case "mode.switched":
 			return { from: event.payload.from, to: event.payload.to };
+		case "message.feedback":
+			return { targetSeq: event.payload.targetSeq, rating: event.payload.rating };
 		case "model.changed":
 			return {
 				from: event.payload.fromModel,

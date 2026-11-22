@@ -353,9 +353,14 @@
 	display: inline-flex;
 	align-items: center;
 	padding: 2px;
+	border: 0;
 	border-radius: var(--r-pill);
 	background: var(--fill-strong);
 	transition: background 0.18s ease;
+}
+
+.settings-toggle:not(.is-disabled) {
+	cursor: pointer;
 }
 
 .settings-toggle.is-on {
@@ -364,6 +369,7 @@
 
 .settings-toggle.is-disabled {
 	opacity: 0.55;
+	cursor: default;
 }
 
 .settings-toggle-knob {

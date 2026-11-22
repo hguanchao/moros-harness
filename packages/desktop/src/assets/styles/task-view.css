@@ -1,0 +1,266 @@
+/* 任务列表（TODO）与子代理分组视图。全部使用语义变量，深浅主题自动适配。 */
+
+/* ---------- 任务条目（对话流任务卡与底部面板共用） ---------- */
+.todo-items {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px 0 2px 22px;
+}
+
+.todo-item {
+	display: flex;
+	align-items: flex-start;
+	gap: 6px;
+	padding: 2px 0;
+	font-size: var(--text-caption);
+	line-height: 1.5;
+	color: var(--text-secondary);
+}
+
+.todo-item-icon {
+	display: inline-flex;
+	flex: none;
+	margin-top: 2px;
+	color: var(--text-faint);
+}
+
+.todo-item-text {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.todo-item.status-in_progress .todo-item-icon,
+.todo-item.status-in_progress .todo-item-text {
+	color: var(--accent);
+}
+
+.todo-item.status-completed .todo-item-icon {
+	color: var(--ok);
+}
+
+.todo-item.status-completed .todo-item-text {
+	color: var(--text-muted);
+}
+
+.todo-item.status-failed .todo-item-icon,
+.todo-item.status-failed .todo-item-text {
+	color: var(--danger);
+}
+
+/* ---------- 对话流收尾任务卡 ---------- */
+.todo-card {
+	border: 1px solid var(--line);
+	border-radius: var(--r-lg);
+	background: var(--fill-soft);
+	padding: 4px 8px 6px;
+	margin: 2px 0;
+}
+
+.todo-card-head {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 2px 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	text-align: left;
+}
+
+.todo-card-head:hover {
+	color: var(--text-primary);
+}
+
+.todo-card-title {
+	font-weight: 500;
+	color: var(--text-primary);
+}
+
+.todo-card-progress {
+	font-variant-numeric: tabular-nums;
+	color: var(--accent);
+	font-size: var(--text-caption);
+}
+
+.todo-card-counts {
+	font-size: var(--text-caption);
+	color: var(--text-faint);
+}
+
+.todo-card-head > svg:last-child {
+	margin-left: auto;
+}
+
+/* ---------- 底部常驻任务面板 ---------- */
+.todo-panel {
+	flex: none;
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--surface-raised);
+	padding: 4px 8px 6px;
+	animation: menu-up-in var(--duration-normal) var(--ease-out);
+}
+
+.todo-panel-summary {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 0;
+	border: 0;
+	background: transparent;
+	color: var(--text-secondary);
+	cursor: pointer;
+	font-size: var(--text-small);
+	text-align: left;
+}
+
+.todo-panel-summary:hover {
+	color: var(--text-primary);
+}
+
+.todo-panel-sep {
+	color: var(--text-faint);
+}
+
+.todo-panel-active {
+	color: var(--accent);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.todo-panel-summary > svg:last-child {
+	margin-left: auto;
+}
+
+.todo-panel-body .todo-items {
+	padding-left: 22px;
+}
+
+/* ---------- 子代理分组视图 ---------- */
+.subagent-group {
+	border-radius: var(--r-md);
+	margin: 2px 0;
+}
+
+.subagent-group-head {
+	width: 100%;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 3px 6px;
+	border: 1px solid var(--line);
+	border-radius: var(--r-md);
+	background: var(--fill-soft);
+	color: var(--text-secondary);
+	cursor: pointer;
+	text-align: left;
+}
+
+.subagent-group-head:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
+}
+
+.subagent-group.is-running .subagent-group-head {
+	color: var(--text-primary);
+}
+
+.subagent-group-label {
+	font-weight: 500;
+}
+
+.subagent-group-counts {
+	font-size: var(--text-caption);
+	color: var(--text-muted);
+}
+
+.subagent-group-duration,
+.subagent-group-tokens {
+	font-size: var(--text-micro);
+	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
+}
+
+.subagent-group-head > svg:last-child {
+	margin-left: auto;
+}
+
+.subagent-members {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 4px 0 2px 22px;
+	border-left: 1px solid var(--line);
+	margin-left: 12px;
+}
+
+.subagent-member {
+	font-size: var(--text-caption);
+	color: var(--text-secondary);
+}
+
+.subagent-member-main {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 0;
+}
+
+.subagent-member-status {
+	display: inline-flex;
+	flex: none;
+}
+
+.subagent-member.status-running .subagent-member-status {
+	color: var(--warn);
+}
+
+.subagent-member.status-done .subagent-member-status,
+.subagent-member.status-done .subagent-member-status-label {
+	color: var(--ok);
+}
+
+.subagent-member.status-failed .subagent-member-status,
+.subagent-member.status-failed .subagent-member-status-label {
+	color: var(--danger);
+}
+
+.subagent-member-status-label {
+	flex: none;
+}
+
+.subagent-member-task {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-primary);
+}
+
+.subagent-member-metric {
+	flex: none;
+	font-size: var(--text-micro);
+	color: var(--text-faint);
+	font-variant-numeric: tabular-nums;
+}
+
+.subagent-failure-toggle {
+	width: 20px;
+	height: 20px;
+}
+
+.subagent-failure {
+	margin: 2px 0 4px;
+	padding: 5px 8px;
+	border-radius: var(--r-sm);
+	background: var(--danger-soft);
+	color: var(--danger);
+	font-size: var(--text-caption);
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}

@@ -75,6 +75,63 @@ export function diffLines(
 	};
 }
 
+/** 单个文件的净变更输入（哈希来自 file.changed 事件 payload）。 */
+export interface FileChangeEntry {
+	readonly path: string;
+	/** 该路径首次变更前的快照哈希；新建文件为 null。 */
+	readonly before: string | null;
+	/** 该路径末次变更后的快照哈希；删除文件为 null。 */
+	readonly after: string | null;
+}
+
+/** 会话级变更汇总：按文件去重的净增删行统计。 */
+export interface ChangeSummary {
+	readonly files: number;
+	readonly added: number;
+	readonly removed: number;
+}
+
+/**
+ * 汇总会话级净变更：按 path 去重（首个 before → 末个 after），逐文件计算增删行并累加。
+ *
+ * 纯逻辑，快照读取通过 `get` 注入，便于测试。单个文件快照缺失/损坏时跳过，不影响整体；
+ * 最终内容回到原样（before === after）的文件不计入。
+ */
+export async function summarizeChangeStats(
+	entries: readonly FileChangeEntry[],
+	get: (hash: string) => Promise<Buffer>,
+): Promise<ChangeSummary> {
+	const grouped = new Map<string, { before: string | null; after: string | null }>();
+	for (const entry of entries) {
+		const existing = grouped.get(entry.path);
+		if (existing === undefined) grouped.set(entry.path, { before: entry.before, after: entry.after });
+		else existing.after = entry.after;
+	}
+	let files = 0;
+	let added = 0;
+	let removed = 0;
+	for (const { before, after } of grouped.values()) {
+		if (before === after) continue;
+		try {
+			const beforeBuffer = before === null ? null : await get(before);
+			const afterBuffer = after === null ? null : await get(after);
+			const beforeText = decodeDiffText(beforeBuffer);
+			const afterText = decodeDiffText(afterBuffer);
+			const diff = diffLines(beforeText.text, afterText.text, {
+				binary: beforeText.binary || afterText.binary,
+				beforeBytes: beforeText.bytes,
+				afterBytes: afterText.bytes,
+			});
+			files += 1;
+			added += diff.added;
+			removed += diff.removed;
+		} catch {
+			// 单个快照损坏不拖垮整体统计。
+		}
+	}
+	return { files, added, removed };
+}
+
 interface Operation extends DiffLine {
 	readonly degraded: boolean;
 }
