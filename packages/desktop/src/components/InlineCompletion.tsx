@@ -1,4 +1,4 @@
-import { Fragment, type CSSProperties, type JSX } from "react";
+import { Fragment, useEffect, useRef, type CSSProperties, type JSX } from "react";
 import { createPortal } from "react-dom";
 
 import type { TriggerToken } from "../utils/inline-completion.ts";
@@ -38,6 +38,11 @@ export function InlineCompletion({
 	readonly onSelect: (index: number) => void;
 	readonly onHover: (index: number) => void;
 }): JSX.Element {
+	const activeRef = useRef<HTMLDivElement | null>(null);
+	// 方向键切换候选时把高亮项滚进可视区，否则长列表里用户看不到选择变化。
+	useEffect(() => {
+		activeRef.current?.scrollIntoView({ block: "nearest" });
+	}, [activeIndex]);
 	// 命令菜单用参考图排版：更宽、带分组标题、每行「/命令 + 说明」同行。
 	const isCommandMenu = trigger === "/";
 	const width = isCommandMenu
@@ -71,6 +76,7 @@ export function InlineCompletion({
 							<Fragment key={option.value}>
 								{groupHeader}
 								<div
+									ref={index === activeIndex ? activeRef : undefined}
 									role="option"
 									aria-selected={index === activeIndex}
 									className={`completion-option ${isCommandMenu ? "is-command" : ""} ${index === activeIndex ? "is-active" : ""}`}
