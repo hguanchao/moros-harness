@@ -8,10 +8,10 @@ import {
 } from "lexical";
 import type { JSX } from "react";
 
-import { FileIcon, QuoteIcon, SlidersIcon, SparklesIcon } from "../Icons.tsx";
+import { FileIcon, PlugIcon, QuoteIcon, SlidersIcon, SparklesIcon } from "../Icons.tsx";
 
-/** chip 种类：划词引用 / @文件 / $技能 / /命令。 */
-export type ChipKind = "quote" | "file" | "skill" | "command";
+/** chip 种类：划词引用 / @文件 / $技能 / /命令 / MCP 连接器。 */
+export type ChipKind = "quote" | "file" | "skill" | "command" | "mcp";
 
 /** 序列化后的 chip 数据（落 draft.quotes/mentions 用）。 */
 export interface ChipData {
@@ -26,7 +26,13 @@ export type SerializedChipNode = Spread<
 	SerializedLexicalNode
 >;
 
-const CHIP_ICONS = { quote: QuoteIcon, file: FileIcon, skill: SparklesIcon, command: SlidersIcon } as const;
+const CHIP_ICONS = {
+	quote: QuoteIcon,
+	file: FileIcon,
+	skill: SparklesIcon,
+	command: SlidersIcon,
+	mcp: PlugIcon,
+} as const;
 
 /**
  * 行内原子 chip 节点（DecoratorNode）：图标 + 文本 + ×，光标不能进入，退格整体删除。

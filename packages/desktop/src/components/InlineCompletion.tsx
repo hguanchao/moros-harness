@@ -1,4 +1,4 @@
-import { type CSSProperties, type JSX } from "react";
+import { Fragment, type CSSProperties, type JSX } from "react";
 import { createPortal } from "react-dom";
 
 import type { TriggerToken } from "../utils/inline-completion.ts";
@@ -8,6 +8,10 @@ export interface CompletionOption {
 	readonly value: string;
 	readonly label: string;
 	readonly description?: string;
+	/** 命令菜单的分组标题（命令 / 技能 / MCP 连接器）；缺省不分段。 */
+	readonly group?: string;
+	/** 选中后插入的 chip 类型；缺省按 trigger 推断（/命令、@文件、$技能）。 */
+	readonly kind?: "command" | "skill" | "mcp";
 }
 
 export type CompletionTrigger = "/" | "@" | "$";
@@ -50,45 +54,55 @@ export function InlineCompletion({
 
 	return createPortal(
 		<div className="inline-completion" style={position} role="listbox" aria-label={`${trigger} 补全`}>
-			{isCommandMenu ? <div className="completion-group-label">命令</div> : null}
 			{options.length === 0 ? (
 				<div className="completion-empty">无匹配结果</div>
 			) : (
-				options.map((option, index) => (
-					<div
-						key={option.value}
-						role="option"
-						aria-selected={index === activeIndex}
-						className={`completion-option ${isCommandMenu ? "is-command" : ""} ${index === activeIndex ? "is-active" : ""}`}
-						onMouseEnter={() => onHover(index)}
-						onMouseDown={(event) => event.preventDefault()}
-						onClick={() => onSelect(index)}
-					>
-						{isCommandMenu ? (
-							<>
-								<span className="completion-command-label">{option.label}</span>
-								{option.description === undefined ? null : (
-									<span className="completion-desc">{option.description}</span>
+				options.map((option, index) => {
+					// 命令菜单按 group 分段：每组第一项前插入分组标题。
+					const groupHeader =
+						isCommandMenu && option.group !== undefined && option.group !== options[index - 1]?.group ? (
+							<div className="completion-group-label" key={`group-${option.group}`}>
+								{option.group}
+							</div>
+						) : null;
+					return (
+						<Fragment key={option.value}>
+							{groupHeader}
+							<div
+								role="option"
+								aria-selected={index === activeIndex}
+								className={`completion-option ${isCommandMenu ? "is-command" : ""} ${index === activeIndex ? "is-active" : ""}`}
+								onMouseEnter={() => onHover(index)}
+								onMouseDown={(event) => event.preventDefault()}
+								onClick={() => onSelect(index)}
+							>
+								{isCommandMenu ? (
+									<>
+										<span className="completion-command-label">{option.label}</span>
+										{option.description === undefined ? null : (
+											<span className="completion-desc">{option.description}</span>
+										)}
+									</>
+								) : (
+									<>
+										<span className="completion-icon">{iconFor(trigger)}</span>
+										<span className="completion-text">
+											<span className="completion-label">{option.label}</span>
+											{option.description === undefined ? null : (
+												<span className="completion-desc">{option.description}</span>
+											)}
+										</span>
+									</>
 								)}
-							</>
-						) : (
-							<>
-								<span className="completion-icon">{iconFor(trigger)}</span>
-								<span className="completion-text">
-									<span className="completion-label">{option.label}</span>
-									{option.description === undefined ? null : (
-										<span className="completion-desc">{option.description}</span>
-									)}
-								</span>
-							</>
-						)}
-					</div>
-				))
+							</div>
+						</Fragment>
+					);
+				})
 			)}
 			{isCommandMenu ? (
 				<div className="completion-hint">
 					<InfoIcon size={12} />
-					<span>输入内容以搜索命令</span>
+					<span>输入内容以搜索命令、技能或 MCP 连接器</span>
 				</div>
 			) : null}
 		</div>,

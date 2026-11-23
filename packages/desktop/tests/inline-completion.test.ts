@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
 	filterCommands,
+	filterConnectors,
 	filterFiles,
 	filterSkills,
 	findAtToken,
@@ -12,6 +13,7 @@ import {
 	formatSkillReference,
 	removeTriggerText,
 	type CommandCandidate,
+	type ConnectorCandidate,
 	type SkillCandidate,
 } from "../src/utils/inline-completion.ts";
 import { DESKTOP_COMMANDS, findDesktopCommand } from "../src/utils/command-list.ts";
@@ -90,6 +92,16 @@ describe("过滤函数排序", () => {
 			{ name: "a-deploy-b", description: "x" },
 		];
 		expect(filterSkills(skills, "deploy").map((skill) => skill.name)).toEqual(["deploy", "a-deploy-b"]);
+	});
+
+	it("filterConnectors：名称前缀 > 名称包含 > 描述包含", () => {
+		const connectors: ConnectorCandidate[] = [
+			{ name: "github", description: "GitHub 仓库操作" },
+			{ name: "docs-mcp", description: "文档搜索" },
+			{ name: "browser", description: "github 网页抓取" },
+		];
+		expect(filterConnectors(connectors, "git").map((item) => item.name)).toEqual(["github", "browser"]);
+		expect(filterConnectors(connectors, "").map((item) => item.name)).toEqual(["github", "docs-mcp", "browser"]);
 	});
 
 	it("filterCommands：前缀命中优先，为空才用描述命中", () => {

@@ -148,6 +148,33 @@ export function filterSkills<T extends SkillCandidate>(
 	return scored.slice(0, limit).map((entry) => entry.skill);
 }
 
+/** MCP 连接器候选的最小结构。 */
+export interface ConnectorCandidate {
+	readonly name: string;
+	readonly description: string;
+}
+
+/** 过滤 MCP 连接器：名称前缀 > 名称包含 > 描述包含，同档保持原序。 */
+export function filterConnectors<T extends ConnectorCandidate>(connectors: readonly T[], query: string): readonly T[] {
+	const needle = query.toLowerCase();
+	if (needle.length === 0) return connectors;
+
+	const scored: { connector: T; score: number }[] = [];
+	for (const connector of connectors) {
+		const name = connector.name.toLowerCase();
+		const score = name.startsWith(needle)
+			? 0
+			: name.includes(needle)
+				? 1
+				: connector.description.toLowerCase().includes(needle)
+					? 2
+					: -1;
+		if (score >= 0) scored.push({ connector, score });
+	}
+	scored.sort((left, right) => left.score - right.score);
+	return scored.map((entry) => entry.connector);
+}
+
 /** 命令候选的最小结构。 */
 export interface CommandCandidate {
 	readonly name: string;

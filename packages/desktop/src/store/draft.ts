@@ -17,13 +17,13 @@ export interface DraftQuote {
 	readonly sourceSeq?: number;
 }
 
-/** @ 文件 / $ 技能引用 chip；display 语义同 DraftQuote。 */
+/** @ 文件 / $ 技能 / MCP 连接器 引用 chip；display 语义同 DraftQuote。 */
 export interface DraftMention {
 	readonly id: string;
-	readonly kind: "file" | "skill";
-	/** 用于序列化的值（文件路径 / 技能名）。 */
+	readonly kind: "file" | "skill" | "mcp";
+	/** 用于序列化的值（文件路径 / 技能名 / 连接器名）。 */
 	readonly value: string;
-	/** 编辑器 chip 显示文字（如 @a.txt / $skill）。 */
+	/** 编辑器 chip 显示文字（如 @a.txt / $skill / server 名）。 */
 	readonly display: string;
 }
 

@@ -38,6 +38,7 @@ import { ComposerEditor, type ComposerEditorHandle } from "./editor/ComposerEdit
 import type { ChipData } from "./editor/ChipNode.tsx";
 import {
 	filterCommands,
+	filterConnectors,
 	filterFiles,
 	filterSkills,
 	findAtToken,
@@ -50,6 +51,20 @@ import { runDesktopCommand, splitCommand, type CommandHandlers } from "../utils/
 import { InlineCompletion, type CompletionOption, type CompletionTrigger } from "./InlineCompletion.tsx";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+/** MCP 连接状态的中文标签；连接器没有 detail 时作为说明文字。 */
+function mcpStatusLabel(status: "connecting" | "connected" | "unreachable" | "disabled"): string {
+	switch (status) {
+		case "connected":
+			return "已连接";
+		case "connecting":
+			return "连接中";
+		case "unreachable":
+			return "未连接";
+		case "disabled":
+			return "已禁用";
+	}
+}
 
 /** 行内补全的当前状态（同时写入 state 与 ref，见 completionRef）。 */
 interface CompletionState {
@@ -99,7 +114,7 @@ export function Composer(): JSX.Element {
 			}));
 			const nextMentions: DraftMention[] = next.mentions.map((c) => ({
 				id: c.id,
-				kind: c.kind === "skill" ? "skill" : "file",
+				kind: c.kind === "skill" ? "skill" : c.kind === "mcp" ? "mcp" : "file",
 				value: c.value,
 				display: c.label,
 			}));
@@ -329,11 +344,47 @@ export function Composer(): JSX.Element {
 		void (async () => {
 			let options: CompletionOption[] = [];
 			if (trigger === "/") {
-				options = filterCommands(DESKTOP_COMMANDS, detected.query).map((command) => ({
+				// 命令菜单分三组：命令 / 技能 / MCP 连接器，都支持按 query 过滤。
+				const commandOptions: CompletionOption[] = filterCommands(DESKTOP_COMMANDS, detected.query).map((command) => ({
 					value: command.name,
 					label: `/${command.name}`,
 					description: command.description,
+					group: "命令",
+					kind: "command",
 				}));
+				let skillOptions: CompletionOption[] = [];
+				let connectorOptions: CompletionOption[] = [];
+				try {
+					const skills = await call(window.moros.skillsList());
+					skillOptions = filterSkills(skills, detected.query).map((skill) => ({
+						value: skill.name,
+						label: skill.name,
+						description: skill.description || skill.scope,
+						group: "技能",
+						kind: "skill",
+					}));
+				} catch {
+					skillOptions = [];
+				}
+				try {
+					const connectors = await call(window.moros.mcpStatus());
+					connectorOptions = filterConnectors(
+						connectors.map((connector) => ({
+							name: connector.name,
+							description: connector.detail.length > 0 ? connector.detail : mcpStatusLabel(connector.status),
+						})),
+						detected.query,
+					).map((connector) => ({
+						value: connector.name,
+						label: connector.name,
+						description: connector.description,
+						group: "MCP 连接器",
+						kind: "mcp",
+					}));
+				} catch {
+					connectorOptions = [];
+				}
+				options = [...commandOptions, ...skillOptions, ...connectorOptions];
 			} else if (trigger === "@") {
 				const files = await listProjectFiles();
 				options = filterFiles(files, detected.query).map((path) => ({ value: path, label: path }));
@@ -353,7 +404,7 @@ export function Composer(): JSX.Element {
 		})();
 	};
 
-	/** 选中补全项：插入对应 chip（/命令、@文件、$技能）；命令发送时才执行。 */
+	/** 选中补全项：插入对应 chip（/命令、@文件、$技能、MCP 连接器）；命令发送时才执行。 */
 	const selectCompletion = (index: number): void => {
 		const current = completionRef.current;
 		if (current === undefined) return;
@@ -362,19 +413,20 @@ export function Composer(): JSX.Element {
 		const { trigger, token } = current;
 		completionDismissed.current = true;
 		setCompletionSafe(undefined);
+		// 命令菜单里可能混着命令/技能/MCP，优先用选项自带 kind；其余按 trigger 推断。
+		const kind: ChipData["kind"] = option.kind ?? (trigger === "/" ? "command" : trigger === "@" ? "file" : "skill");
+		const isCommand = kind === "command";
 		// /命令可带说明：value 存「命令名 + 空格 + 说明」，发送时用 splitCommand 拆开。
-		const commandValue =
-			trigger === "/" && (token.args ?? "").length > 0 ? `${option.value} ${token.args}` : option.value;
+		const commandValue = isCommand && (token.args ?? "").length > 0 ? `${option.value} ${token.args}` : option.value;
 		const chip: ChipData = {
 			id: crypto.randomUUID(),
-			kind: trigger === "/" ? "command" : trigger === "@" ? "file" : "skill",
-			value: trigger === "/" ? commandValue : option.value,
-			label:
-				trigger === "/"
-					? `/${commandValue}`
-					: trigger === "@"
-						? (option.value.split("/").at(-1) ?? option.value)
-						: option.value,
+			kind,
+			value: isCommand ? commandValue : option.value,
+			label: isCommand
+				? `/${commandValue}`
+				: kind === "file"
+					? (option.value.split("/").at(-1) ?? option.value)
+					: option.value,
 		};
 		// 先删触发 token，再插入 chip（编辑器原生保证光标与原子删除）。
 		editorRef.current?.deleteTriggerToken(token.end - token.start);
