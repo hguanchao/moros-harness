@@ -26,20 +26,18 @@ import {
 	PlugIcon,
 	PlusIcon,
 	PointerIcon,
-	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
-	SparklesIcon,
 	StopIcon,
 	TerminalIcon,
 	XIcon,
 } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
+import type { DraftMention } from "../store/draft.ts";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
-import { buildQuote } from "../utils/message-actions.ts";
-import { firstLine } from "../utils/format.ts";
 import {
+	activeChips,
 	buildModelInput,
 	MAX_FILE_INLINE_BYTES,
 	MAX_TOTAL_INLINE_BYTES,
@@ -228,10 +226,10 @@ export function Composer(): JSX.Element {
 	 * 读取 file mention 的内容并按预算内联；失败/二进制/超预算降级为占位文本，不阻断发送。
 	 * 必须在会话确定（工作区已切换）之后调用，否则首条消息会读到旧工作区。
 	 */
-	const collectInlineFilesFromMentions = async (): Promise<InlineFile[]> => {
+	const collectInlineFilesFromMentions = async (activeMentions: readonly DraftMention[]): Promise<InlineFile[]> => {
 		const files: InlineFile[] = [];
 		let used = 0;
-		for (const mention of mentions) {
+		for (const mention of activeMentions) {
 			if (mention.kind !== "file") continue;
 			try {
 				const result = await call(window.moros.workspaceRead(mention.value));
@@ -293,9 +291,12 @@ export function Composer(): JSX.Element {
 				if (context === undefined || epoch !== currentNavigationEpoch()) return;
 				session = context.session;
 			}
+			// 以正文为准：只有内联显示文字仍在正文里的 chip 才生效。
+			const activeQuotes = activeChips(text, quotes);
+			const activeMentions = activeChips(text, mentions);
 			// 工作区已确定，此时读取 @file 内容并组装最终送给模型的文本。
-			const files = await collectInlineFilesFromMentions();
-			const message = buildModelInput({ text: text.trim(), quotes, mentions, files });
+			const files = await collectInlineFilesFromMentions(activeMentions);
+			const message = buildModelInput({ text: text.trim(), quotes: activeQuotes, mentions: activeMentions, files });
 			await call(
 				window.moros.chatSend({
 					sessionId: session.meta.id,
@@ -352,34 +353,36 @@ export function Composer(): JSX.Element {
 		})();
 	};
 
-	/** 选中补全项：命令立即执行（不留 chip）；文件/技能加入 mention chip。 */
+	/** 选中补全项：命令立即执行；文件/技能把内联文字插入 textarea 并登记 chip。 */
 	const selectCompletion = (index: number): void => {
 		if (completion === undefined) return;
 		const option = completion.options[index];
 		if (option === undefined) return;
 		const { trigger, token } = completion;
-		const cleaned = removeTriggerText(text, token);
-		dispatch({ type: "draft-text", text: cleaned.text });
+		completionDismissed.current = true;
 		setCompletion(undefined);
-		completionDismissed.current = false;
 		if (trigger === "/") {
+			const cleaned = removeTriggerText(text, token);
+			dispatch({ type: "draft-text", text: cleaned.text });
+			requestAnimationFrame(() => elementFocusAndCursor(cleaned.cursor));
 			void runDesktopCommand(option.value, "", commandHandlers);
-		} else {
-			dispatch({
-				type: "draft-mention-added",
-				mention: {
-					id: crypto.randomUUID(),
-					kind: trigger === "@" ? "file" : "skill",
-					value: option.value,
-					label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
-					start: token.start,
-					end: token.end,
-				},
-			});
+			return;
 		}
-		requestAnimationFrame(() => {
-			elementFocusAndCursor(cleaned.cursor);
+		// 显示文字内联插入（替换触发片段），chip 记录 display 供发送时判断有效性。
+		const display = trigger === "@" ? formatFileReference(option.value) : formatSkillReference(option.value);
+		const next = text.slice(0, token.start) + display + " " + text.slice(token.end);
+		const cursor = token.start + display.length + 1;
+		dispatch({ type: "draft-text", text: next });
+		dispatch({
+			type: "draft-mention-added",
+			mention: {
+				id: crypto.randomUUID(),
+				kind: trigger === "@" ? "file" : "skill",
+				value: option.value,
+				display,
+			},
 		});
+		requestAnimationFrame(() => elementFocusAndCursor(cursor));
 	};
 
 	/** textarea 键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
@@ -410,6 +413,15 @@ export function Composer(): JSX.Element {
 			return true;
 		}
 		return false;
+	};
+
+	/** 清除正文里的全部引用/文件/技能显示文字，并清空对应结构化 chip。 */
+	const clearAllChips = (): void => {
+		let next = text;
+		for (const chip of [...quotes, ...mentions]) next = next.replace(chip.display, "");
+		dispatch({ type: "draft-text", text: next.trim() });
+		dispatch({ type: "draft-chips-clear" });
+		requestAnimationFrame(() => elementFocusAndCursor(next.trim().length));
 	};
 
 	const elementFocusAndCursor = (cursor: number): void => {
@@ -622,43 +634,17 @@ export function Composer(): JSX.Element {
 						))}
 					</div>
 				) : null}
-				{quotes.length > 0 ? (
-					<div className="quote-chips">
-						{quotes.map((quote) => (
-							<span className="quote-chip" key={quote.id} data-tooltip={quote.text}>
-								<QuoteIcon size={10} />
-								<span className="quote-chip-text">引用：{firstLine(quote.text, 20)}</span>
-								<button
-									type="button"
-									className="quote-chip-remove"
-									aria-label="移除引用"
-									onClick={() => dispatch({ type: "draft-quote-removed", id: quote.id })}
-								>
-									<XIcon size={9} />
-								</button>
-							</span>
-						))}
-					</div>
-				) : null}
-				{mentions.length > 0 ? (
-					<div className="quote-chips">
-						{mentions.map((mention) => (
-							<span className="quote-chip" key={mention.id} data-tooltip={mention.value}>
-								{mention.kind === "file" ? <FolderIcon size={10} /> : <SparklesIcon size={10} />}
-								<span className="quote-chip-text">
-									{mention.kind === "file" ? "@" : "$"}
-									{firstLine(mention.label, 20)}
-								</span>
-								<button
-									type="button"
-									className="quote-chip-remove"
-									aria-label="移除引用"
-									onClick={() => dispatch({ type: "draft-mention-removed", id: mention.id })}
-								>
-									<XIcon size={9} />
-								</button>
-							</span>
-						))}
+				{quotes.length > 0 || mentions.length > 0 ? (
+					<div className="quote-clear-row">
+						<button
+							type="button"
+							className="ghost-button small"
+							data-tooltip="移除正文中的全部引用文字"
+							onClick={() => clearAllChips()}
+						>
+							<XIcon size={11} />
+							清除引用
+						</button>
 					</div>
 				) : null}
 

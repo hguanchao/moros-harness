@@ -65,12 +65,15 @@ export function ChatPage(): JSX.Element {
 	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
 	const handleQuote = useCallback(
 		(text: string, span?: { start: number; end: number; sourceSeq?: number }): void => {
+			// 内联显示文字插入正文；发送时只有它仍在正文里，引用 chip 才生效。
+			const display = `引用：${text.replace(/\s+/g, " ").slice(0, 30)}`;
+			dispatch({ type: "draft-text-append", text: `${display} ` });
 			dispatch({
 				type: "draft-quote-added",
 				quote: {
 					id: crypto.randomUUID(),
 					text,
-					...(span === undefined ? {} : { start: span.start, end: span.end }),
+					display,
 					...(span?.sourceSeq === undefined ? {} : { sourceSeq: span.sourceSeq }),
 				},
 			});

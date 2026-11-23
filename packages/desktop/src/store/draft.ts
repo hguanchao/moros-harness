@@ -3,27 +3,28 @@ import type { ProjectRef, PreparedImage, SessionView } from "../shared/contract.
 /** 输入框附件上限；与新任务草稿共用，避免异步添加超过 UI 限制。 */
 export const MAX_DRAFT_IMAGES = 8;
 
-/** 引用 chip：选区原文快照；span 与来源 seq 在选中时固化。 */
+/**
+ * 引用 chip：选区原文快照。
+ * display 是插入到输入框里的内联文字（如「引用：几行」）；发送时若它仍在正文里，
+ * chip 才生效——即"以文字为准"，用户删掉该文字即取消引用。
+ */
 export interface DraftQuote {
 	readonly id: string;
 	readonly text: string;
-	/** 选区在原文中的字符偏移（UTF-16）。 */
-	readonly start?: number;
-	readonly end?: number;
+	/** 插入到 textarea 的内联显示文字。 */
+	readonly display: string;
 	/** 来源 assistant 消息的事件 seq（拿不到时省略）。 */
 	readonly sourceSeq?: number;
 }
 
-/** @ 文件 / $ 技能引用 chip；span 在选中时固化。 */
+/** @ 文件 / $ 技能引用 chip；display 语义同 DraftQuote。 */
 export interface DraftMention {
 	readonly id: string;
 	readonly kind: "file" | "skill";
 	/** 用于序列化的值（文件路径 / 技能名）。 */
 	readonly value: string;
-	/** chip 上显示的短标签。 */
-	readonly label: string;
-	readonly start?: number;
-	readonly end?: number;
+	/** 插入到 textarea 的内联显示文字（如 @a.txt / $skill）。 */
+	readonly display: string;
 }
 
 /**

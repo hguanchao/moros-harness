@@ -570,10 +570,10 @@ describe("draft-quote 引用消息 chip", () => {
 		const base = reducer(reducer(activeState(), { type: "new-task" }), { type: "draft-text", text: "问题：" });
 		const added = reducer(base, {
 			type: "draft-quote-added",
-			quote: { id: "q1", text: "引用原文" },
+			quote: { id: "q1", text: "引用原文", display: "引用：引用原文" },
 		});
 
-		expect(added.draft.quotes).toEqual([{ id: "q1", text: "引用原文" }]);
+		expect(added.draft.quotes).toEqual([{ id: "q1", text: "引用原文", display: "引用：引用原文" }]);
 		expect(added.draft.text).toBe("问题：");
 		expect(added.draftRevision).toBe(base.draftRevision + 1);
 	});
@@ -581,7 +581,7 @@ describe("draft-quote 引用消息 chip", () => {
 	it("移除引用 chip", () => {
 		const added = reducer(reducer(activeState(), { type: "new-task" }), {
 			type: "draft-quote-added",
-			quote: { id: "q1", text: "引用原文" },
+			quote: { id: "q1", text: "引用原文", display: "引用：引用原文" },
 		});
 		const removed = reducer(added, { type: "draft-quote-removed", id: "q1" });
 		expect(removed.draft.quotes).toEqual([]);
@@ -590,13 +590,15 @@ describe("draft-quote 引用消息 chip", () => {
 
 	it("空文本不产生变化", () => {
 		const base = reducer(activeState(), { type: "new-task" });
-		expect(reducer(base, { type: "draft-quote-added", quote: { id: "q1", text: "   " } })).toBe(base);
+		expect(reducer(base, { type: "draft-quote-added", quote: { id: "q1", text: "   ", display: "引用：   " } })).toBe(
+			base,
+		);
 	});
 
 	it("发送后清空引用 chip", () => {
 		const added = reducer(reducer(activeState(), { type: "new-task" }), {
 			type: "draft-quote-added",
-			quote: { id: "q1", text: "引用原文" },
+			quote: { id: "q1", text: "引用原文", display: "引用：引用原文" },
 		});
 		const sent = reducer(added, {
 			type: "draft-sent",
@@ -607,15 +609,14 @@ describe("draft-quote 引用消息 chip", () => {
 		expect(sent.draft.quotes).toEqual([]);
 	});
 });
-
 describe("draft-mention 文件/技能引用 chip", () => {
 	it("加入 mention chip 并递增 revision，不动正文", () => {
 		const base = reducer(activeState(), { type: "new-task" });
 		const added = reducer(base, {
 			type: "draft-mention-added",
-			mention: { id: "m1", kind: "file", value: "src/a.ts", label: "a.ts" },
+			mention: { id: "m1", kind: "file", value: "src/a.ts", display: "@src/a.ts" },
 		});
-		expect(added.draft.mentions).toEqual([{ id: "m1", kind: "file", value: "src/a.ts", label: "a.ts" }]);
+		expect(added.draft.mentions).toEqual([{ id: "m1", kind: "file", value: "src/a.ts", display: "@src/a.ts" }]);
 		expect(added.draft.text).toBe("");
 		expect(added.draftRevision).toBe(base.draftRevision + 1);
 	});
@@ -623,7 +624,7 @@ describe("draft-mention 文件/技能引用 chip", () => {
 	it("移除 mention chip", () => {
 		const added = reducer(reducer(activeState(), { type: "new-task" }), {
 			type: "draft-mention-added",
-			mention: { id: "m1", kind: "skill", value: "deploy", label: "deploy" },
+			mention: { id: "m1", kind: "skill", value: "deploy", display: "$deploy" },
 		});
 		const removed = reducer(added, { type: "draft-mention-removed", id: "m1" });
 		expect(removed.draft.mentions).toEqual([]);
@@ -632,7 +633,7 @@ describe("draft-mention 文件/技能引用 chip", () => {
 	it("发送后清空 mention chip", () => {
 		const added = reducer(reducer(activeState(), { type: "new-task" }), {
 			type: "draft-mention-added",
-			mention: { id: "m1", kind: "file", value: "a.ts", label: "a.ts" },
+			mention: { id: "m1", kind: "file", value: "a.ts", display: "@a.ts" },
 		});
 		const sent = reducer(added, {
 			type: "draft-sent",
@@ -642,24 +643,16 @@ describe("draft-mention 文件/技能引用 chip", () => {
 		});
 		expect(sent.draft.mentions).toEqual([]);
 	});
-});
 
-describe("chip span 元数据", () => {
-	it("引用 chip 带 span 与 sourceSeq 原样保留", () => {
-		const base = reducer(activeState(), { type: "new-task" });
-		const added = reducer(base, {
-			type: "draft-quote-added",
-			quote: { id: "q1", text: "原文", start: 2, end: 4, sourceSeq: 7 },
-		});
-		expect(added.draft.quotes[0]).toEqual({ id: "q1", text: "原文", start: 2, end: 4, sourceSeq: 7 });
-	});
-
-	it("mention chip 带 span 原样保留", () => {
-		const base = reducer(activeState(), { type: "new-task" });
-		const added = reducer(base, {
+	it("draft-chips-clear 清空全部 chip", () => {
+		let state = reducer(activeState(), { type: "new-task" });
+		state = reducer(state, { type: "draft-quote-added", quote: { id: "q", text: "原文", display: "引用：原文" } });
+		state = reducer(state, {
 			type: "draft-mention-added",
-			mention: { id: "m1", kind: "file", value: "src/a.ts", label: "a.ts", start: 0, end: 10 },
+			mention: { id: "m", kind: "file", value: "a.ts", display: "@a.ts" },
 		});
-		expect(added.draft.mentions[0]).toMatchObject({ start: 0, end: 10 });
+		const cleared = reducer(state, { type: "draft-chips-clear" });
+		expect(cleared.draft.quotes).toEqual([]);
+		expect(cleared.draft.mentions).toEqual([]);
 	});
 });

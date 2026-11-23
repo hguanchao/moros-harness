@@ -107,11 +107,15 @@ export type Action =
 	| { readonly type: "navigation-loading"; readonly isLoading: boolean }
 	| { readonly type: "sending"; readonly isSending: boolean }
 	| { readonly type: "draft-text"; readonly text: string }
+	/** 追加文本到草稿末尾（划词引用显示文字）。 */
+	| { readonly type: "draft-text-append"; readonly text: string }
 	/** 划词引用 chip：加入 / 移除；引用原文发送时才格式化为 `> ` 块。 */
 	| { readonly type: "draft-quote-added"; readonly quote: DraftQuote }
 	| { readonly type: "draft-quote-removed"; readonly id: string }
 	| { readonly type: "draft-mention-added"; readonly mention: DraftMention }
 	| { readonly type: "draft-mention-removed"; readonly id: string }
+	/** 清空全部引用/文件/技能 chip（配合正文显示文字一起清除）。 */
+	| { readonly type: "draft-chips-clear" }
 	| { readonly type: "draft-image-added"; readonly image: PreparedImage; readonly generation: number }
 	| { readonly type: "draft-image-removed"; readonly id: string }
 	| { readonly type: "draft-project"; readonly project: ProjectRef | null }
@@ -277,6 +281,13 @@ export function reducer(state: AppState, action: Action): AppState {
 			return action.text === state.draft.text
 				? state
 				: { ...state, draft: { ...state.draft, text: action.text }, draftRevision: state.draftRevision + 1 };
+		case "draft-text-append":
+			if (action.text.length === 0) return state;
+			return {
+				...state,
+				draft: { ...state.draft, text: state.draft.text + action.text },
+				draftRevision: state.draftRevision + 1,
+			};
 		case "draft-quote-added":
 			if (action.quote.text.trim().length === 0) return state;
 			return {
@@ -301,6 +312,12 @@ export function reducer(state: AppState, action: Action): AppState {
 			return {
 				...state,
 				draft: { ...state.draft, mentions: state.draft.mentions.filter((mention) => mention.id !== action.id) },
+				draftRevision: state.draftRevision + 1,
+			};
+		case "draft-chips-clear":
+			return {
+				...state,
+				draft: { ...state.draft, quotes: [], mentions: [] },
 				draftRevision: state.draftRevision + 1,
 			};
 		case "draft-image-added": {

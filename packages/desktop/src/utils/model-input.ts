@@ -59,8 +59,18 @@ function formatFiles(files: readonly InlineFile[]): string {
 }
 
 /**
+ * 筛出"仍然生效"的富元素：只有其 display 内联文字还在正文里时，chip 才生效。
+ * 用户在 textarea 里删掉显示文字即取消该引用（以文字为准）。
+ */
+export function activeChips<T extends { readonly display: string }>(text: string, chips: readonly T[]): readonly T[] {
+	return chips.filter((chip) => text.includes(chip.display));
+}
+
+/**
  * 构造送给模型的 user message。
- * 无引用、无 mention、无文件时原样返回 text，保持既有行为。
+ * 内联显示文字保留在正文中（对齐 ZCode：可见文本即模型文本）；
+ * 结构化材料（引用 JSON + 文件内容）作为额外块附在正文之前。
+ * 无富元素时原样返回 text，保持既有行为。
  */
 export function buildModelInput(parts: ModelInputParts): string {
 	const { text, quotes, mentions, files = [] } = parts;
@@ -70,16 +80,9 @@ export function buildModelInput(parts: ModelInputParts): string {
 	const material = {
 		quotes: quotes.map((quote) => ({
 			...(quote.sourceSeq === undefined ? {} : { sourceSeq: quote.sourceSeq }),
-			...(quote.start === undefined ? {} : { start: quote.start }),
-			...(quote.end === undefined ? {} : { end: quote.end }),
 			text: quote.text,
 		})),
-		mentions: mentions.map((mention) => ({
-			kind: mention.kind,
-			value: mention.value,
-			...(mention.start === undefined ? {} : { start: mention.start }),
-			...(mention.end === undefined ? {} : { end: mention.end }),
-		})),
+		mentions: mentions.map((mention) => ({ kind: mention.kind, value: mention.value })),
 	};
 
 	const sections: string[] = [
