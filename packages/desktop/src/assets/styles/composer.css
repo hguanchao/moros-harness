@@ -636,11 +636,11 @@
 }
 
 .completion-command-label {
-	/* 名称自适应显示完整，过长才省略；说明列靠 min-width 保持大致对齐。 */
+	/* 底色块宽度随名称文字自适应：短名不留空白，过长才省略。 */
 	display: inline-flex;
 	align-items: center;
 	flex: 0 1 auto;
-	min-width: 88px;
+	width: fit-content;
 	max-width: 168px;
 	padding: 1px 7px;
 	border-radius: var(--r-sm);
