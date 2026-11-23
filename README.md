@@ -27,6 +27,10 @@ pnpm dev -- doctor           # 本机配置与工具探测
 
 全局配置位于 `~/.moros/`：`config.toml`、`providers.json`、`skills/` 与会话目录。
 
+用户级技能从以下目录的 `<name>/SKILL.md` 扫描（每个目录下的直接子目录，不递归）：
+`~/.moros/skills/`、`~/.agents/skills/`、`~/.codex/skills/`、`~/.claude/skills/`。
+项目级技能从项目根的 `.moros/skills/` 扫描，仅在工作区信任后生效。
+
 桌面端：
 
 ```bash

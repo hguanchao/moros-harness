@@ -4,10 +4,10 @@ import { join, resolve } from "node:path";
 /**
  * 技能（skills）：磁盘上的指令包，按固定目录约定扫描。
  *
- * 目录约定：用户级 `<home>/.moros/skills/<name>/SKILL.md`，项目级
- * `<root>/.moros/skills/<name>/SKILL.md`。含 SKILL.md 的子目录即一个技能，不向技能
- * 目录内部继续递归。名字与描述取 SKILL.md 开头的 YAML frontmatter（name/description），
- * 缺失时用目录名。
+ * 目录约定：用户级 `<home>/.{moros,agents,codex,claude}/skills/<name>/SKILL.md`，
+ * 项目级 `<root>/.moros/skills/<name>/SKILL.md`。含 SKILL.md 的子目录即一个技能，
+ * 不向技能目录内部继续递归。名字与描述取 SKILL.md 开头的 YAML frontmatter
+ * （name/description），缺失时用目录名。
  */
 
 /** 技能清单条目。 */
@@ -22,9 +22,14 @@ export interface SkillSummary {
 	readonly path: string;
 }
 
-/** 用户级技能目录。 */
+/** 用户级 Moros 技能目录。 */
 export function userSkillsDirectory(homeDir: string): string {
 	return join(homeDir, ".moros", "skills");
+}
+
+/** 用户级技能扫描目录：Moros 原生目录 + 主流 agent 的通用目录。 */
+export function userSkillDirectories(homeDir: string): readonly string[] {
+	return [".moros", ".agents", ".codex", ".claude"].map((name) => join(homeDir, name, "skills"));
 }
 
 /** 项目级技能目录。 */
@@ -78,7 +83,10 @@ export async function listSkills(options: {
 	readonly projectRoot?: string;
 	readonly trusted?: boolean;
 }): Promise<SkillSummary[]> {
-	const skills = await scanSkills(userSkillsDirectory(options.homeDir), "user");
+	const skills: SkillSummary[] = [];
+	for (const directory of userSkillDirectories(options.homeDir)) {
+		skills.push(...(await scanSkills(directory, "user")));
+	}
 	if (options.projectRoot !== undefined && options.trusted === true) {
 		skills.push(...(await scanSkills(projectSkillsDirectory(options.projectRoot), "project")));
 	}

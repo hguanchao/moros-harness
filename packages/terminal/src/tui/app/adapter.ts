@@ -909,7 +909,9 @@ export function buildTuiOptions(state: AdapterState, warnings: WarningSink): Tui
 				})),
 			directories: () => {
 				const directories = core.skillsDirectories(projectRoot);
-				return directories.project === undefined ? [directories.user] : [directories.user, directories.project];
+				return directories.project === undefined
+					? [...directories.allUser]
+					: [...directories.allUser, directories.project];
 			},
 		},
 		checkpoints: {

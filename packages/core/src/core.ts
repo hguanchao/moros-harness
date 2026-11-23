@@ -87,6 +87,7 @@ import { normalizeProjectRoot } from "./session/project-dir.ts";
 import {
 	listSkills as collectSkills,
 	projectSkillsDirectory,
+	userSkillDirectories,
 	userSkillsDirectory,
 	type SkillSummary,
 } from "./skills.ts";
@@ -2067,9 +2068,14 @@ export class Core {
 	}
 
 	/** 用户级与项目级技能目录（技能页脚注展示实际扫描路径）。 */
-	skillsDirectories(projectRoot?: string): { readonly user: string; readonly project?: string } {
+	skillsDirectories(projectRoot?: string): {
+		readonly user: string;
+		readonly allUser: readonly string[];
+		readonly project?: string;
+	} {
 		return {
 			user: userSkillsDirectory(this.#homeDir),
+			allUser: userSkillDirectories(this.#homeDir),
 			...(projectRoot === undefined ? {} : { project: projectSkillsDirectory(projectRoot) }),
 		};
 	}
