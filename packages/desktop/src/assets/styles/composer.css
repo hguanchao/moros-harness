@@ -150,6 +150,9 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
+	/* 视觉间距用 margin 而非插入空格文本节点：后者会进正文、污染送给模型的文本。
+	   左右各留一点，chip 之间、chip 与文字之间都有呼吸空间。 */
+	margin: 0 4px 2px 0;
 	max-width: 200px;
 	padding: 0 6px;
 	border-radius: var(--r-pill);

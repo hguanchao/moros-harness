@@ -9,7 +9,6 @@ import {
 } from "react";
 import {
 	$createParagraphNode,
-	$createTextNode,
 	$getRoot,
 	$getSelection,
 	$isParagraphNode,
@@ -81,17 +80,14 @@ function EditorBridge({
 		handleRef.current = {
 			insertChip: (chip) => {
 				editor.update(() => {
+					// 间距由 .editor-chip 的 CSS margin 负责，这里不插空格文本节点——
+					// 空格会进正文、污染送给模型的文本。
+					const node = $createChipNode(chip.id, chip.kind, chip.value, chip.label);
 					const selection = $getSelection();
-					if ($isRangeSelection(selection))
-						selection.insertNodes([$createChipNode(chip.id, chip.kind, chip.value, chip.label), $createTextNode(" ")]);
+					if ($isRangeSelection(selection)) selection.insertNodes([node]);
 					else {
-						const root = $getRoot();
-						const p = root.getLastChild();
-						if (p && "append" in p)
-							(p as ReturnType<typeof $createParagraphNode>).append(
-								$createChipNode(chip.id, chip.kind, chip.value, chip.label),
-								$createTextNode(" "),
-							);
+						const p = $getRoot().getLastChild();
+						if (p && "append" in p) (p as ReturnType<typeof $createParagraphNode>).append(node);
 					}
 				});
 			},
