@@ -5,7 +5,7 @@ import { call, errorMessage } from "../api/api.ts";
 import { Composer } from "../components/Composer.tsx";
 import { EmptyBrand } from "../components/EmptyBrand.tsx";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
-import { buildQuote, resolveFeedbacks } from "../utils/message-actions.ts";
+import { resolveFeedbacks } from "../utils/message-actions.ts";
 import { useExitingItems } from "../hooks/use-exiting.ts";
 import {
 	AlertIcon,
@@ -65,9 +65,7 @@ export function ChatPage(): JSX.Element {
 	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
 	const handleQuote = useCallback(
 		(text: string): void => {
-			const quote = buildQuote(text);
-			if (quote.length === 0) return;
-			dispatch({ type: "draft-text-append", text: quote });
+			dispatch({ type: "draft-quote-added", quote: { id: crypto.randomUUID(), text } });
 			document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
 		},
 		[dispatch],

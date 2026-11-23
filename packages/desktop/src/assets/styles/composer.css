@@ -406,7 +406,7 @@
 		0 4px 16px var(--shadow-soft);
 }
 
-/* chip 胶囊样式（兼容保留；当前 @文件/$技能/引用均为内联文本，未使用） */
+/* 引用 chip：与图片附件同形态的可移除引用块 */
 .quote-chips {
 	display: flex;
 	flex-wrap: wrap;
@@ -524,53 +524,4 @@
 	padding: 8px 7px;
 	font-size: var(--text-caption);
 	color: var(--text-faint);
-}
-
-/* 输入镜像：textarea 作为唯一输入源（文字透明），背后镜像渲染 @文件/$技能/引用 灰色胶囊 */
-.composer-input-wrap {
-	position: relative;
-}
-
-.composer .composer-input {
-	color: transparent;
-	caret-color: var(--text-primary);
-}
-
-/* 选中文本仍需可见 */
-.composer .composer-input::selection {
-	background: var(--accent-soft);
-}
-
-.input-mirror {
-	position: absolute;
-	inset: 0;
-	padding: 4px 6px 0;
-	border: none;
-	overflow: hidden;
-	pointer-events: none;
-	white-space: pre-wrap;
-	overflow-wrap: break-word;
-	word-break: normal;
-	font-size: var(--text-body);
-	line-height: 1.5;
-	color: var(--text-primary);
-}
-
-/* 行内 chip：用 box-shadow 模拟水平留白，不改变文字宽度，保证光标对齐 */
-.input-chip {
-	background: #e0e0e0;
-	border-radius: 4px;
-	box-shadow: 0 0 0 2px #e0e0e0;
-	color: var(--text-primary);
-}
-
-.input-chip-skill {
-	background: var(--accent-soft);
-	box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-.input-chip-quote {
-	background: var(--fill-soft);
-	box-shadow: 0 0 0 2px var(--fill-soft);
-	color: var(--text-secondary);
 }

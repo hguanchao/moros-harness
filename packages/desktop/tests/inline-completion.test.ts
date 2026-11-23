@@ -29,11 +29,6 @@ describe("findTriggerToken 触发片段定位", () => {
 		expect(findSkillToken("${home}/x", 3)).toBeUndefined();
 	});
 
-	it("回归：光标紧跟插入的尾随空格时会产生含空格的幽灵 token（由 Composer 守卫拦截）", () => {
-		// 这是补全误弹的根因场景，Composer 通过「光标前一字符为空白则关闭补全」规避。
-		expect(findAtToken("@a.txt ", 7)).toMatchObject({ start: 0, end: 7, query: "a.txt " });
-	});
-
 	it("$ 片段只吃安全字符", () => {
 		const token = findSkillToken("用 $deploy-docs 技能", 14);
 		expect(token).toMatchObject({ query: "deploy-docs" });

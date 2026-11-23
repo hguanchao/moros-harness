@@ -26,8 +26,10 @@ import {
 	PlugIcon,
 	PlusIcon,
 	PointerIcon,
+	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
+	SparklesIcon,
 	StopIcon,
 	TerminalIcon,
 	XIcon,
@@ -35,6 +37,8 @@ import {
 import { useApp } from "../store/state.tsx";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
+import { buildQuote } from "../utils/message-actions.ts";
+import { firstLine } from "../utils/format.ts";
 import {
 	filterCommands,
 	filterFiles,
@@ -50,7 +54,6 @@ import {
 import { DESKTOP_COMMANDS } from "../utils/command-list.ts";
 import { runDesktopCommand, type CommandHandlers } from "../utils/command-runner.ts";
 import { InlineCompletion, type CompletionOption, type CompletionTrigger } from "./InlineCompletion.tsx";
-import { tokenizeForDisplay } from "../utils/input-chips.ts";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -105,7 +108,7 @@ export function Composer(): JSX.Element {
 	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
-	const { text, images } = state.draft;
+	const { text, images, quotes, mentions } = state.draft;
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
@@ -113,7 +116,6 @@ export function Composer(): JSX.Element {
 	const [imageUrl, setImageUrl] = useState("");
 	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
-	const mirror = useRef<HTMLDivElement | null>(null);
 	const isSubmitting = useRef(false);
 	// 行内补全状态；Esc 关闭后记住 dismissed，输入变化才重置。
 	const [completion, setCompletion] = useState<
@@ -143,7 +145,10 @@ export function Composer(): JSX.Element {
 		current !== undefined && state.runStates[current.meta.id] === "paused" && current.running !== true;
 	const stoppable = running || awaitingApproval;
 	const disabled = !state.ready || state.isNavigating || readOnly || trustBlocked;
-	const canSend = !disabled && !isSending && (text.trim().length > 0 || images.length > 0);
+	const canSend =
+		!disabled &&
+		!isSending &&
+		(text.trim().length > 0 || images.length > 0 || quotes.length > 0 || mentions.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
 	const model =
 		current === undefined
@@ -214,7 +219,14 @@ export function Composer(): JSX.Element {
 
 	const send = async (): Promise<void> => {
 		if (disabled || isSending || isSubmitting.current) return;
-		const message = text.trim();
+		// 引用 chip 在发送时才序列化：`> ` 引用块 + `@path` / `$name`，拼在正文之前。
+		const quoteText = quotes.map((quote) => buildQuote(quote.text)).join("");
+		const mentionText = mentions
+			.map((mention) =>
+				mention.kind === "file" ? formatFileReference(mention.value) : formatSkillReference(mention.value),
+			)
+			.join(" ");
+		const message = `${quoteText}${mentionText.length === 0 ? "" : `${mentionText}\n`}${text.trim()}`;
 		if (message.length === 0 && images.length === 0) return;
 		const epoch = currentNavigationEpoch();
 		const generation = state.draftGeneration;
@@ -270,11 +282,6 @@ export function Composer(): JSX.Element {
 	/** 根据当前输入与光标重算补全浮层。 */
 	const updateCompletion = (value: string, cursor: number): void => {
 		if (completionDismissed.current) return;
-		// 光标紧跟空白时视为无活动 token：插入 @path/$name 后的尾随空格不该再弹补全。
-		if (cursor > 0 && /\s/.test(value[cursor - 1] ?? "")) {
-			setCompletion(undefined);
-			return;
-		}
 		const detected = findSlashToken(value, cursor) ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
 		if (detected === undefined) {
 			setCompletion(undefined);
@@ -312,30 +319,32 @@ export function Composer(): JSX.Element {
 		})();
 	};
 
-	/** 选中补全项：命令立即执行；文件/技能以内联文本插入光标处。 */
+	/** 选中补全项：命令立即执行（不留 chip）；文件/技能加入 mention chip。 */
 	const selectCompletion = (index: number): void => {
 		if (completion === undefined) return;
 		const option = completion.options[index];
 		if (option === undefined) return;
 		const { trigger, token } = completion;
+		const cleaned = removeTriggerText(text, token);
+		dispatch({ type: "draft-text", text: cleaned.text });
 		setCompletion(undefined);
-		// 选中后关闭补全，直到用户下一次真实输入（onChange 会重置）；
-		// 避免光标复位触发的 onSelect 重新弹出含尾随空格的幽灵 token。
-		completionDismissed.current = true;
+		completionDismissed.current = false;
 		if (trigger === "/") {
-			// 命令：清理触发文本后立即执行。
-			const cleaned = removeTriggerText(text, token);
-			dispatch({ type: "draft-text", text: cleaned.text });
-			requestAnimationFrame(() => elementFocusAndCursor(cleaned.cursor));
 			void runDesktopCommand(option.value, "", commandHandlers);
 		} else {
-			// 文件/技能：把 @path / $name 内联替换到触发片段处，后跟一个空格。
-			const reference = trigger === "@" ? formatFileReference(option.value) : formatSkillReference(option.value);
-			const next = text.slice(0, token.start) + reference + " " + text.slice(token.end);
-			const cursor = token.start + reference.length + 1;
-			dispatch({ type: "draft-text", text: next });
-			requestAnimationFrame(() => elementFocusAndCursor(cursor));
+			dispatch({
+				type: "draft-mention-added",
+				mention: {
+					id: crypto.randomUUID(),
+					kind: trigger === "@" ? "file" : "skill",
+					value: option.value,
+					label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
+				},
+			});
 		}
+		requestAnimationFrame(() => {
+			elementFocusAndCursor(cleaned.cursor);
+		});
 	};
 
 	/** textarea 键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
@@ -578,51 +587,74 @@ export function Composer(): JSX.Element {
 						))}
 					</div>
 				) : null}
-
-				<div className="composer-input-wrap">
-					<textarea
-						className="composer-input"
-						ref={textarea}
-						value={text}
-						rows={1}
-						disabled={disabled}
-						placeholder={
-							trustBlocked
-								? "请先确认工作区信任"
-								: readOnly
-									? "该会话正在另一个窗口中使用，当前为只读"
-									: "描述你的任务，/调用指令，@文件，$技能"
-						}
-						onChange={(event) => {
-							const value = event.target.value;
-							dispatch({ type: "draft-text", text: value });
-							completionDismissed.current = false;
-							updateCompletion(value, event.target.selectionStart);
-						}}
-						onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
-						onScroll={(event) => {
-							if (mirror.current !== null) mirror.current.scrollTop = event.currentTarget.scrollTop;
-						}}
-						onPaste={onPaste}
-						onKeyDown={(event) => {
-							if (handleCompletionKeyDown(event)) return;
-							if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-							event.preventDefault();
-							void send();
-						}}
-					/>
-					<div className="input-mirror" ref={mirror} aria-hidden="true">
-						{tokenizeForDisplay(text).map((segment, index) =>
-							segment.chip === false ? (
-								<span key={index}>{segment.text}</span>
-							) : (
-								<span className={`input-chip input-chip-${segment.chip}`} key={index}>
-									{segment.text}
-								</span>
-							),
-						)}
+				{quotes.length > 0 ? (
+					<div className="quote-chips">
+						{quotes.map((quote) => (
+							<span className="quote-chip" key={quote.id} data-tooltip={quote.text}>
+								<QuoteIcon size={10} />
+								<span className="quote-chip-text">引用：{firstLine(quote.text, 20)}</span>
+								<button
+									type="button"
+									className="quote-chip-remove"
+									aria-label="移除引用"
+									onClick={() => dispatch({ type: "draft-quote-removed", id: quote.id })}
+								>
+									<XIcon size={9} />
+								</button>
+							</span>
+						))}
 					</div>
-				</div>
+				) : null}
+				{mentions.length > 0 ? (
+					<div className="quote-chips">
+						{mentions.map((mention) => (
+							<span className="quote-chip" key={mention.id} data-tooltip={mention.value}>
+								{mention.kind === "file" ? <FolderIcon size={10} /> : <SparklesIcon size={10} />}
+								<span className="quote-chip-text">
+									{mention.kind === "file" ? "@" : "$"}
+									{firstLine(mention.label, 20)}
+								</span>
+								<button
+									type="button"
+									className="quote-chip-remove"
+									aria-label="移除引用"
+									onClick={() => dispatch({ type: "draft-mention-removed", id: mention.id })}
+								>
+									<XIcon size={9} />
+								</button>
+							</span>
+						))}
+					</div>
+				) : null}
+
+				<textarea
+					className="composer-input"
+					ref={textarea}
+					value={text}
+					rows={1}
+					disabled={disabled}
+					placeholder={
+						trustBlocked
+							? "请先确认工作区信任"
+							: readOnly
+								? "该会话正在另一个窗口中使用，当前为只读"
+								: "描述你的任务，/调用指令，@文件，$技能"
+					}
+					onChange={(event) => {
+						const value = event.target.value;
+						dispatch({ type: "draft-text", text: value });
+						completionDismissed.current = false;
+						updateCompletion(value, event.target.selectionStart);
+					}}
+					onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
+					onPaste={onPaste}
+					onKeyDown={(event) => {
+						if (handleCompletionKeyDown(event)) return;
+						if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+						event.preventDefault();
+						void send();
+					}}
+				/>
 				{completion === undefined ? null : (
 					<InlineCompletion
 						trigger={completion.trigger}

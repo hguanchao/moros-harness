@@ -21,7 +21,7 @@ import type {
 	WorkspaceTrustView,
 } from "../shared/contract.ts";
 import { DEFAULT_SIDEBAR_WIDTH } from "../shared/contract.ts";
-import { createTaskDraft, MAX_DRAFT_IMAGES, type TaskDraft } from "./draft.ts";
+import { createTaskDraft, MAX_DRAFT_IMAGES, type DraftMention, type DraftQuote, type TaskDraft } from "./draft.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
 export type Page = "chat" | "files" | "changes" | "trace" | "sessions" | "settings";
@@ -107,8 +107,11 @@ export type Action =
 	| { readonly type: "navigation-loading"; readonly isLoading: boolean }
 	| { readonly type: "sending"; readonly isSending: boolean }
 	| { readonly type: "draft-text"; readonly text: string }
-	/** 划词引用：把 `> ` 引用块直接追加到草稿文本末尾。 */
-	| { readonly type: "draft-text-append"; readonly text: string }
+	/** 划词引用 chip：加入 / 移除；引用原文发送时才格式化为 `> ` 块。 */
+	| { readonly type: "draft-quote-added"; readonly quote: DraftQuote }
+	| { readonly type: "draft-quote-removed"; readonly id: string }
+	| { readonly type: "draft-mention-added"; readonly mention: DraftMention }
+	| { readonly type: "draft-mention-removed"; readonly id: string }
 	| { readonly type: "draft-image-added"; readonly image: PreparedImage; readonly generation: number }
 	| { readonly type: "draft-image-removed"; readonly id: string }
 	| { readonly type: "draft-project"; readonly project: ProjectRef | null }
@@ -274,11 +277,30 @@ export function reducer(state: AppState, action: Action): AppState {
 			return action.text === state.draft.text
 				? state
 				: { ...state, draft: { ...state.draft, text: action.text }, draftRevision: state.draftRevision + 1 };
-		case "draft-text-append":
-			if (action.text.length === 0) return state;
+		case "draft-quote-added":
+			if (action.quote.text.trim().length === 0) return state;
 			return {
 				...state,
-				draft: { ...state.draft, text: state.draft.text + action.text },
+				draft: { ...state.draft, quotes: [...state.draft.quotes, action.quote] },
+				draftRevision: state.draftRevision + 1,
+			};
+		case "draft-quote-removed":
+			return {
+				...state,
+				draft: { ...state.draft, quotes: state.draft.quotes.filter((quote) => quote.id !== action.id) },
+				draftRevision: state.draftRevision + 1,
+			};
+		case "draft-mention-added":
+			if (action.mention.value.trim().length === 0) return state;
+			return {
+				...state,
+				draft: { ...state.draft, mentions: [...state.draft.mentions, action.mention] },
+				draftRevision: state.draftRevision + 1,
+			};
+		case "draft-mention-removed":
+			return {
+				...state,
+				draft: { ...state.draft, mentions: state.draft.mentions.filter((mention) => mention.id !== action.id) },
 				draftRevision: state.draftRevision + 1,
 			};
 		case "draft-image-added": {
@@ -339,6 +361,9 @@ export function reducer(state: AppState, action: Action): AppState {
 					...state.draft,
 					text: action.revision === state.draftRevision ? "" : state.draft.text,
 					images,
+					// 引用随本次发送一起清空；发送期间新加的引用（revision 已变）保留。
+					quotes: action.revision === state.draftRevision ? [] : state.draft.quotes,
+					mentions: action.revision === state.draftRevision ? [] : state.draft.mentions,
 				},
 				draftRevision: state.draftRevision + 1,
 			};
