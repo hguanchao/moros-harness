@@ -204,8 +204,10 @@ export const ComposerEditor = forwardRef<ComposerEditorHandle, ComposerEditorPro
 		editable: !disabled,
 	}).current;
 
+	// 用捕获阶段：Lexical 在 contenteditable 上注册了原生 keydown，冒泡阶段的外层
+	// onKeyDown 晚于它执行：Enter 会先被 Lexical 插入换行、清空补全态，导致外层误发送。
 	return (
-		<div className={`composer-editor ${disabled === true ? "is-disabled" : ""}`} onKeyDown={onKeyDown}>
+		<div className={`composer-editor ${disabled === true ? "is-disabled" : ""}`} onKeyDownCapture={onKeyDown}>
 			<LexicalComposer initialConfig={initialConfig}>
 				<RichTextPlugin
 					contentEditable={<ContentEditable className="composer-input" aria-label="消息输入" />}

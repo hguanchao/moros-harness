@@ -345,6 +345,7 @@ export function Composer(): JSX.Element {
 		if (completion === undefined) return false;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
+			event.stopPropagation();
 			setCompletion({
 				...completion,
 				activeIndex: Math.min(completion.activeIndex + 1, Math.max(0, completion.options.length - 1)),
@@ -353,16 +354,19 @@ export function Composer(): JSX.Element {
 		}
 		if (event.key === "ArrowUp") {
 			event.preventDefault();
+			event.stopPropagation();
 			setCompletion({ ...completion, activeIndex: Math.max(completion.activeIndex - 1, 0) });
 			return true;
 		}
 		if (event.key === "Enter" || event.key === "Tab") {
 			event.preventDefault();
+			event.stopPropagation();
 			selectCompletion(completion.activeIndex);
 			return true;
 		}
 		if (event.key === "Escape") {
 			event.preventDefault();
+			event.stopPropagation();
 			setCompletion(undefined);
 			completionDismissed.current = true;
 			return true;

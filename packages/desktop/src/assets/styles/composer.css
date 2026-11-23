@@ -119,6 +119,12 @@
 	white-space: pre-wrap;
 }
 
+/* Lexical 用 <p> 作段落，浏览器默认 1em 上下 margin 会把空编辑器光标顶到
+   placeholder 下一行；输入区每个段落不应有额外间距，换行间距由内容自身控制。 */
+.composer .composer-input p {
+	margin: 0;
+}
+
 .composer-editor.is-disabled .composer-input {
 	opacity: 0.6;
 }
