@@ -348,13 +348,15 @@
 		color 0.12s ease;
 }
 
+/* 与菜单项保持一致：计划模式统一用 --lane-model，避免触发器黑色、菜单蓝
+   两种颜色同时出现。末位 svg 是下拉箭头，跟随文字同色。 */
 .permission.is-plan.dropdown-inline .dropdown-trigger {
 	background: var(--fill-soft);
-	color: var(--accent);
+	color: var(--lane-model);
 }
 
-.permission.is-plan .dropdown-trigger > svg:last-child {
-	color: var(--accent);
+.permission.is-plan .dropdown-trigger > svg {
+	color: var(--lane-model);
 }
 
 @media (prefers-reduced-motion: reduce) {
