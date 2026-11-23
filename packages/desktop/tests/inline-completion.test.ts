@@ -49,6 +49,20 @@ describe("findTriggerToken 触发片段定位", () => {
 		expect(findSlashToken("/  ", 3)).toBeUndefined();
 	});
 
+	it("/ 命令后跟说明文字识别为 args，query 仍是命令名", () => {
+		const token = findSlashToken("/review 审查 API 代码", "/review 审查 API 代码".length);
+		expect(token).toMatchObject({ start: 0, query: "review", args: "审查 API 代码" });
+		// 说明可以任意字符（中文/路径），选中命令时整段替换成 chip。
+		expect(findSlashToken("/compact 第一轮对话压缩", 17)).toMatchObject({
+			query: "compact",
+			args: "第一轮对话压缩",
+		});
+		// 没有说明时 args 为空串。
+		expect(findSlashToken("/review", 7)).toMatchObject({ query: "review", args: "" });
+		// 命令名只能跟在行首或空白后，URL/路径不触发。
+		expect(findSlashToken("https://example.com/review", 26)).toBeUndefined();
+	});
+
 	it("光标在片段中间时 query 到光标为止，end 到片段末尾", () => {
 		const token = findTriggerToken("@src/app", 4, "@", (char) => !/\s/.test(char));
 		expect(token).toMatchObject({ start: 0, end: 8, query: "src" });
@@ -110,10 +124,11 @@ describe("写回与清理", () => {
 	});
 
 	it("removeTriggerText 从文本中移除片段", () => {
-		const token = findSlashToken("用 /mod 命令", 5);
+		// token 现在覆盖整行命令与说明，选中命令时整段替换成 chip。
+		const token = findSlashToken("用 /mod 命令", 9);
 		expect(token).toBeDefined();
 		if (token === undefined) return;
-		expect(removeTriggerText("用 /mod 命令", token)).toEqual({ text: "用  命令", cursor: 2 });
+		expect(removeTriggerText("用 /mod 命令", token)).toEqual({ text: "用 ", cursor: 2 });
 	});
 });
 

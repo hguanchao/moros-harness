@@ -30,9 +30,9 @@ export interface DraftMention {
 /** / 命令 chip：选中命令后先入草稿，发送时才真正执行（compact/review）。 */
 export interface DraftCommand {
 	readonly id: string;
-	/** 命令名（不含斜杠），如 compact / review。 */
+	/** 命令名与可选说明（如 "review 审查 API 代码"），发送时用 splitCommand 拆分。 */
 	readonly value: string;
-	/** 编辑器 chip 显示文字（如 /compact）。 */
+	/** 编辑器 chip 显示文字（如 /compact、/review 审查 API）。 */
 	readonly display: string;
 }
 

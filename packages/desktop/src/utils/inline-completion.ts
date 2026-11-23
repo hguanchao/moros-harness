@@ -11,6 +11,8 @@ export interface TriggerToken {
 	readonly end: number;
 	/** 触发符到光标之间的已输入内容。 */
 	readonly query: string;
+	/** `/` 命令后可选的说明文字（命令名之后的非空白内容）；其他 trigger 不填。 */
+	readonly args?: string;
 }
 
 /**
@@ -58,23 +60,35 @@ export function findSkillToken(text: string, cursor: number): TriggerToken | und
 }
 
 /**
- * `/` 命令片段：只吃字母（命令名），遇空白/数字/标点终止。
- * query 允许尾部单个空格（如 "/ "）——用户敲完 / 后常顺手带一个空格，
- * 此时命令补全浮层应保持可见，回车执行选中的命令而不是把消息发出去。
+ * `/` 命令片段：`/` + 命令名，其后可跟可选说明（如 `/review 审查 API 代码`）。
+ * 命令名只吃字母；命令名后的内容作为 args（review 用它限定审查范围）。
+ * token 覆盖整行内命令名与说明（end 到行尾），选中命令时整段替换成 chip。
+ * 纯 "/" 或 "/ " 仍显示命令列表；无命令名且尾部空白多于一个空格时视为普通文本。
  */
 export function findSlashToken(text: string, cursor: number): TriggerToken | undefined {
-	const token = findTriggerToken(
-		text,
-		cursor,
-		"/",
-		(char) => /[A-Za-z]/.test(char),
-		(query) => /^[A-Za-z]*\s?$/.test(query),
-	);
-	if (token === undefined) return undefined;
-	// "/ " 的尾随空格只是手滑，查询串按空处理（等价刚敲 "/"），命令列表照常显示。
-	const query = token.query.trimEnd();
-	// token.end 不覆盖空格，删除触发片段时只删 "/"，空格留给编辑器正常排版。
-	return { ...token, query };
+	const position = Math.min(Math.max(0, cursor), text.length);
+	if (position === 0) return undefined;
+	// 命令与说明不跨行：只看光标所在行。
+	const lineStart = text.lastIndexOf("\n", position - 1) + 1;
+	const lineBreak = text.indexOf("\n", position);
+	const lineEnd = lineBreak < 0 ? text.length : lineBreak;
+	const line = text.slice(lineStart, lineEnd);
+	const match = /(?:^|\s)\/([A-Za-z]*)(?:\s+([\s\S]*))?$/.exec(line);
+	if (match === null) return undefined;
+	const slashOffset = match[0].startsWith("/") ? 0 : 1;
+	const start = lineStart + (match.index ?? 0) + slashOffset;
+	// 光标必须在斜杠之后，否则只是普通文本（例如光标在命令前）。
+	if (start >= position) return undefined;
+	const nameEnd = lineStart + (match.index ?? 0) + slashOffset + 1 + (match[1] ?? "").length;
+	// query 取光标前的命令名部分；光标已在说明里时用完整命令名过滤。
+	const query = line.slice(start - lineStart + 1, Math.min(position - lineStart, nameEnd - lineStart));
+	const args = (match[2] ?? "").trim();
+	// 没有命令名时只容忍一个尾随空格（用户敲 "/" 后手滑），再多就是普通文本。
+	if (query.length === 0 && text.slice(start + 1, position).length > 1) return undefined;
+	// end 收拢到行尾，但不吃尾随空白，避免选中命令时把段末空格一起吞掉。
+	let end = lineEnd;
+	while (end > position && /\s/.test(text[end - 1] ?? "")) end -= 1;
+	return { start, end, query, args };
 }
 
 const FILE_LIMIT = 200;

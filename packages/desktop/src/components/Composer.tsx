@@ -46,7 +46,7 @@ import {
 	type TriggerToken,
 } from "../utils/inline-completion.ts";
 import { DESKTOP_COMMANDS } from "../utils/command-list.ts";
-import { runDesktopCommand, type CommandHandlers } from "../utils/command-runner.ts";
+import { runDesktopCommand, splitCommand, type CommandHandlers } from "../utils/command-runner.ts";
 import { InlineCompletion, type CompletionOption, type CompletionTrigger } from "./InlineCompletion.tsx";
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
@@ -251,9 +251,10 @@ export function Composer(): JSX.Element {
 		isSubmitting.current = true;
 		dispatch({ type: "sending", isSending: true });
 		try {
-			// / 命令 chip 在发送时才执行：compact/review 不依赖会话消息，可独立运行。
+			// / 命令 chip 在发送时才执行：value 可能带说明（"/review 审查 API"），拆成名与参数。
 			for (const command of commands) {
-				await runDesktopCommand(command.value, "", commandHandlers);
+				const { name: commandName, args: commandArgs } = splitCommand(command.value);
+				await runDesktopCommand(commandName, commandArgs, commandHandlers);
 			}
 			// 只有命令、没有消息内容时，执行完即清空草稿，不建会话也不发消息。
 			if (!hasMessage) {
@@ -361,13 +362,16 @@ export function Composer(): JSX.Element {
 		const { trigger, token } = current;
 		completionDismissed.current = true;
 		setCompletionSafe(undefined);
+		// /命令可带说明：value 存「命令名 + 空格 + 说明」，发送时用 splitCommand 拆开。
+		const commandValue =
+			trigger === "/" && (token.args ?? "").length > 0 ? `${option.value} ${token.args}` : option.value;
 		const chip: ChipData = {
 			id: crypto.randomUUID(),
 			kind: trigger === "/" ? "command" : trigger === "@" ? "file" : "skill",
-			value: option.value,
+			value: trigger === "/" ? commandValue : option.value,
 			label:
 				trigger === "/"
-					? `/${option.value}`
+					? `/${commandValue}`
 					: trigger === "@"
 						? (option.value.split("/").at(-1) ?? option.value)
 						: option.value,
@@ -399,6 +403,8 @@ export function Composer(): JSX.Element {
 			return true;
 		}
 		if (event.key === "Enter" || event.key === "Tab") {
+			// 没有候选时别吞掉按键：此时 selectCompletion 什么都不做，会变成「回车无反应」。
+			if (current.options.length === 0) return false;
 			event.preventDefault();
 			event.stopPropagation();
 			selectCompletion(current.activeIndex);
