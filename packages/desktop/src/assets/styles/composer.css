@@ -154,7 +154,7 @@
 	visibility: hidden;
 }
 
-/* 视觉胶囊：固定 200px、超出省略、tooltip 显示完整内容 */
+/* 视觉胶囊：宽度自适应内容、最大 160px，超出省略、tooltip 显示完整内容 */
 .inline-chip {
 	position: absolute;
 	left: 0;
@@ -162,7 +162,7 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 2px;
-	width: 200px;
+	max-width: 160px;
 	height: 20px;
 	padding: 0 4px;
 	box-sizing: border-box;
