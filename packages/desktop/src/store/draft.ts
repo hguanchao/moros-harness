@@ -27,6 +27,15 @@ export interface DraftMention {
 	readonly display: string;
 }
 
+/** / 命令 chip：选中命令后先入草稿，发送时才真正执行（compact/review）。 */
+export interface DraftCommand {
+	readonly id: string;
+	/** 命令名（不含斜杠），如 compact / review。 */
+	readonly value: string;
+	/** 编辑器 chip 显示文字（如 /compact）。 */
+	readonly display: string;
+}
+
 /**
  * 尚未发送的任务输入；项目关联仅在创建会话时生效，不迁移已有会话。
  * 模型与推理强度由 newTaskState 注入上一会话的选择；审批档位与计划模式不继承，
@@ -39,6 +48,8 @@ export interface TaskDraft {
 	readonly quotes: readonly DraftQuote[];
 	/** @ 文件 / $ 技能引用 chip。 */
 	readonly mentions: readonly DraftMention[];
+	/** / 命令 chip：发送时才执行命令。 */
+	readonly commands: readonly DraftCommand[];
 	readonly project: ProjectRef | null;
 	/** 首次发送前切换到的本地分支；仅在选择 Git 项目并选择分支后存在。 */
 	readonly branch: string | undefined;
@@ -65,6 +76,7 @@ export function createTaskDraft(
 		images: [],
 		quotes: [],
 		mentions: [],
+		commands: [],
 		project: null,
 		branch: undefined,
 		model: seed.model,

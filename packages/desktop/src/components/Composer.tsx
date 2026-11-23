@@ -24,7 +24,7 @@ import {
 	XIcon,
 } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
-import type { DraftMention, DraftQuote } from "../store/draft.ts";
+import type { DraftCommand, DraftMention, DraftQuote } from "../store/draft.ts";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 import {
@@ -66,7 +66,7 @@ export function Composer(): JSX.Element {
 	const actions = useDesktopActions();
 	const current = state.current;
 	const project = state.project;
-	const { text, images, quotes, mentions } = state.draft;
+	const { text, images, quotes, mentions, commands } = state.draft;
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
@@ -75,17 +75,23 @@ export function Composer(): JSX.Element {
 	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
 	const editorRef = useRef<ComposerEditorHandle | null>(null);
 	const isSubmitting = useRef(false);
-	// 编辑器 draft：正文 + chip（编辑器是 chip 真相，回写 draft.quotes/mentions）。
+	// 编辑器 draft：正文 + chip（编辑器是 chip 真相，回写 draft.quotes/mentions/commands）。
 	const editorDraft = useMemo(
 		() => ({
 			text,
 			quotes: quotes.map((q) => ({ id: q.id, kind: "quote" as const, value: q.text, label: q.display })),
 			mentions: mentions.map((m) => ({ id: m.id, kind: m.kind, value: m.value, label: m.display })),
+			commands: commands.map((c) => ({ id: c.id, kind: "command" as const, value: c.value, label: c.display })),
 		}),
-		[text, quotes, mentions],
+		[text, quotes, mentions, commands],
 	);
 	const handleEditorChange = useCallback(
-		(next: { text: string; quotes: readonly ChipData[]; mentions: readonly ChipData[] }): void => {
+		(next: {
+			text: string;
+			quotes: readonly ChipData[];
+			mentions: readonly ChipData[];
+			commands: readonly ChipData[];
+		}): void => {
 			const nextQuotes: DraftQuote[] = next.quotes.map((c) => ({
 				id: c.id,
 				text: c.value,
@@ -97,7 +103,18 @@ export function Composer(): JSX.Element {
 				value: c.value,
 				display: c.label,
 			}));
-			dispatch({ type: "draft-sync", text: next.text, quotes: nextQuotes, mentions: nextMentions });
+			const nextCommands: DraftCommand[] = next.commands.map((c) => ({
+				id: c.id,
+				value: c.value,
+				display: c.label,
+			}));
+			dispatch({
+				type: "draft-sync",
+				text: next.text,
+				quotes: nextQuotes,
+				mentions: nextMentions,
+				commands: nextCommands,
+			});
 		},
 		[dispatch],
 	);
@@ -130,7 +147,7 @@ export function Composer(): JSX.Element {
 	const canSend =
 		!disabled &&
 		!isSending &&
-		(text.trim().length > 0 || images.length > 0 || quotes.length > 0 || mentions.length > 0);
+		(text.trim().length > 0 || images.length > 0 || quotes.length > 0 || mentions.length > 0 || commands.length > 0);
 	const queued = state.queue[current?.meta.id ?? ""] ?? [];
 	const model =
 		current === undefined
@@ -225,7 +242,8 @@ export function Composer(): JSX.Element {
 
 	const send = async (): Promise<void> => {
 		if (disabled || isSending || isSubmitting.current) return;
-		if (text.trim().length === 0 && images.length === 0 && quotes.length === 0 && mentions.length === 0) return;
+		const hasMessage = text.trim().length > 0 || images.length > 0 || quotes.length > 0 || mentions.length > 0;
+		if (!hasMessage && commands.length === 0) return;
 		const epoch = currentNavigationEpoch();
 		const generation = state.draftGeneration;
 		const revision = state.draftRevision;
@@ -233,6 +251,15 @@ export function Composer(): JSX.Element {
 		isSubmitting.current = true;
 		dispatch({ type: "sending", isSending: true });
 		try {
+			// / 命令 chip 在发送时才执行：compact/review 不依赖会话消息，可独立运行。
+			for (const command of commands) {
+				await runDesktopCommand(command.value, "", commandHandlers);
+			}
+			// 只有命令、没有消息内容时，执行完即清空草稿，不建会话也不发消息。
+			if (!hasMessage) {
+				dispatch({ type: "draft-sent", generation, revision, imageIds });
+				return;
+			}
 			let session = current;
 			if (session === undefined) {
 				const draftProject = state.draft.project;
@@ -325,7 +352,7 @@ export function Composer(): JSX.Element {
 		})();
 	};
 
-	/** 选中补全项：命令删 token 并执行；文件/技能插入真正的 chip 节点。 */
+	/** 选中补全项：插入对应 chip（/命令、@文件、$技能）；命令发送时才执行。 */
 	const selectCompletion = (index: number): void => {
 		const current = completionRef.current;
 		if (current === undefined) return;
@@ -334,17 +361,16 @@ export function Composer(): JSX.Element {
 		const { trigger, token } = current;
 		completionDismissed.current = true;
 		setCompletionSafe(undefined);
-		if (trigger === "/") {
-			// 删除已输入的 /xxx（token.end - token.start 个字符）
-			editorRef.current?.deleteTriggerToken(token.end - token.start);
-			void runDesktopCommand(option.value, "", commandHandlers);
-			return;
-		}
 		const chip: ChipData = {
 			id: crypto.randomUUID(),
-			kind: trigger === "@" ? "file" : "skill",
+			kind: trigger === "/" ? "command" : trigger === "@" ? "file" : "skill",
 			value: option.value,
-			label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
+			label:
+				trigger === "/"
+					? `/${option.value}`
+					: trigger === "@"
+						? (option.value.split("/").at(-1) ?? option.value)
+						: option.value,
 		};
 		// 先删触发 token，再插入 chip（编辑器原生保证光标与原子删除）。
 		editorRef.current?.deleteTriggerToken(token.end - token.start);

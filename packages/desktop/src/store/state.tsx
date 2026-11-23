@@ -21,7 +21,14 @@ import type {
 	WorkspaceTrustView,
 } from "../shared/contract.ts";
 import { DEFAULT_SIDEBAR_WIDTH } from "../shared/contract.ts";
-import { createTaskDraft, MAX_DRAFT_IMAGES, type DraftMention, type DraftQuote, type TaskDraft } from "./draft.ts";
+import {
+	createTaskDraft,
+	MAX_DRAFT_IMAGES,
+	type DraftCommand,
+	type DraftMention,
+	type DraftQuote,
+	type TaskDraft,
+} from "./draft.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 
 export type Page = "chat" | "files" | "changes" | "trace" | "sessions" | "settings";
@@ -113,6 +120,7 @@ export type Action =
 			readonly text: string;
 			readonly quotes: readonly DraftQuote[];
 			readonly mentions: readonly DraftMention[];
+			readonly commands: readonly DraftCommand[];
 	  }
 	/** 追加文本到草稿末尾（划词引用显示文字）。 */
 	| { readonly type: "draft-text-append"; readonly text: string }
@@ -287,7 +295,13 @@ export function reducer(state: AppState, action: Action): AppState {
 		case "draft-sync":
 			return {
 				...state,
-				draft: { ...state.draft, text: action.text, quotes: action.quotes, mentions: action.mentions },
+				draft: {
+					...state.draft,
+					text: action.text,
+					quotes: action.quotes,
+					mentions: action.mentions,
+					commands: action.commands,
+				},
 				draftRevision: state.draftRevision + 1,
 			};
 		case "draft-text":
@@ -330,7 +344,7 @@ export function reducer(state: AppState, action: Action): AppState {
 		case "draft-chips-clear":
 			return {
 				...state,
-				draft: { ...state.draft, quotes: [], mentions: [] },
+				draft: { ...state.draft, quotes: [], mentions: [], commands: [] },
 				draftRevision: state.draftRevision + 1,
 			};
 		case "draft-image-added": {
@@ -394,6 +408,7 @@ export function reducer(state: AppState, action: Action): AppState {
 					// 引用随本次发送一起清空；发送期间新加的引用（revision 已变）保留。
 					quotes: action.revision === state.draftRevision ? [] : state.draft.quotes,
 					mentions: action.revision === state.draftRevision ? [] : state.draft.mentions,
+					commands: action.revision === state.draftRevision ? [] : state.draft.commands,
 				},
 				draftRevision: state.draftRevision + 1,
 			};

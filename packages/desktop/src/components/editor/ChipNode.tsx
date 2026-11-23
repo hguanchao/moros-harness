@@ -10,10 +10,10 @@ import {
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
 import { useCallback, type JSX } from "react";
 
-import { FileIcon, QuoteIcon, SparklesIcon, XIcon } from "../Icons.tsx";
+import { FileIcon, QuoteIcon, SlidersIcon, SparklesIcon, XIcon } from "../Icons.tsx";
 
-/** chip 种类：划词引用 / @文件 / $技能。 */
-export type ChipKind = "quote" | "file" | "skill";
+/** chip 种类：划词引用 / @文件 / $技能 / /命令。 */
+export type ChipKind = "quote" | "file" | "skill" | "command";
 
 /** 序列化后的 chip 数据（落 draft.quotes/mentions 用）。 */
 export interface ChipData {
@@ -28,7 +28,7 @@ export type SerializedChipNode = Spread<
 	SerializedLexicalNode
 >;
 
-const CHIP_ICONS = { quote: QuoteIcon, file: FileIcon, skill: SparklesIcon } as const;
+const CHIP_ICONS = { quote: QuoteIcon, file: FileIcon, skill: SparklesIcon, command: SlidersIcon } as const;
 
 /**
  * 行内原子 chip 节点（DecoratorNode）：图标 + 文本 + ×，光标不能进入，退格整体删除。

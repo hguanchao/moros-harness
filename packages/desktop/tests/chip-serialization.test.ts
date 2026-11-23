@@ -27,6 +27,7 @@ const sample: EditorDraft = {
 		{ id: "m1", kind: "file", value: "src/a.ts", label: "@a.ts" },
 		{ id: "s1", kind: "skill", value: "deploy", label: "$deploy" },
 	],
+	commands: [{ id: "c1", kind: "command", value: "compact", label: "/compact" }],
 };
 
 describe("serializeEditor / rebuildEditorFromDraft 往返", () => {
@@ -36,6 +37,7 @@ describe("serializeEditor / rebuildEditorFromDraft 往返", () => {
 		expect(result.text).toBe(sample.text);
 		expect(result.quotes).toEqual(sample.quotes);
 		expect(result.mentions).toEqual(sample.mentions);
+		expect(result.commands).toEqual(sample.commands);
 	});
 
 	it("正文不含 chip 显示文字", () => {
@@ -44,14 +46,16 @@ describe("serializeEditor / rebuildEditorFromDraft 往返", () => {
 		expect(result.text).not.toContain("引用：原文内容");
 		expect(result.text).not.toContain("@a.ts");
 		expect(result.text).not.toContain("$deploy");
+		expect(result.text).not.toContain("/compact");
 	});
 
 	it("空草稿不产生 chip", () => {
-		const editor = setup({ text: "", quotes: [], mentions: [] });
+		const editor = setup({ text: "", quotes: [], mentions: [], commands: [] });
 		const result = serializeEditor(editor.getEditorState());
 		expect(result.text).toBe("");
 		expect(result.quotes).toEqual([]);
 		expect(result.mentions).toEqual([]);
+		expect(result.commands).toEqual([]);
 	});
 
 	it("重建后光标落在末尾（最后一个 chip 之后），不是开头", () => {
@@ -76,6 +80,7 @@ describe("serializeEditor / rebuildEditorFromDraft 往返", () => {
 			text: "",
 			quotes: [],
 			mentions: [{ id: "x", kind: "file", value: "a.txt", label: "@a.txt" }],
+			commands: [],
 		});
 		let found = false;
 		editor.getEditorState().read(() => {

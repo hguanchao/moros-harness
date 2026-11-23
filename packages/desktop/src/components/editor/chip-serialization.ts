@@ -22,6 +22,7 @@ export interface EditorDraft {
 	readonly text: string;
 	readonly quotes: readonly ChipData[];
 	readonly mentions: readonly ChipData[];
+	readonly commands: readonly ChipData[];
 }
 
 /** 从 EditorState 提取纯正文 + chip 列表。 */
@@ -30,6 +31,7 @@ export function serializeEditor(editorState: EditorState): EditorDraft {
 		let text = "";
 		const quotes: ChipData[] = [];
 		const mentions: ChipData[] = [];
+		const commands: ChipData[] = [];
 		const root = $getRoot();
 
 		const walk = (node: LexicalNode): void => {
@@ -41,6 +43,7 @@ export function serializeEditor(editorState: EditorState): EditorDraft {
 					label: node.__chipLabel,
 				};
 				if (data.kind === "quote") quotes.push(data);
+				else if (data.kind === "command") commands.push(data);
 				else mentions.push(data);
 				return; // chip 文本不进正文
 			}
@@ -57,7 +60,7 @@ export function serializeEditor(editorState: EditorState): EditorDraft {
 			walk(child);
 			if ($isParagraphNode(child)) text += "\n";
 		}
-		return { text: text.replace(/\n$/, ""), quotes, mentions };
+		return { text: text.replace(/\n$/, ""), quotes, mentions, commands };
 	});
 }
 
@@ -69,7 +72,7 @@ export function rebuildEditorFromDraft(draft: EditorDraft): void {
 	const root = $getRoot();
 	root.clear();
 	const paragraph = $createParagraphNode();
-	const chips: readonly ChipData[] = [...draft.quotes, ...draft.mentions];
+	const chips: readonly ChipData[] = [...draft.quotes, ...draft.mentions, ...draft.commands];
 	if (chips.length === 0 && draft.text.length === 0) {
 		root.append(paragraph);
 		paragraph.selectEnd();

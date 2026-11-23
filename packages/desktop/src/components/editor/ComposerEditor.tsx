@@ -117,7 +117,7 @@ function EditorBridge({
 		(editorState: EditorState) => {
 			if (applyingExternal.current) return;
 			const next = serializeEditor(editorState);
-			const signature = `${next.text}\u0000${next.quotes.map((q) => q.id).join(",")}\u0000${next.mentions.map((m) => m.id).join(",")}`;
+			const signature = `${next.text}\u0000${next.quotes.map((q) => q.id).join(",")}\u0000${next.mentions.map((m) => m.id).join(",")}\u0000${next.commands.map((c) => c.id).join(",")}`;
 			if (signature === lastSerialized.current) return;
 			lastSerialized.current = signature;
 			onChange(next);
@@ -165,7 +165,7 @@ function EditorBridge({
 
 	// 外部 draft 变化（signature 不同）→ 重建编辑器内容。
 	useEffect(() => {
-		const signature = `${draft.text}\u0000${draft.quotes.map((q) => q.id).join(",")}\u0000${draft.mentions.map((m) => m.id).join(",")}`;
+		const signature = `${draft.text}\u0000${draft.quotes.map((q) => q.id).join(",")}\u0000${draft.mentions.map((m) => m.id).join(",")}\u0000${draft.commands.map((c) => c.id).join(",")}`;
 		if (signature === lastSerialized.current) return;
 		applyingExternal.current = true;
 		lastSerialized.current = signature;
