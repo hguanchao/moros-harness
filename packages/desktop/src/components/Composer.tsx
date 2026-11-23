@@ -688,25 +688,29 @@ export function Composer(): JSX.Element {
 							segment.chip === undefined ? (
 								<span key={index}>{segment.text}</span>
 							) : (
-								<span className={`inline-chip inline-chip-${segment.chip.kind}`} key={index}>
-									<span className="inline-chip-icon">
-										{segment.chip.kind === "quote" ? (
-											<QuoteIcon size={10} />
-										) : segment.chip.kind === "file" ? (
-											<FolderIcon size={10} />
-										) : (
-											<SparklesIcon size={10} />
-										)}
+								<span className="inline-chip-slot" key={index}>
+									{/* 隐藏的完整文字：撑出与 textarea 一致的布局宽度，保证光标对齐 */}
+									<span className="inline-chip-measure">{segment.text}</span>
+									<span className={`inline-chip inline-chip-${segment.chip.kind}`} data-tooltip={segment.text}>
+										<span className="inline-chip-icon">
+											{segment.chip.kind === "quote" ? (
+												<QuoteIcon size={10} />
+											) : segment.chip.kind === "file" ? (
+												<FolderIcon size={10} />
+											) : (
+												<SparklesIcon size={10} />
+											)}
+										</span>
+										<span className="inline-chip-text">{segment.text}</span>
+										<button
+											type="button"
+											className="inline-chip-remove"
+											aria-label="移除此引用"
+											onClick={() => removeChip(segment.chip!.id)}
+										>
+											<XIcon size={9} />
+										</button>
 									</span>
-									{segment.text}
-									<button
-										type="button"
-										className="inline-chip-remove"
-										aria-label="移除此引用"
-										onClick={() => removeChip(segment.chip!.id)}
-									>
-										<XIcon size={9} />
-									</button>
 								</span>
 							),
 						)}

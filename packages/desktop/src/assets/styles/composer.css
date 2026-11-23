@@ -143,61 +143,71 @@
 	color: var(--text-primary);
 }
 
-/* 同排胶囊：背景向左右各扩出 14px 容纳图标/×；文字本身宽度不变 → 光标精确对齐 */
-.inline-chip {
+/* slot 占"完整文字"的布局宽度（光标据此对齐）；胶囊视觉固定宽、绝对定位在 slot 内 */
+.inline-chip-slot {
 	position: relative;
-	background: #e0e0e0;
+	display: inline;
+}
+
+/* 隐藏的完整文字：撑宽用，与实际 textarea 内容等宽 */
+.inline-chip-measure {
+	visibility: hidden;
+}
+
+/* 视觉胶囊：固定 120px、超出省略、tooltip 显示完整内容 */
+.inline-chip {
+	position: absolute;
+	left: 0;
+	top: 0;
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	width: 120px;
+	height: 20px;
+	padding: 0 4px;
+	box-sizing: border-box;
 	border-radius: 4px;
-	box-shadow:
-		-14px 0 0 0 #e0e0e0,
-		14px 0 0 0 #e0e0e0;
+	background: #e0e0e0;
 	color: var(--text-primary);
+	pointer-events: auto;
+}
+
+.inline-chip-text {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .inline-chip-skill {
 	background: var(--accent-soft);
-	box-shadow:
-		-14px 0 0 0 var(--accent-soft),
-		14px 0 0 0 var(--accent-soft);
 }
 
 .inline-chip-quote {
 	background: var(--fill-soft);
-	box-shadow:
-		-14px 0 0 0 var(--fill-soft),
-		14px 0 0 0 var(--fill-soft);
 }
 
-/* 图标与 × 绝对定位在胶囊左右两侧，始终可见，不占布局宽度 */
 .inline-chip-icon {
-	position: absolute;
-	left: -13px;
-	top: 50%;
-	transform: translateY(-50%);
 	display: inline-flex;
+	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 11px;
-	height: 14px;
 	color: var(--text-faint);
 }
 
 .inline-chip-remove {
-	position: absolute;
-	right: -13px;
-	top: 50%;
-	transform: translateY(-50%);
 	display: inline-flex;
+	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 11px;
-	height: 14px;
+	width: 12px;
+	height: 12px;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
 	background: transparent;
 	color: var(--text-faint);
-	pointer-events: auto;
 	cursor: pointer;
 }
 

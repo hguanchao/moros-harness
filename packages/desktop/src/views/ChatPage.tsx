@@ -65,8 +65,8 @@ export function ChatPage(): JSX.Element {
 	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
 	const handleQuote = useCallback(
 		(text: string, span?: { start: number; end: number; sourceSeq?: number }): void => {
-			// 内联显示文字插入正文；发送时只有它仍在正文里，引用 chip 才生效。
-			const display = `引用：${text.replace(/\s+/g, " ").slice(0, 30)}`;
+			// 完整引用文字进入正文（光标/发送基于完整内容）；胶囊视觉上省略显示。
+			const display = `引用：${text.replace(/\s+/g, " ").trim()}`;
 			dispatch({ type: "draft-text-append", text: `${display} ` });
 			dispatch({
 				type: "draft-quote-added",
