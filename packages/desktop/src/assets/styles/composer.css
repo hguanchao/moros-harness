@@ -162,7 +162,7 @@
 	max-width: 160px;
 	padding: 0 6px;
 	border-radius: var(--r-md);
-	background: var(--fill-strong);
+	background: #d7d7d7;
 	color: var(--text-primary);
 	font-size: var(--text-caption);
 	line-height: 1.5;
@@ -195,12 +195,10 @@
 	white-space: nowrap;
 }
 
-.editor-chip-skill {
-	background: var(--accent-soft);
-}
-
+/* 所有 chip 背景统一为同色，种类差异只由图标区分。 */
+.editor-chip-skill,
 .editor-chip-quote {
-	background: var(--fill-soft);
+	background: #d7d7d7;
 }
 
 .editor-chip-remove {
