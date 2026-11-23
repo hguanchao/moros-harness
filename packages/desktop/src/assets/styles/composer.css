@@ -95,6 +95,10 @@
 	color: var(--text-primary);
 }
 
+.composer-input-wrap {
+	position: relative;
+}
+
 .composer .composer-input {
 	display: block;
 	width: 100%;
@@ -104,7 +108,9 @@
 	border: none;
 	outline: none;
 	background: transparent;
-	color: var(--text-primary);
+	/* 文字透明，由镜像层渲染；光标仍可见 */
+	color: transparent;
+	caret-color: var(--text-primary);
 	font-size: var(--text-body);
 	line-height: 1.5;
 	resize: none;
@@ -113,6 +119,64 @@
 
 .composer-input::placeholder {
 	color: var(--text-faint);
+}
+
+.composer .composer-input::selection {
+	background: var(--accent-soft);
+}
+
+/* 镜像层：与 textarea 同位置同排，绘制普通文本与灰色胶囊 */
+.input-mirror {
+	position: absolute;
+	inset: 0;
+	padding: 4px 6px 0;
+	overflow: hidden;
+	pointer-events: none;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+	font-size: var(--text-body);
+	line-height: 1.5;
+	color: var(--text-primary);
+}
+
+/* 同排胶囊：用 box-shadow 撑出灰底与左右内边距，不改变文字宽度 → 光标精确对齐 */
+.inline-chip {
+	background: #e0e0e0;
+	border-radius: 4px;
+	box-shadow: 0 0 0 2px #e0e0e0;
+	color: var(--text-primary);
+}
+
+.inline-chip-skill {
+	background: var(--accent-soft);
+	box-shadow: 0 0 0 2px var(--accent-soft);
+}
+
+.inline-chip-quote {
+	background: var(--fill-soft);
+	box-shadow: 0 0 0 2px var(--fill-soft);
+}
+
+.inline-chip-remove {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 12px;
+	height: 12px;
+	margin-left: 2px;
+	padding: 0;
+	border: 0;
+	border-radius: 50%;
+	background: transparent;
+	color: var(--text-muted);
+	pointer-events: auto;
+	cursor: pointer;
+	vertical-align: middle;
+}
+
+.inline-chip-remove:hover {
+	background: var(--fill-hover);
+	color: var(--text-primary);
 }
 
 .composer-toolbar {
@@ -524,11 +588,4 @@
 	padding: 8px 7px;
 	font-size: var(--text-caption);
 	color: var(--text-faint);
-}
-
-/* 清除引用小按钮行 */
-.quote-clear-row {
-	display: flex;
-	justify-content: flex-end;
-	padding: 2px 6px 4px;
 }

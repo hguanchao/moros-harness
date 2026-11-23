@@ -34,6 +34,7 @@ import {
 } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
 import type { DraftMention } from "../store/draft.ts";
+import { segmentInput, type ChipRef } from "../utils/input-chips.ts";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 import {
@@ -114,6 +115,16 @@ export function Composer(): JSX.Element {
 	const current = state.current;
 	const project = state.project;
 	const { text, images, quotes, mentions } = state.draft;
+	// 同排混排的胶囊：以正文里的 display 文字为准（用户删掉即消失）。
+	const chips: ChipRef[] = [
+		...quotes.map((quote) => ({ id: quote.id, kind: "quote" as const, display: quote.display })),
+		...mentions.map((mention) => ({
+			id: mention.id,
+			kind: mention.kind === "file" ? ("file" as const) : ("skill" as const),
+			display: mention.display,
+		})),
+	];
+	const segments = segmentInput(text, chips);
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
@@ -121,6 +132,7 @@ export function Composer(): JSX.Element {
 	const [imageUrl, setImageUrl] = useState("");
 	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
 	const textarea = useRef<HTMLTextAreaElement | null>(null);
+	const displayMirror = useRef<HTMLDivElement | null>(null);
 	const isSubmitting = useRef(false);
 	// 行内补全状态；Esc 关闭后记住 dismissed，输入变化才重置。
 	const [completion, setCompletion] = useState<
@@ -416,12 +428,14 @@ export function Composer(): JSX.Element {
 	};
 
 	/** 清除正文里的全部引用/文件/技能显示文字，并清空对应结构化 chip。 */
-	const clearAllChips = (): void => {
-		let next = text;
-		for (const chip of [...quotes, ...mentions]) next = next.replace(chip.display, "");
+	/** 删除单个胶囊：从正文移除其 display 文字，并移除对应 chip。 */
+	const removeChip = (id: string): void => {
+		const chip = chips.find((item) => item.id === id);
+		if (chip === undefined) return;
+		const next = text.replace(chip.display, "");
 		dispatch({ type: "draft-text", text: next.trim() });
-		dispatch({ type: "draft-chips-clear" });
-		requestAnimationFrame(() => elementFocusAndCursor(next.trim().length));
+		if (quotes.some((quote) => quote.id === id)) dispatch({ type: "draft-quote-removed", id });
+		else dispatch({ type: "draft-mention-removed", id });
 	};
 
 	const elementFocusAndCursor = (cursor: number): void => {
@@ -634,48 +648,59 @@ export function Composer(): JSX.Element {
 						))}
 					</div>
 				) : null}
-				{quotes.length > 0 || mentions.length > 0 ? (
-					<div className="quote-clear-row">
-						<button
-							type="button"
-							className="ghost-button small"
-							data-tooltip="移除正文中的全部引用文字"
-							onClick={() => clearAllChips()}
-						>
-							<XIcon size={11} />
-							清除引用
-						</button>
+				<div className="composer-input-wrap">
+					<textarea
+						className="composer-input"
+						ref={textarea}
+						value={text}
+						rows={1}
+						disabled={disabled}
+						placeholder={
+							trustBlocked
+								? "请先确认工作区信任"
+								: readOnly
+									? "该会话正在另一个窗口中使用，当前为只读"
+									: "描述你的任务，/调用指令，@文件，$技能"
+						}
+						onChange={(event) => {
+							const value = event.target.value;
+							dispatch({ type: "draft-text", text: value });
+							completionDismissed.current = false;
+							updateCompletion(value, event.target.selectionStart);
+						}}
+						onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
+						onScroll={(event) => {
+							if (displayMirror.current !== null) displayMirror.current.scrollTop = event.currentTarget.scrollTop;
+						}}
+						onPaste={onPaste}
+						onKeyDown={(event) => {
+							if (handleCompletionKeyDown(event)) return;
+							if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+							event.preventDefault();
+							void send();
+						}}
+					/>
+					{/* 镜像层：与 textarea 同排，把 display 文字画成灰色胶囊（textarea 文字透明） */}
+					<div className="input-mirror" ref={displayMirror} aria-hidden="true">
+						{segments.map((segment, index) =>
+							segment.chip === undefined ? (
+								<span key={index}>{segment.text}</span>
+							) : (
+								<span className={`inline-chip inline-chip-${segment.chip.kind}`} key={index}>
+									{segment.text}
+									<button
+										type="button"
+										className="inline-chip-remove"
+										aria-label="移除此引用"
+										onClick={() => removeChip(segment.chip!.id)}
+									>
+										<XIcon size={9} />
+									</button>
+								</span>
+							),
+						)}
 					</div>
-				) : null}
-
-				<textarea
-					className="composer-input"
-					ref={textarea}
-					value={text}
-					rows={1}
-					disabled={disabled}
-					placeholder={
-						trustBlocked
-							? "请先确认工作区信任"
-							: readOnly
-								? "该会话正在另一个窗口中使用，当前为只读"
-								: "描述你的任务，/调用指令，@文件，$技能"
-					}
-					onChange={(event) => {
-						const value = event.target.value;
-						dispatch({ type: "draft-text", text: value });
-						completionDismissed.current = false;
-						updateCompletion(value, event.target.selectionStart);
-					}}
-					onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
-					onPaste={onPaste}
-					onKeyDown={(event) => {
-						if (handleCompletionKeyDown(event)) return;
-						if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-						event.preventDefault();
-						void send();
-					}}
-				/>
+				</div>
 				{completion === undefined ? null : (
 					<InlineCompletion
 						trigger={completion.trigger}
