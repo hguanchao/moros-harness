@@ -586,6 +586,11 @@ export function Composer(): JSX.Element {
 						if (handleCompletionKeyDown(event)) return;
 						if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
 						event.preventDefault();
+						// 捕获阶段必须 stopPropagation：否则事件继续到 contenteditable 上 Lexical 的
+						// 原生 keydown，触发 KEY_ENTER_COMMAND 插入换行（rich-text 处理器不检查
+						// defaultPrevented），造成「既发送又换行」。Shift+Enter 不拦截，交给 Lexical
+						// 走 INSERT_LINE_BREAK_COMMAND 正常换行。
+						event.stopPropagation();
 						void send();
 					}}
 					onSelectionChange={(value, cursor, rect) => {
