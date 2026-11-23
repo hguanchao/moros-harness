@@ -12,6 +12,7 @@ import { SkillDialog } from "../components/SkillDialog.tsx";
 import {
 	ArchiveIcon2,
 	ArrowLeftIcon,
+	FileTextIcon,
 	FolderIcon,
 	MinusIcon,
 	MonitorIcon,
@@ -20,6 +21,7 @@ import {
 	PlusIcon,
 	PuzzleIcon,
 	RefreshIcon,
+	SearchIcon,
 	ServerIcon,
 	SettingsIcon,
 	SlidersHorizontalIcon,
@@ -226,6 +228,9 @@ export function SettingsApp(): JSX.Element {
 							} catch (error) {
 								notice("error", errorMessage(error));
 							}
+						}}
+						onSkillRefresh={async () => {
+							await refresh();
 						}}
 					/>
 				);
@@ -879,6 +884,7 @@ function ExtensionsPanel({
 	onSkillAdd,
 	onSkillDelete,
 	onSkillImport,
+	onSkillRefresh,
 }: {
 	readonly summary: ConfigSummary | undefined;
 	readonly skills: readonly SkillSummary[];
@@ -894,6 +900,7 @@ function ExtensionsPanel({
 	readonly onSkillAdd: () => void;
 	readonly onSkillDelete: (path: string) => Promise<void>;
 	readonly onSkillImport: () => Promise<void>;
+	readonly onSkillRefresh: () => Promise<void>;
 }): JSX.Element {
 	const [tab, setTab] = useState<ExtensionTab>("skills");
 	const tabs: readonly { readonly key: ExtensionTab; readonly label: string }[] = [
@@ -928,6 +935,7 @@ function ExtensionsPanel({
 						onAdd={onSkillAdd}
 						onDelete={onSkillDelete}
 						onImport={onSkillImport}
+						onRefresh={onSkillRefresh}
 					/>
 				) : null}
 				{tab === "mcp" ? (
@@ -971,6 +979,7 @@ function SkillsPanel({
 	onAdd,
 	onDelete,
 	onImport,
+	onRefresh,
 }: {
 	readonly skills: readonly SkillSummary[];
 	readonly summary: ConfigSummary | undefined;
@@ -978,10 +987,36 @@ function SkillsPanel({
 	readonly onAdd: () => void;
 	readonly onDelete: (path: string) => Promise<void>;
 	readonly onImport: () => Promise<void>;
+	readonly onRefresh: () => Promise<void>;
 }): JSX.Element {
-	// 只有用户级技能（~/.moros/skills 等）可删；项目与共享目录技能只读。
-	const userSkills = skills.filter((skill) => skill.scope === "user");
-	const readonlySkills = skills.filter((skill) => skill.scope === "project");
+	const [query, setQuery] = useState("");
+	const [addMenuOpen, setAddMenuOpen] = useState(false);
+	const addMenuRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		if (!addMenuOpen) return;
+		const close = (event: PointerEvent): void => {
+			if (!addMenuRef.current?.contains(event.target as Node)) setAddMenuOpen(false);
+		};
+		const onKey = (event: KeyboardEvent): void => {
+			if (event.key === "Escape") setAddMenuOpen(false);
+		};
+		document.addEventListener("pointerdown", close);
+		document.addEventListener("keydown", onKey);
+		return () => {
+			document.removeEventListener("pointerdown", close);
+			document.removeEventListener("keydown", onKey);
+		};
+	}, [addMenuOpen]);
+
+	// 搜索按名称与描述过滤；只有用户级技能（~/.moros/skills）可删。
+	const needle = query.trim().toLowerCase();
+	const matched =
+		needle.length === 0
+			? skills
+			: skills.filter((skill) => `${skill.name} ${skill.description}`.toLowerCase().includes(needle));
+	const userSkills = matched.filter((skill) => skill.scope === "user");
+	const readonlySkills = matched.filter((skill) => skill.scope === "project");
 	const renderRow = (skill: SkillSummary): JSX.Element => (
 		<div className="skill-row" key={`${skill.scope}:${skill.path}`}>
 			<span className="ext-row-icon">
@@ -1003,24 +1038,69 @@ function SkillsPanel({
 		</div>
 	);
 	return (
-		<SettingsSection
-			title="Skills"
-			description="用户技能可在此添加、导入与删除；项目与共享目录技能只读，模型按需加载其 SKILL.md。"
-		>
-			<div className="ext-actions">
-				<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onImport()}>
-					从文件夹导入
+		<>
+			<div className="ext-toolbar">
+				<div className="ext-search">
+					<SearchIcon size={13} />
+					<input
+						value={query}
+						onChange={(event) => setQuery(event.target.value)}
+						placeholder="搜索技能"
+						aria-label="搜索技能"
+					/>
+				</div>
+				<button
+					className="ghost-button small ext-icon-button"
+					aria-label="刷新技能"
+					data-tooltip="刷新"
+					onClick={() => void onRefresh()}
+				>
+					<RefreshIcon size={14} />
 				</button>
-				<button className="primary-button small" disabled={mcpBlocked} onClick={onAdd}>
-					<PlusIcon size={14} />
-					添加技能
-				</button>
+				<div className="ext-add-menu" ref={addMenuRef}>
+					<button
+						className="primary-button small ext-icon-button"
+						aria-label="添加技能"
+						data-tooltip="添加技能"
+						aria-expanded={addMenuOpen}
+						disabled={mcpBlocked}
+						onClick={() => setAddMenuOpen((open) => !open)}
+					>
+						<PlusIcon size={16} />
+					</button>
+					{addMenuOpen ? (
+						<div className="ext-add-dropdown">
+							<button
+								type="button"
+								onClick={() => {
+									setAddMenuOpen(false);
+									onAdd();
+								}}
+							>
+								<FileTextIcon size={14} />
+								创建技能
+							</button>
+							<button
+								type="button"
+								onClick={() => {
+									setAddMenuOpen(false);
+									void onImport();
+								}}
+							>
+								<FolderIcon size={14} />
+								上传技能
+							</button>
+						</div>
+					) : null}
+				</div>
 			</div>
 			{mcpBlocked ? <div className="mcp-busy-hint">当前有回合正在运行，期间不能添加或删除技能。</div> : null}
 			{skills.length === 0 ? (
 				<div className="settings-empty-hint">
-					没有可用技能。点「添加技能」新建，或从文件夹导入一个含 <code>SKILL.md</code> 的目录。
+					没有可用技能。点右上角 + 新建，或上传一个含 <code>SKILL.md</code> 的目录。
 				</div>
+			) : matched.length === 0 ? (
+				<div className="settings-empty-hint">没有匹配的技能。</div>
 			) : (
 				<div className="skill-list">
 					{userSkills.length > 0 ? (
@@ -1042,7 +1122,7 @@ function SkillsPanel({
 					跳过条目：{summary.skipped.map((item) => `${item.path}（${item.reason}）`).join("；")}
 				</div>
 			) : null}
-		</SettingsSection>
+		</>
 	);
 }
 
