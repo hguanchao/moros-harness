@@ -702,11 +702,11 @@ export function Composer(): JSX.Element {
 									>
 										<span className="inline-chip-icon">
 											{segment.chip.kind === "quote" ? (
-												<QuoteIcon size={10} />
+												<QuoteIcon size={14} />
 											) : segment.chip.kind === "file" ? (
-												<FolderIcon size={10} />
+												<FolderIcon size={14} />
 											) : (
-												<SparklesIcon size={10} />
+												<SparklesIcon size={14} />
 											)}
 										</span>
 										<span className="inline-chip-text">{segment.text}</span>
@@ -716,7 +716,7 @@ export function Composer(): JSX.Element {
 											aria-label="移除此引用"
 											onClick={() => removeChip(segment.chip!.id)}
 										>
-											<XIcon size={9} />
+											<XIcon size={12} />
 										</button>
 									</span>
 								</span>
