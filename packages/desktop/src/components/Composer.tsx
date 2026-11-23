@@ -51,6 +51,15 @@ import { InlineCompletion, type CompletionOption, type CompletionTrigger } from 
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
+/** 行内补全的当前状态（同时写入 state 与 ref，见 completionRef）。 */
+interface CompletionState {
+	readonly trigger: CompletionTrigger;
+	readonly token: TriggerToken;
+	readonly options: readonly CompletionOption[];
+	readonly activeIndex: number;
+	readonly rect: { left: number; bottom: number; top: number };
+}
+
 /** 输入框与首发/运行控制；信任页由 ChatPage 负责，新任务首次有效发送才创建会话。 */
 export function Composer(): JSX.Element {
 	const { state, dispatch } = useApp();
@@ -93,16 +102,14 @@ export function Composer(): JSX.Element {
 		[dispatch],
 	);
 	// 行内补全状态；Esc 关闭后记住 dismissed，输入变化才重置。
-	const [completion, setCompletion] = useState<
-		| {
-				readonly trigger: CompletionTrigger;
-				readonly token: TriggerToken;
-				readonly options: readonly CompletionOption[];
-				readonly activeIndex: number;
-				readonly rect: { left: number; bottom: number; top: number };
-		  }
-		| undefined
-	>(undefined);
+	const [completion, setCompletion] = useState<CompletionState | undefined>(undefined);
+	// 键盘事件（捕获阶段）与异步补全计算之间可能有竞态：state 更新尚未渲染时 Enter
+	// 读到旧值会误走发送。用 ref 镜像最新值，keydown 一律读 ref，保证与浮层一致。
+	const completionRef = useRef<CompletionState | undefined>(undefined);
+	const setCompletionSafe = useCallback((next: CompletionState | undefined): void => {
+		completionRef.current = next;
+		setCompletion(next);
+	}, []);
 	const completionDismissed = useRef(false);
 	/** @ 文件数据源缓存（会话内复用）。 */
 	const fileListCache = useRef<readonly string[] | undefined>(undefined);
@@ -276,14 +283,17 @@ export function Composer(): JSX.Element {
 	/** 根据编辑器提供的正文/光标/位置重算补全浮层。 */
 	const updateCompletion = (value: string, cursor: number, rect: DOMRect | undefined): void => {
 		if (completionDismissed.current) return;
-		// 光标紧跟空白时不算活动 token：插入 @path/$name 后的尾随空格不该再弹补全。
-		if (cursor > 0 && /\s/.test(value[cursor - 1] ?? "")) {
-			setCompletion(undefined);
+		// 先算 / 命令补全：它容忍尾随空格（"/ "），用户敲 / 后顺手带的空格不该
+		// 让浮层消失——否则浮层看着还开着、回车时 completion 却已清空而误发送。
+		const slash = findSlashToken(value, cursor);
+		if (slash === undefined && cursor > 0 && /\s/.test(value[cursor - 1] ?? "")) {
+			// @/$ 的尾随空格：chip 已插入，不该再弹补全。
+			setCompletionSafe(undefined);
 			return;
 		}
-		const detected = findSlashToken(value, cursor) ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
+		const detected = slash ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
 		if (detected === undefined || rect === undefined) {
-			setCompletion(undefined);
+			setCompletionSafe(undefined);
 			return;
 		}
 		const trigger: CompletionTrigger = value[detected.start] === "/" ? "/" : value[detected.start] === "@" ? "@" : "$";
@@ -311,18 +321,19 @@ export function Composer(): JSX.Element {
 					options = [];
 				}
 			}
-			setCompletion({ trigger, token: detected, options, activeIndex: 0, rect: anchor });
+			setCompletionSafe({ trigger, token: detected, options, activeIndex: 0, rect: anchor });
 		})();
 	};
 
 	/** 选中补全项：命令删 token 并执行；文件/技能插入真正的 chip 节点。 */
 	const selectCompletion = (index: number): void => {
-		if (completion === undefined) return;
-		const option = completion.options[index];
+		const current = completionRef.current;
+		if (current === undefined) return;
+		const option = current.options[index];
 		if (option === undefined) return;
-		const { trigger, token } = completion;
+		const { trigger, token } = current;
 		completionDismissed.current = true;
-		setCompletion(undefined);
+		setCompletionSafe(undefined);
 		if (trigger === "/") {
 			// 删除已输入的 /xxx（token.end - token.start 个字符）
 			editorRef.current?.deleteTriggerToken(token.end - token.start);
@@ -342,32 +353,35 @@ export function Composer(): JSX.Element {
 
 	/** 编辑器键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
 	const handleCompletionKeyDown = (event: KeyboardEvent<HTMLElement>): boolean => {
-		if (completion === undefined) return false;
+		// 读 ref 而非 state：异步补全刚算完、state 尚未渲染时，浮层已可见而 state 还是旧值，
+		// 用 state 会让 Enter 漏过补全拦截、误走发送。
+		const current = completionRef.current;
+		if (current === undefined) return false;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
 			event.stopPropagation();
-			setCompletion({
-				...completion,
-				activeIndex: Math.min(completion.activeIndex + 1, Math.max(0, completion.options.length - 1)),
+			setCompletionSafe({
+				...current,
+				activeIndex: Math.min(current.activeIndex + 1, Math.max(0, current.options.length - 1)),
 			});
 			return true;
 		}
 		if (event.key === "ArrowUp") {
 			event.preventDefault();
 			event.stopPropagation();
-			setCompletion({ ...completion, activeIndex: Math.max(completion.activeIndex - 1, 0) });
+			setCompletionSafe({ ...current, activeIndex: Math.max(current.activeIndex - 1, 0) });
 			return true;
 		}
 		if (event.key === "Enter" || event.key === "Tab") {
 			event.preventDefault();
 			event.stopPropagation();
-			selectCompletion(completion.activeIndex);
+			selectCompletion(current.activeIndex);
 			return true;
 		}
 		if (event.key === "Escape") {
 			event.preventDefault();
 			event.stopPropagation();
-			setCompletion(undefined);
+			setCompletionSafe(undefined);
 			completionDismissed.current = true;
 			return true;
 		}
@@ -606,7 +620,7 @@ export function Composer(): JSX.Element {
 						activeIndex={completion.activeIndex}
 						rect={completion.rect}
 						onSelect={selectCompletion}
-						onHover={(index) => setCompletion({ ...completion, activeIndex: index })}
+						onHover={(index) => setCompletionSafe({ ...completion, activeIndex: index })}
 					/>
 				)}
 

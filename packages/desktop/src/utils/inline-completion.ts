@@ -57,15 +57,24 @@ export function findSkillToken(text: string, cursor: number): TriggerToken | und
 	);
 }
 
-/** `/` 命令片段：只吃字母（命令名），遇空白/数字/标点终止。 */
+/**
+ * `/` 命令片段：只吃字母（命令名），遇空白/数字/标点终止。
+ * query 允许尾部单个空格（如 "/ "）——用户敲完 / 后常顺手带一个空格，
+ * 此时命令补全浮层应保持可见，回车执行选中的命令而不是把消息发出去。
+ */
 export function findSlashToken(text: string, cursor: number): TriggerToken | undefined {
-	return findTriggerToken(
+	const token = findTriggerToken(
 		text,
 		cursor,
 		"/",
 		(char) => /[A-Za-z]/.test(char),
-		(query) => /^[A-Za-z]*$/.test(query),
+		(query) => /^[A-Za-z]*\s?$/.test(query),
 	);
+	if (token === undefined) return undefined;
+	// "/ " 的尾随空格只是手滑，查询串按空处理（等价刚敲 "/"），命令列表照常显示。
+	const query = token.query.trimEnd();
+	// token.end 不覆盖空格，删除触发片段时只删 "/"，空格留给编辑器正常排版。
+	return { ...token, query };
 }
 
 const FILE_LIMIT = 200;

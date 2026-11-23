@@ -40,6 +40,15 @@ describe("findTriggerToken 触发片段定位", () => {
 		expect(findSlashToken("用 /model v4", 8)).toMatchObject({ query: "model" });
 	});
 
+	it("/ 后跟手滑空格仍识别为命令补全，query 按空处理", () => {
+		// 用户敲 / 后常顺手带空格；此时浮层应保持可见、回车执行命令而非发送消息。
+		// end 覆盖到空格之后，选中命令时连 "/ " 一起删干净。
+		expect(findSlashToken("/ ", 2)).toMatchObject({ start: 0, end: 2, query: "" });
+		expect(findSlashToken("/co ", 4)).toMatchObject({ start: 0, query: "co" });
+		// 两个空格不是合法命令片段。
+		expect(findSlashToken("/  ", 3)).toBeUndefined();
+	});
+
 	it("光标在片段中间时 query 到光标为止，end 到片段末尾", () => {
 		const token = findTriggerToken("@src/app", 4, "@", (char) => !/\s/.test(char));
 		expect(token).toMatchObject({ start: 0, end: 8, query: "src" });
