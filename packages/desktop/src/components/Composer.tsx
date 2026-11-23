@@ -961,9 +961,10 @@ function ModelEffortPicker({
 
 	// 推理档位严格按模型配置列出，判断顺序固定：显式关闭（reasoning=false）→ 只有 Off；
 	// 配置了档位就只列这些；档位为空数组 → 只有 Off；未配置档位（旧版配置）→ 全档位可选。
+	// 没有模型时（未选择或所选供应商下已无模型）不显示推理强度——档位依附于具体模型。
 	const effortValues: readonly SessionView["effort"][] =
 		selectedEntry === undefined
-			? EFFORT_OPTIONS.map((option) => option.value)
+			? []
 			: selectedEntry.reasoning === false
 				? ["off"]
 				: selectedEntry.reasoningEfforts === undefined
@@ -1018,7 +1019,10 @@ function ModelEffortPicker({
 				) : (
 					<>
 						<span className="model-picker-model">{modelLabel}</span>
-						<span className="model-picker-effort">{` · ${effortLabel(effort)}`}</span>
+						{/* 模型已不可用时（供应商下无此模型）不显示推理强度，档位依附于具体模型。 */}
+						{selectedEntry === undefined ? null : (
+							<span className="model-picker-effort">{` · ${effortLabel(effort)}`}</span>
+						)}
 					</>
 				)
 			}
