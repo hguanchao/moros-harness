@@ -119,7 +119,12 @@ export function Composer(): JSX.Element {
 	const { text, images, quotes, mentions } = state.draft;
 	// 同排混排的胶囊：以正文里的 display 文字为准（用户删掉即消失）。
 	const chips: ChipRef[] = [
-		...quotes.map((quote) => ({ id: quote.id, kind: "quote" as const, display: quote.display })),
+		...quotes.map((quote) => ({
+			id: quote.id,
+			kind: "quote" as const,
+			display: quote.display,
+			tooltip: quote.text,
+		})),
 		...mentions.map((mention) => ({
 			id: mention.id,
 			kind: mention.kind === "file" ? ("file" as const) : ("skill" as const),
@@ -691,7 +696,10 @@ export function Composer(): JSX.Element {
 								<span className="inline-chip-slot" key={index}>
 									{/* 隐藏的完整文字：撑出与 textarea 一致的布局宽度，保证光标对齐 */}
 									<span className="inline-chip-measure">{segment.text}</span>
-									<span className={`inline-chip inline-chip-${segment.chip.kind}`} data-tooltip={segment.text}>
+									<span
+										className={`inline-chip inline-chip-${segment.chip.kind}`}
+										data-tooltip={segment.chip.tooltip ?? segment.text}
+									>
 										<span className="inline-chip-icon">
 											{segment.chip.kind === "quote" ? (
 												<QuoteIcon size={10} />

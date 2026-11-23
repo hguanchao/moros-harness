@@ -65,8 +65,8 @@ export function ChatPage(): JSX.Element {
 	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
 	const handleQuote = useCallback(
 		(text: string, span?: { start: number; end: number; sourceSeq?: number }): void => {
-			// 完整引用文字进入正文（光标/发送基于完整内容）；胶囊视觉上省略显示。
-			const display = `引用：${text.replace(/\s+/g, " ").trim()}`;
+			// 正文只放短摘要（光标紧贴胶囊）；完整原文存在 quote.text，发送时注入模型，内容不丢。
+			const display = `引用：${text.replace(/\s+/g, " ").trim().slice(0, 10)}`;
 			dispatch({ type: "draft-text-append", text: `${display} ` });
 			dispatch({
 				type: "draft-quote-added",

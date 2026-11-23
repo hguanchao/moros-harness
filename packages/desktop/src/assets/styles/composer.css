@@ -193,7 +193,7 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	color: var(--text-faint);
+	color: var(--text-primary);
 }
 
 .inline-chip-remove {

@@ -9,6 +9,8 @@ export interface ChipRef {
 	readonly id: string;
 	readonly kind: "quote" | "file" | "skill";
 	readonly display: string;
+	/** 悬停提示的完整内容（如引用原文）；缺省时用 display。 */
+	readonly tooltip?: string;
 }
 
 export interface InputSegment {
