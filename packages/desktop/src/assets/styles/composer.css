@@ -145,14 +145,20 @@
 	background: var(--accent-soft);
 }
 
-/* 真 chip 节点（Lexical segmented TextNode，光标不能进入，退格整体删除） */
+/* chip 的装饰器宿主。间距放在宿主的 padding-right 上，而不是内部 .editor-chip
+   的 margin 上：caret 画在宿主 border-box（含 padding）的右边缘，这样光标与 chip
+   之间也有间距；若用 margin，caret 会紧贴 chip 内容右边缘。padding 不进正文，
+   不会污染送给模型的文本。 */
+.editor-chip-host {
+	padding-right: 4px;
+}
+
+/* 真 chip 节点（Lexical 行内原子节点，光标不能进入，退格整体删除） */
 .editor-chip {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	/* 视觉间距用 margin 而非插入空格文本节点：后者会进正文、污染送给模型的文本。
-	   左右各留一点，chip 之间、chip 与文字之间都有呼吸空间。 */
-	margin: 0 4px 2px 0;
+	margin-bottom: 2px;
 	max-width: 200px;
 	padding: 0 6px;
 	border-radius: var(--r-pill);
