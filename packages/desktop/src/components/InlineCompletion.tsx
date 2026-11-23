@@ -41,7 +41,7 @@ export function InlineCompletion({
 	// 命令菜单用参考图排版：更宽、带分组标题、每行「/命令 + 说明」同行。
 	const isCommandMenu = trigger === "/";
 	const width = isCommandMenu
-		? Math.min(Math.max(rect.left + 16, 520), window.innerWidth - 16)
+		? Math.min(Math.max(rect.left + 16, 600), window.innerWidth - 16)
 		: Math.min(Math.max(rect.left + 16, 260), window.innerWidth - 16);
 	const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
 	const spaceBelow = window.innerHeight - rect.bottom - 12;
@@ -54,51 +54,54 @@ export function InlineCompletion({
 
 	return createPortal(
 		<div className="inline-completion" style={position} role="listbox" aria-label={`${trigger} 补全`}>
-			{options.length === 0 ? (
-				<div className="completion-empty">无匹配结果</div>
-			) : (
-				options.map((option, index) => {
-					// 命令菜单按 group 分段：每组第一项前插入分组标题。
-					const groupHeader =
-						isCommandMenu && option.group !== undefined && option.group !== options[index - 1]?.group ? (
-							<div className="completion-group-label" key={`group-${option.group}`}>
-								{option.group}
-							</div>
-						) : null;
-					return (
-						<Fragment key={option.value}>
-							{groupHeader}
-							<div
-								role="option"
-								aria-selected={index === activeIndex}
-								className={`completion-option ${isCommandMenu ? "is-command" : ""} ${index === activeIndex ? "is-active" : ""}`}
-								onMouseEnter={() => onHover(index)}
-								onMouseDown={(event) => event.preventDefault()}
-								onClick={() => onSelect(index)}
-							>
-								{isCommandMenu ? (
-									<>
-										<span className="completion-command-label">{option.label}</span>
-										{option.description === undefined ? null : (
-											<span className="completion-desc">{option.description}</span>
-										)}
-									</>
-								) : (
-									<>
-										<span className="completion-icon">{iconFor(trigger)}</span>
-										<span className="completion-text">
-											<span className="completion-label">{option.label}</span>
+			{/* 列表单独滚动，底部提示作为兄弟节点固定在底部，不随列表滚动。 */}
+			<div className="completion-list">
+				{options.length === 0 ? (
+					<div className="completion-empty">无匹配结果</div>
+				) : (
+					options.map((option, index) => {
+						// 命令菜单按 group 分段：每组第一项前插入分组标题。
+						const groupHeader =
+							isCommandMenu && option.group !== undefined && option.group !== options[index - 1]?.group ? (
+								<div className="completion-group-label" key={`group-${option.group}`}>
+									{option.group}
+								</div>
+							) : null;
+						return (
+							<Fragment key={option.value}>
+								{groupHeader}
+								<div
+									role="option"
+									aria-selected={index === activeIndex}
+									className={`completion-option ${isCommandMenu ? "is-command" : ""} ${index === activeIndex ? "is-active" : ""}`}
+									onMouseEnter={() => onHover(index)}
+									onMouseDown={(event) => event.preventDefault()}
+									onClick={() => onSelect(index)}
+								>
+									{isCommandMenu ? (
+										<>
+											<span className="completion-command-label">{option.label}</span>
 											{option.description === undefined ? null : (
 												<span className="completion-desc">{option.description}</span>
 											)}
-										</span>
-									</>
-								)}
-							</div>
-						</Fragment>
-					);
-				})
-			)}
+										</>
+									) : (
+										<>
+											<span className="completion-icon">{iconFor(trigger)}</span>
+											<span className="completion-text">
+												<span className="completion-label">{option.label}</span>
+												{option.description === undefined ? null : (
+													<span className="completion-desc">{option.description}</span>
+												)}
+											</span>
+										</>
+									)}
+								</div>
+							</Fragment>
+						);
+					})
+				)}
+			</div>
 			{isCommandMenu ? (
 				<div className="completion-hint">
 					<InfoIcon size={12} />

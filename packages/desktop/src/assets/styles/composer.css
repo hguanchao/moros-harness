@@ -551,13 +551,22 @@
 	z-index: 210;
 	display: flex;
 	flex-direction: column;
-	overflow-y: auto;
+	/* 外层不滚动，由内部的 .completion-list 滚动，保证底部提示始终可见。 */
+	overflow: hidden;
 	padding: 4px;
 	border: 1px solid var(--line-strong);
 	border-radius: var(--r-md);
 	background: var(--surface-chrome);
 	box-shadow: var(--shadow);
 	animation: tooltip-in 0.1s ease-out;
+}
+
+.completion-list {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
 }
 
 .completion-option {
@@ -627,11 +636,12 @@
 }
 
 .completion-command-label {
-	/* 固定宽度让说明列左对齐：命令名/技能名长短不一，若不锁宽说明会参差。 */
+	/* 名称自适应显示完整，过长才省略；说明列靠 min-width 保持大致对齐。 */
 	display: inline-flex;
 	align-items: center;
-	flex: 0 0 88px;
-	min-width: 0;
+	flex: 0 1 auto;
+	min-width: 88px;
+	max-width: 168px;
 	padding: 1px 7px;
 	border-radius: var(--r-sm);
 	background: var(--fill-soft);

@@ -176,6 +176,23 @@ export function Composer(): JSX.Element {
 		if (!disabled) editorRef.current?.focus();
 	}, [current?.meta.id, state.draftGeneration, disabled]);
 
+	// 补全浮层打开时，点击编辑器与浮层之外即关闭（等价于"失去焦点"）。
+	// 浮层用 portal 渲染到 body，不在 .composer 内，故用 role=listbox 判定。
+	useEffect(() => {
+		if (completion === undefined) return;
+		const onPointerDown = (event: PointerEvent): void => {
+			const target = event.target as Node;
+			const editorEl = document.querySelector(".composer .composer-input");
+			const inCompletion = target instanceof Element && target.closest('[role="listbox"]') !== null;
+			if ((editorEl === null || !editorEl.contains(target)) && !inCompletion) {
+				completionDismissed.current = true;
+				setCompletionSafe(undefined);
+			}
+		};
+		document.addEventListener("pointerdown", onPointerDown);
+		return () => document.removeEventListener("pointerdown", onPointerDown);
+	}, [completion, setCompletionSafe]);
+
 	const report = (error: unknown): void => {
 		if (current !== undefined) {
 			dispatch({ type: "inline-notice", sessionId: current.meta.id, tone: "error", text: errorMessage(error) });
