@@ -627,13 +627,19 @@
 }
 
 .completion-command-label {
-	flex: none;
+	/* 固定宽度让说明列左对齐：命令名/技能名长短不一，若不锁宽说明会参差。 */
+	display: inline-flex;
+	align-items: center;
+	flex: 0 0 88px;
+	min-width: 0;
 	padding: 1px 7px;
 	border-radius: var(--r-sm);
 	background: var(--fill-soft);
 	color: var(--text-primary);
 	font-size: var(--text-caption);
 	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .completion-option.is-command.is-active .completion-command-label {
