@@ -111,8 +111,10 @@
 	/* 文字透明，由镜像层渲染；光标仍可见 */
 	color: transparent;
 	caret-color: var(--text-primary);
+	font-family: inherit;
 	font-size: var(--text-body);
 	line-height: 1.5;
+	letter-spacing: normal;
 	resize: none;
 	user-select: text;
 }
@@ -134,13 +136,16 @@
 	pointer-events: none;
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
+	font-family: inherit;
 	font-size: var(--text-body);
 	line-height: 1.5;
+	letter-spacing: normal;
 	color: var(--text-primary);
 }
 
 /* 同排胶囊：用 box-shadow 撑出灰底与左右内边距，不改变文字宽度 → 光标精确对齐 */
 .inline-chip {
+	position: relative;
 	background: #e0e0e0;
 	border-radius: 4px;
 	box-shadow: 0 0 0 2px #e0e0e0;
@@ -157,21 +162,28 @@
 	box-shadow: 0 0 0 2px var(--fill-soft);
 }
 
+/* × 绝对定位在胶囊右端外侧，不占布局宽度，保证镜像文字与 textarea 光标对齐 */
 .inline-chip-remove {
-	display: inline-flex;
+	position: absolute;
+	right: -14px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: none;
 	align-items: center;
 	justify-content: center;
 	width: 12px;
 	height: 12px;
-	margin-left: 2px;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
-	background: transparent;
+	background: var(--surface-chrome);
 	color: var(--text-muted);
 	pointer-events: auto;
 	cursor: pointer;
-	vertical-align: middle;
+}
+
+.inline-chip:hover .inline-chip-remove {
+	display: inline-flex;
 }
 
 .inline-chip-remove:hover {
