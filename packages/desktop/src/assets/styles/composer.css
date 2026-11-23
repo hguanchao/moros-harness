@@ -158,17 +158,18 @@
 .inline-chip {
 	position: absolute;
 	left: 0;
-	top: 0;
+	top: -1px;
 	display: inline-flex;
 	align-items: center;
-	gap: 2px;
+	gap: 4px;
 	max-width: 160px;
 	height: 20px;
-	padding: 0 4px;
+	padding: 0 6px;
 	box-sizing: border-box;
-	border-radius: 4px;
-	background: #e0e0e0;
+	border-radius: var(--r-pill);
+	background: var(--fill-strong);
 	color: var(--text-primary);
+	font-size: var(--text-caption);
 	pointer-events: auto;
 }
 
@@ -180,12 +181,9 @@
 	white-space: nowrap;
 }
 
-.inline-chip-skill {
-	background: var(--accent-soft);
-}
-
+.inline-chip-skill,
 .inline-chip-quote {
-	background: var(--fill-soft);
+	background: var(--fill-strong);
 }
 
 .inline-chip-icon {
@@ -193,7 +191,7 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	color: var(--text-primary);
+	color: var(--text-secondary);
 }
 
 .inline-chip-remove {
@@ -203,11 +201,12 @@
 	justify-content: center;
 	width: 14px;
 	height: 14px;
+	margin-right: -2px;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
 	background: transparent;
-	color: var(--text-primary);
+	color: var(--text-muted);
 	cursor: pointer;
 }
 

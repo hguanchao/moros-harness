@@ -702,11 +702,11 @@ export function Composer(): JSX.Element {
 									>
 										<span className="inline-chip-icon">
 											{segment.chip.kind === "quote" ? (
-												<QuoteIcon size={14} />
+												<QuoteIcon size={12} />
 											) : segment.chip.kind === "file" ? (
-												<FolderIcon size={14} />
+												<FolderIcon size={12} />
 											) : (
-												<SparklesIcon size={14} />
+												<SparklesIcon size={12} />
 											)}
 										</span>
 										<span className="inline-chip-text">{segment.text}</span>
