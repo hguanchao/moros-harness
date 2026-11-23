@@ -1,26 +1,19 @@
 import { useEffect, useState, type JSX } from "react";
 
-import type { SkillDocumentResult, SkillDraftInput } from "../shared/contract.ts";
+import type { SkillDraftInput } from "../shared/contract.ts";
 import { errorMessage } from "../api/api.ts";
 import { XIcon } from "./Icons.tsx";
 
-/**
- * 添加/编辑用户技能的对话框。名称新建时可填、编辑时禁用（路径即身份）。
- * 只能写 ~/.moros/skills 下的用户技能，由后端做目录约束。
- */
+/** 新增用户技能的对话框；技能只能加到 ~/.moros/skills，后端做目录约束。 */
 export function SkillDialog({
 	open,
-	detail,
 	onClose,
 	onSave,
 }: {
 	readonly open: boolean;
-	/** 编辑目标；缺省为新增。 */
-	readonly detail: SkillDocumentResult | undefined;
 	onClose(): void;
 	onSave(draft: SkillDraftInput): Promise<void>;
 }): JSX.Element | null {
-	const editing = detail !== undefined;
 	const [name, setName] = useState("");
 	const [description, setDescription] = useState("");
 	const [body, setBody] = useState("");
@@ -29,12 +22,12 @@ export function SkillDialog({
 
 	useEffect(() => {
 		if (!open) return;
-		setName(detail?.name ?? "");
-		setDescription(detail?.description ?? "");
-		setBody(detail?.body ?? "");
+		setName("");
+		setDescription("");
+		setBody("");
 		setError(undefined);
 		setSaving(false);
-	}, [open, detail]);
+	}, [open]);
 
 	if (!open) return null;
 
@@ -65,11 +58,11 @@ export function SkillDialog({
 			<div
 				className="modal discover-modal"
 				role="dialog"
-				aria-label={editing ? "编辑技能" : "添加技能"}
+				aria-label="添加技能"
 				onClick={(event) => event.stopPropagation()}
 			>
 				<div className="modal-head">
-					<h2>{editing ? "编辑技能" : "添加技能"}</h2>
+					<h2>添加技能</h2>
 					<button className="icon-button" aria-label="关闭" onClick={onClose}>
 						<XIcon size={16} />
 					</button>
@@ -80,12 +73,10 @@ export function SkillDialog({
 						<input
 							className="form-input"
 							value={name}
-							disabled={editing}
 							onChange={(event) => setName(event.target.value)}
 							placeholder="deploy-docs"
 							aria-label="技能名"
 						/>
-						{editing ? <span className="form-hint">编辑时技能名不可改</span> : null}
 					</label>
 					<label className="mcp-field">
 						<span className="detail-label">一句话描述</span>
@@ -114,7 +105,7 @@ export function SkillDialog({
 						取消
 					</button>
 					<button className="primary-button" disabled={saving} onClick={() => void submit()}>
-						{saving ? "保存中…" : editing ? "保存" : "添加"}
+						{saving ? "添加中…" : "添加"}
 					</button>
 				</div>
 			</div>

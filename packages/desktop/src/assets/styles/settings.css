@@ -251,7 +251,7 @@
 
 .skill-row {
 	display: flex;
-	align-items: baseline;
+	align-items: center;
 	gap: 8px;
 	padding: 7px 9px;
 	border-radius: 7px;
@@ -277,16 +277,6 @@
 
 .mcp-row strong {
 	font-size: var(--text-small);
-}
-
-.mcp-detail {
-	flex: 1;
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-	color: var(--text-faint);
-	font-size: var(--text-caption);
 }
 
 .mcp-health {

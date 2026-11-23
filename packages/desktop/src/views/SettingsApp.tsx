@@ -3,13 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type React
 import type { SettingsPatch, SettingsSnapshot } from "@moros/core/config/settings.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
 import type { SkillSummary } from "@moros/core/skills.ts";
-import type {
-	ConfigSummary,
-	McpServerDetail,
-	McpServerDraftInput,
-	SkillDocumentResult,
-	SkillDraftInput,
-} from "../shared/contract.ts";
+import type { ConfigSummary, McpServerDetail, McpServerDraftInput, SkillDraftInput } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { Dropdown } from "../components/Dropdown.tsx";
@@ -29,6 +23,7 @@ import {
 	ServerIcon,
 	SettingsIcon,
 	SlidersHorizontalIcon,
+	SparklesIcon,
 	SunIcon,
 	UserCogIcon,
 } from "../components/Icons.tsx";
@@ -80,10 +75,8 @@ export function SettingsApp(): JSX.Element {
 	const [loadError, setLoadError] = useState<string | undefined>(undefined);
 	/** MCP 对话框：undefined 关闭；{ detail } 编辑（detail 为 null 表示新增）。 */
 	const [mcpDialog, setMcpDialog] = useState<{ readonly detail: McpServerDetail | null } | undefined>(undefined);
-	/** 技能对话框：undefined 关闭；detail 为编辑目标，path 为编辑时原 SKILL.md 路径（新增时省略）。 */
-	const [skillDialog, setSkillDialog] = useState<
-		{ readonly detail: SkillDocumentResult | null; readonly path?: string } | undefined
-	>(undefined);
+	/** 技能对话框：仅新增，open 即显示。 */
+	const [skillDialogOpen, setSkillDialogOpen] = useState(false);
 	/** 本工作区是否有回合在飞；有则禁用 MCP 增删改（写通道侧也会拒绝，双层保护）。 */
 	const mcpBlocked = Object.values(state.runStates).some((run) => run === "running" || run === "paused");
 
@@ -207,15 +200,7 @@ export function SettingsApp(): JSX.Element {
 								notice("error", errorMessage(error));
 							}
 						}}
-						onSkillAdd={() => setSkillDialog({ detail: null })}
-						onSkillEdit={async (path) => {
-							try {
-								const detail = await call(window.moros.skillDetail(path));
-								setSkillDialog({ detail, path });
-							} catch (error) {
-								notice("error", errorMessage(error));
-							}
-						}}
+						onSkillAdd={() => setSkillDialogOpen(true)}
 						onSkillDelete={async (path) => {
 							if (
 								!(await confirm({
@@ -318,11 +303,10 @@ export function SettingsApp(): JSX.Element {
 				}}
 			/>
 			<SkillDialog
-				open={skillDialog !== undefined}
-				detail={skillDialog?.detail ?? undefined}
-				onClose={() => setSkillDialog(undefined)}
+				open={skillDialogOpen}
+				onClose={() => setSkillDialogOpen(false)}
 				onSave={async (draft: SkillDraftInput) => {
-					await call(window.moros.skillUpsert(draft, skillDialog?.path));
+					await call(window.moros.skillUpsert(draft));
 					await refresh();
 				}}
 			/>
@@ -893,7 +877,6 @@ function ExtensionsPanel({
 	onDelete,
 	onReload,
 	onSkillAdd,
-	onSkillEdit,
 	onSkillDelete,
 	onSkillImport,
 }: {
@@ -909,7 +892,6 @@ function ExtensionsPanel({
 	readonly onDelete: (name: string) => Promise<void>;
 	readonly onReload: () => Promise<void>;
 	readonly onSkillAdd: () => void;
-	readonly onSkillEdit: (path: string) => Promise<void>;
 	readonly onSkillDelete: (path: string) => Promise<void>;
 	readonly onSkillImport: () => Promise<void>;
 }): JSX.Element {
@@ -944,7 +926,6 @@ function ExtensionsPanel({
 						summary={summary}
 						mcpBlocked={mcpBlocked}
 						onAdd={onSkillAdd}
-						onEdit={onSkillEdit}
 						onDelete={onSkillDelete}
 						onImport={onSkillImport}
 					/>
@@ -982,13 +963,12 @@ function PluginsEmpty(): JSX.Element {
 	);
 }
 
-/** Skills：用户技能可增删改/导入；项目与共享目录技能只读。 */
+/** Skills：按来源分组，用户技能可添加/导入/删除，项目与共享目录技能只读。 */
 function SkillsPanel({
 	skills,
 	summary,
 	mcpBlocked,
 	onAdd,
-	onEdit,
 	onDelete,
 	onImport,
 }: {
@@ -996,56 +976,65 @@ function SkillsPanel({
 	readonly summary: ConfigSummary | undefined;
 	readonly mcpBlocked: boolean;
 	readonly onAdd: () => void;
-	readonly onEdit: (path: string) => Promise<void>;
 	readonly onDelete: (path: string) => Promise<void>;
 	readonly onImport: () => Promise<void>;
 }): JSX.Element {
+	// 只有用户级技能（~/.moros/skills 等）可删；项目与共享目录技能只读。
+	const userSkills = skills.filter((skill) => skill.scope === "user");
+	const readonlySkills = skills.filter((skill) => skill.scope === "project");
+	const renderRow = (skill: SkillSummary): JSX.Element => (
+		<div className="skill-row" key={`${skill.scope}:${skill.path}`}>
+			<span className="ext-row-icon">
+				<SparklesIcon size={14} />
+			</span>
+			<span className="ext-row-main">
+				<strong>{skill.name}</strong>
+				<span className="ext-row-desc">{skill.description || "无描述"}</span>
+			</span>
+			{skill.scope === "user" ? (
+				<span className="mcp-actions">
+					<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onDelete(skill.path)}>
+						删除
+					</button>
+				</span>
+			) : (
+				<span className="pill">只读</span>
+			)}
+		</div>
+	);
 	return (
 		<SettingsSection
 			title="Skills"
-			description="用户技能可在此添加与编辑；项目与共享目录技能只读，模型按需加载其 SKILL.md。"
+			description="用户技能可在此添加、导入与删除；项目与共享目录技能只读，模型按需加载其 SKILL.md。"
 		>
-			<div className="section-head">
+			<div className="ext-actions">
+				<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onImport()}>
+					从文件夹导入
+				</button>
 				<button className="primary-button small" disabled={mcpBlocked} onClick={onAdd}>
 					<PlusIcon size={14} />
 					添加技能
 				</button>
-				<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onImport()}>
-					从文件夹导入
-				</button>
 			</div>
-			{mcpBlocked ? <div className="mcp-busy-hint">当前有回合正在运行，期间不能新增、编辑或删除技能。</div> : null}
+			{mcpBlocked ? <div className="mcp-busy-hint">当前有回合正在运行，期间不能添加或删除技能。</div> : null}
 			{skills.length === 0 ? (
 				<div className="settings-empty-hint">
 					没有可用技能。点「添加技能」新建，或从文件夹导入一个含 <code>SKILL.md</code> 的目录。
 				</div>
 			) : (
 				<div className="skill-list">
-					{skills.map((skill) => (
-						<div className="skill-row" key={`${skill.scope}:${skill.path}`}>
-							<span className={`pill ${skill.scope === "project" ? "warn" : ""}`}>
-								{skill.scope === "project" ? "项目" : "用户"}
-							</span>
-							<strong>{skill.name}</strong>
-							<span>{skill.description}</span>
-							{skill.scope === "user" ? (
-								<span className="mcp-actions">
-									<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onEdit(skill.path)}>
-										编辑
-									</button>
-									<button
-										className="ghost-button small"
-										disabled={mcpBlocked}
-										onClick={() => void onDelete(skill.path)}
-									>
-										删除
-									</button>
-								</span>
-							) : (
-								<span className="m">只读</span>
-							)}
-						</div>
-					))}
+					{userSkills.length > 0 ? (
+						<>
+							<div className="ext-group-title">用户技能</div>
+							{userSkills.map(renderRow)}
+						</>
+					) : null}
+					{readonlySkills.length > 0 ? (
+						<>
+							<div className="ext-group-title">项目与共享技能（只读）</div>
+							{readonlySkills.map(renderRow)}
+						</>
+					) : null}
 				</div>
 			)}
 			{summary !== undefined && summary.skipped.length > 0 ? (
@@ -1055,6 +1044,22 @@ function SkillsPanel({
 			) : null}
 		</SettingsSection>
 	);
+}
+
+/** MCP 连接状态的中文文案：用语义词替代原始枚举值，便于一眼读懂。 */
+function mcpStatusLabel(status: string): string {
+	switch (status) {
+		case "connected":
+			return "已连接";
+		case "connecting":
+			return "连接中";
+		case "unreachable":
+			return "连接失败";
+		case "disabled":
+			return "已禁用";
+		default:
+			return "未连接";
+	}
 }
 
 /** MCP：外部工具服务器的连接状态与管理，回合运行中禁止增删改。 */
@@ -1086,18 +1091,20 @@ function McpPanel({
 				<span className="mcp-summary">
 					{mcp.length === 0 ? "未配置 server" : `${connected} / ${mcp.length} 已连接`}
 				</span>
-				<button className="ghost-button small" onClick={() => void onHealth()}>
-					<RefreshIcon size={13} />
-					健康检查
-				</button>
-				<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onReload()}>
-					<RefreshIcon size={13} />
-					重新加载
-				</button>
-				<button className="primary-button small" disabled={mcpBlocked} onClick={onAdd}>
-					<PlusIcon size={14} />
-					添加连接器
-				</button>
+				<span className="ext-actions">
+					<button className="ghost-button small" onClick={() => void onHealth()}>
+						<RefreshIcon size={13} />
+						健康检查
+					</button>
+					<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onReload()}>
+						<RefreshIcon size={13} />
+						重新加载
+					</button>
+					<button className="primary-button small" disabled={mcpBlocked} onClick={onAdd}>
+						<PlusIcon size={14} />
+						添加连接器
+					</button>
+				</span>
 			</div>
 			{mcpBlocked ? (
 				<div className="mcp-busy-hint">当前有回合正在运行，期间不能新增、编辑或删除 MCP 服务器。</div>
@@ -1111,9 +1118,11 @@ function McpPanel({
 						return (
 							<div className={`mcp-row ${mcpBlocked ? "is-busy" : ""}`} key={server.name}>
 								<span className={`status-dot status-${isConnected ? "ok" : "error"}`} />
-								<strong>{server.name}</strong>
-								<span className="pill">{server.status}</span>
-								<span className="mcp-detail">{server.detail}</span>
+								<span className="ext-row-main">
+									<strong>{server.name}</strong>
+									<span className="ext-row-desc">{server.detail || "无详情"}</span>
+								</span>
+								<span className={`pill ${isConnected ? "" : "warn"}`}>{mcpStatusLabel(server.status)}</span>
 								<span className="mcp-actions">
 									<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onEdit(server.name)}>
 										编辑

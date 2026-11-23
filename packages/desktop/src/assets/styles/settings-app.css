@@ -516,6 +516,56 @@
 	animation: overlay-in var(--duration-normal) var(--ease-out);
 }
 
+/* 操作区：统一靠右，避免按钮散落在标题两侧；与 ZCode 的右上动作区一致。 */
+.ext-actions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-left: auto;
+}
+
+/* 来源分组小标题（用户技能 / 项目与共享技能）。 */
+.ext-group-title {
+	margin: 12px 0 4px;
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+
+.ext-group-title:first-child {
+	margin-top: 2px;
+}
+
+/* 行的主内容：图标 + 名称/描述；描述单行省略，长文本不撑破布局。 */
+.ext-row-icon {
+	display: inline-flex;
+	flex: none;
+	color: var(--text-faint);
+}
+
+.ext-row-main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	flex: 1;
+	gap: 2px;
+}
+
+.ext-row-main strong {
+	color: var(--text-primary);
+	font-size: var(--text-small);
+}
+
+.ext-row-desc {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--text-faint);
+	font-size: var(--text-caption);
+}
+
 /* 空态提示：与列表同宽的浅色说明块 */
 .settings-empty-hint {
 	padding: 16px;
