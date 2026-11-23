@@ -335,6 +335,11 @@ export function Composer(): JSX.Element {
 	/** 根据当前输入与光标重算补全浮层。 */
 	const updateCompletion = (value: string, cursor: number): void => {
 		if (completionDismissed.current) return;
+		// 光标紧跟空白时不算活动 token：插入 @path/$name 后的尾随空格不该再弹补全。
+		if (cursor > 0 && /\s/.test(value[cursor - 1] ?? "")) {
+			setCompletion(undefined);
+			return;
+		}
 		const detected = findSlashToken(value, cursor) ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
 		if (detected === undefined) {
 			setCompletion(undefined);
@@ -661,6 +666,7 @@ export function Composer(): JSX.Element {
 						ref={textarea}
 						value={text}
 						rows={1}
+						spellCheck={false}
 						disabled={disabled}
 						placeholder={
 							trustBlocked
