@@ -24,6 +24,8 @@ export function TooltipHost(): JSX.Element | null {
 	const bubbleRef = useRef<HTMLDivElement>(null);
 	const timer = useRef<number | undefined>(undefined);
 	const activeTarget = useRef<HTMLElement | undefined>(undefined);
+	/** 点击后短暂抑制提示：点击常伴随聚焦/菜单展开，此时提示会与浮层重叠。 */
+	const suppressUntil = useRef(0);
 
 	useEffect(() => {
 		const findTarget = (node: EventTarget | null): HTMLElement | undefined => {
@@ -43,17 +45,42 @@ export function TooltipHost(): JSX.Element | null {
 		};
 		/** 目标是否仍挂在文档里且可见；脱离 DOM（如双击重命名把 h2 换成 input）时不再定位。 */
 		const isTargetValid = (target: HTMLElement): boolean => target.isConnected && target.getClientRects().length > 0;
+		/**
+		 * 目标已展开浮层时不再显示提示。
+		 * 下拉框把 data-tooltip 放在根元素上、菜单是其子元素，鼠标停在触发器或菜单上时
+		 * 都会匹配到同一个提示；不抑制就会与展开的菜单重叠（其他弹层同理）。
+		 */
+		const isSuppressed = (target: HTMLElement): boolean => {
+			if (Date.now() < suppressUntil.current) return true;
+			// 全局有任何浮层展开时都不显示提示（时间上先于 target 子树渲染完成）。
+			if (
+				document.querySelector(
+					'.dropdown-trigger.is-open, .dropdown-menu, [role="listbox"], .modal-backdrop, .inline-completion, .ext-add-dropdown, .completion-list',
+				) !== null
+			) {
+				return true;
+			}
+			return (
+				target.querySelector(
+					'.dropdown-trigger.is-open, .dropdown-menu, [role="listbox"], .modal-backdrop, .inline-completion, .ext-add-dropdown',
+				) !== null
+			);
+		};
 		/** 悬停：先取消旧计时，延迟后再显示，避免划过时逐个弹出。 */
 		const scheduleShow = (target: HTMLElement): void => {
 			const text = target.dataset.tooltip;
-			if (text === undefined || text.length === 0) return;
+			if (text === undefined || text.length === 0 || isSuppressed(target)) {
+				hide();
+				return;
+			}
 			if (activeTarget.current === target && timer.current === undefined) return;
 			clearTimer();
 			activeTarget.current = target;
 			timer.current = window.setTimeout(() => {
 				timer.current = undefined;
-				// 延迟期间目标可能已被替换/移除，此时其矩形为 0 导致气泡跑到左上角。
-				if (!isTargetValid(target)) {
+				// 延迟期间：目标可能被替换/移除（矩形为 0 气泡会飞到左上角），
+				// 或已展开菜单/弹层（提示会盖在浮层上）；两种情况都不显示。
+				if (!isTargetValid(target) || isSuppressed(target) || activeTarget.current !== target) {
 					hide();
 					return;
 				}
@@ -64,7 +91,7 @@ export function TooltipHost(): JSX.Element | null {
 		/** 键盘聚焦：无障碍场景下即时显示。 */
 		const showNow = (target: HTMLElement): void => {
 			const text = target.dataset.tooltip;
-			if (text === undefined || text.length === 0 || !isTargetValid(target)) return;
+			if (text === undefined || text.length === 0 || !isTargetValid(target) || isSuppressed(target)) return;
 			clearTimer();
 			activeTarget.current = target;
 			const rect = target.getBoundingClientRect();
@@ -105,6 +132,14 @@ export function TooltipHost(): JSX.Element | null {
 		});
 		observer.observe(document.body, { childList: true, subtree: true });
 
+		// 点击即隐藏：打开菜单/弹窗后鼠标仍停在触发器上，若不主动隐藏提示会一直盖在浮层上。
+		// 短暂抑制覆盖随后的 focusin/pointerover（菜单可能还在 React 渲染中）。
+		const onPointerDown = (): void => {
+			suppressUntil.current = Date.now() + 300;
+			hide();
+		};
+
+		document.addEventListener("pointerdown", onPointerDown, true);
 		document.addEventListener("pointerover", onOver);
 		document.addEventListener("pointermove", onMove);
 		document.addEventListener("pointerout", onOut);
@@ -115,6 +150,7 @@ export function TooltipHost(): JSX.Element | null {
 		return () => {
 			clearTimer();
 			observer.disconnect();
+			document.removeEventListener("pointerdown", onPointerDown, true);
 			document.removeEventListener("pointerover", onOver);
 			document.removeEventListener("pointermove", onMove);
 			document.removeEventListener("pointerout", onOut);
