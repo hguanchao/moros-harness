@@ -24,6 +24,37 @@ const WorkspaceTargetSchema = z.discriminatedUnion("kind", [
 	z.object({ kind: z.literal("tasks") }).strict(),
 	z.object({ kind: z.literal("project"), root: z.string().min(1).max(4096) }).strict(),
 ]);
+
+/** MCP server 名：与 core 的 SERVER_NAME_PATTERN 一致。 */
+const McpServerNameSchema = z
+	.string()
+	.min(1)
+	.max(64)
+	.regex(/^[A-Za-z0-9_-]+$/);
+const McpPairsSchema = z
+	.record(z.string().min(1).max(256), z.string().max(8192))
+	.refine((pairs) => Object.keys(pairs).length <= 64, "too many pairs (max 64)");
+/** 设置页填写的 server 草稿；stdio 要 command，http/sse 要 http(s) URL。 */
+const McpServerDraftSchema = z.discriminatedUnion("type", [
+	z
+		.object({
+			type: z.literal("stdio"),
+			command: z.string().min(1).max(4096),
+			args: z.array(z.string().max(4096)).max(64).optional(),
+			env: McpPairsSchema.optional(),
+		})
+		.strict(),
+	z
+		.object({
+			type: z.enum(["http", "sse"]),
+			url: z
+				.string()
+				.url()
+				.refine((value) => ["http:", "https:"].includes(new URL(value).protocol), "url must use http or https"),
+			headers: McpPairsSchema.optional(),
+		})
+		.strict(),
+]);
 const ReasoningEffortSchema = z.enum(["off", "minimal", "low", "medium", "high", "max"]);
 const ApprovalModeSchema = z.enum(["ask", "auto", "yolo"]);
 
@@ -321,6 +352,12 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.mcpStatus, getWindow, z.tuple([]), () => host.mcpStatus());
 	handle(IPC.mcpReconnect, getWindow, z.tuple([z.string().min(1).max(200)]), ([name]) => host.mcpReconnect(name));
 	handle(IPC.mcpHealth, getWindow, z.tuple([]), () => host.mcpHealth());
+	handle(IPC.mcpServerUpsert, getWindow, z.tuple([McpServerNameSchema, McpServerDraftSchema]), ([name, draft]) =>
+		host.upsertMcpServer(name, draft),
+	);
+	handle(IPC.mcpServerRemove, getWindow, z.tuple([McpServerNameSchema]), ([name]) => host.removeMcpServer(name));
+	handle(IPC.mcpServerDetail, getWindow, z.tuple([McpServerNameSchema]), ([name]) => host.mcpServerDetail(name));
+	handle(IPC.mcpReload, getWindow, z.tuple([]), () => host.reloadMcp());
 
 	handle(IPC.imagesPick, getWindow, z.tuple([]), () => host.prepareImageFromDialog());
 	handle(

@@ -551,3 +551,63 @@
 	white-space: pre-wrap;
 	overflow-wrap: anywhere;
 }
+
+/* MCP 行内操作按钮与禁用提示 */
+.mcp-actions {
+	display: inline-flex;
+	gap: 6px;
+	margin-left: auto;
+}
+
+.mcp-row.is-busy .mcp-actions button:not(:disabled),
+.mcp-busy-hint {
+	opacity: 0.55;
+}
+
+.mcp-busy-hint {
+	color: var(--warn);
+	font-size: var(--text-caption);
+}
+
+/* 添加/编辑 MCP server 对话框 */
+.mcp-dialog-body {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	margin: 8px 0 4px;
+}
+
+.mcp-field {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.mcp-transport-switch {
+	display: flex;
+	gap: 2px;
+}
+
+.mcp-field .form-input,
+.mcp-field .form-area {
+	width: 100%;
+	padding: 7px 9px;
+	border: 1px solid var(--line-strong);
+	border-radius: var(--r-md);
+	background: var(--surface-main);
+	color: var(--text-primary);
+	font-family: inherit;
+	font-size: var(--text-small);
+	resize: vertical;
+}
+
+.mcp-field .form-input:focus,
+.mcp-field .form-area:focus {
+	outline: none;
+	border-color: var(--accent);
+}
+
+.mcp-field .form-hint {
+	color: var(--text-faint);
+	font-size: var(--text-caption);
+}

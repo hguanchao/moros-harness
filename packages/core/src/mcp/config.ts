@@ -19,14 +19,14 @@ const SERVER_TYPES = ["stdio", "http", "sse"] as const satisfies readonly McpSer
  * 校验直接复用 parseMcpServers，避免两处规则漂移。
  */
 export interface McpServerDraft {
-	readonly type?: "stdio" | "http" | "sse";
-	readonly command?: string;
-	readonly args?: readonly string[];
-	readonly url?: string;
-	readonly headers?: Readonly<Record<string, string>>;
-	readonly env?: Readonly<Record<string, string>>;
-	readonly timeout?: number;
-	readonly disabled?: boolean;
+	readonly type?: "stdio" | "http" | "sse" | undefined;
+	readonly command?: string | undefined;
+	readonly args?: readonly string[] | undefined;
+	readonly url?: string | undefined;
+	readonly headers?: Readonly<Record<string, string>> | undefined;
+	readonly env?: Readonly<Record<string, string>> | undefined;
+	readonly timeout?: number | undefined;
+	readonly disabled?: boolean | undefined;
 }
 
 /** 校验并规范化一个 server 草稿；非法时抛错（消息可直接展示给使用者）。 */

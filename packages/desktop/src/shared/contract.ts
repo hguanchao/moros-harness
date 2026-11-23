@@ -95,6 +95,10 @@ export const IPC = {
 	mcpStatus: "moros:mcp-status",
 	mcpReconnect: "moros:mcp-reconnect",
 	mcpHealth: "moros:mcp-health",
+	mcpServerUpsert: "moros:mcp-server-upsert",
+	mcpServerRemove: "moros:mcp-server-remove",
+	mcpServerDetail: "moros:mcp-server-detail",
+	mcpReload: "moros:mcp-reload",
 	imagesPick: "moros:images-pick",
 	imagesFromBytes: "moros:images-from-bytes",
 	imagesFromUrl: "moros:images-from-url",
@@ -357,6 +361,27 @@ export interface ConfigSummary {
 	readonly ui?: Record<string, unknown>;
 }
 
+/**
+ * 设置页填写的 MCP server 草稿（IPC 传输用，三个形态互斥）。
+ * 与 core 的 McpServerDraft 对应；完整字段由表单录入，高级项（timeout/disabled）
+ * 由 core 的 writer 在编辑时原位保留。
+ */
+export type McpServerDraftInput =
+	| {
+			readonly type: "stdio";
+			readonly command: string;
+			readonly args?: readonly string[] | undefined;
+			readonly env?: Readonly<Record<string, string>> | undefined;
+	  }
+	| {
+			readonly type: "http" | "sse";
+			readonly url: string;
+			readonly headers?: Readonly<Record<string, string>> | undefined;
+	  };
+
+/** MCP server 详情（编辑表单回填用；只有表单暴露的字段，高级项不回传）。 */
+export type McpServerDetail = McpServerDraftInput & { readonly name: string };
+
 export type PushMessage =
 	| { readonly type: "event"; readonly sessionId: string; readonly event: EventRecord }
 	| {
@@ -529,6 +554,10 @@ export interface DesktopBridge {
 	mcpStatus(): Promise<RpcResult<readonly McpStatus[]>>;
 	mcpReconnect(name: string): Promise<RpcResult<string>>;
 	mcpHealth(): Promise<RpcResult<readonly string[]>>;
+	mcpServerUpsert(name: string, draft: McpServerDraftInput): Promise<RpcResult<McpServerDetail>>;
+	mcpServerRemove(name: string): Promise<RpcResult<void>>;
+	mcpServerDetail(name: string): Promise<RpcResult<McpServerDetail | null>>;
+	mcpReload(): Promise<RpcResult<void>>;
 
 	imagesPick(): Promise<RpcResult<PreparedImage | null>>;
 	imagesFromBytes(bytes: Uint8Array, mediaType?: string): Promise<RpcResult<PreparedImage>>;

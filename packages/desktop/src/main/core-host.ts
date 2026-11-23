@@ -56,6 +56,8 @@ import {
 	type GitBranches,
 	type GitCheckoutResult,
 	type LiveState,
+	type McpServerDetail,
+	type McpServerDraftInput,
 	type PreparedImage,
 	type ProjectSelection,
 	type ProjectSnapshot,
@@ -1041,6 +1043,51 @@ export class DesktopHost {
 
 	async mcpHealth(): Promise<readonly string[]> {
 		return this.#requiredCore().healthCheckMcp(this.#requiredProject());
+	}
+
+	/** 当前工作区是否有回合在飞；有则拒绝改 MCP 配置，避免运行中工具面不一致。 */
+	#assertMcpIdle(): void {
+		const root = this.#requiredProject();
+		if (this.#hasWorkInRoot(root))
+			throw new Error("A turn is running; wait for it to finish before changing MCP servers");
+	}
+
+	async upsertMcpServer(name: string, draft: McpServerDraftInput): Promise<McpServerDetail> {
+		this.#assertMcpIdle();
+		const core = this.#requiredCore();
+		const config = await core.upsertMcpServer(this.#requiredProject(), name, draft);
+		await this.#refreshCatalog();
+		await this.#pushViewIfCurrent(this.#current?.meta.id);
+		// 详情只回填表单暴露的字段；高级项由 writer 编辑时原位保留。
+		return config.type === "stdio"
+			? { name: config.name, type: "stdio", command: config.command ?? "", args: config.args, env: config.env }
+			: { name: config.name, type: config.type, url: config.url ?? "", headers: config.headers };
+	}
+
+	async removeMcpServer(name: string): Promise<void> {
+		this.#assertMcpIdle();
+		await this.#requiredCore().removeMcpServer(this.#requiredProject(), name);
+		await this.#refreshCatalog();
+		await this.#pushViewIfCurrent(this.#current?.meta.id);
+	}
+
+	async reloadMcp(): Promise<void> {
+		this.#assertMcpIdle();
+		await this.#requiredCore().reloadMcp(this.#requiredProject());
+		await this.#refreshCatalog();
+		await this.#pushViewIfCurrent(this.#current?.meta.id);
+	}
+
+	async mcpServerDetail(name: string): Promise<McpServerDetail | null> {
+		// 配置完整字段只在 core 内存里；通过 configSummary 只能拿到 name/type/enabled。
+		// 为避免在 host 里重复解析 TOML，detail 只回填已知基础信息，表单未覆盖的高级项
+		// 由 core writer 在 upsert 时原位保留（见 updateGlobalMcpServers）。
+		const summary = await this.configSummary();
+		const entry = summary.mcpServers.find((server) => server.name === name);
+		if (entry === undefined) return null;
+		return entry.type === "stdio"
+			? { name, type: "stdio", command: "" }
+			: { name, type: entry.type === "sse" ? "sse" : "http", url: "" };
 	}
 
 	async prepareImageFromDialog(): Promise<PreparedImage | null> {

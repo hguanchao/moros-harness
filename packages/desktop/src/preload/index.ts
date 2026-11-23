@@ -88,6 +88,10 @@ const bridge: DesktopBridge = {
 	mcpStatus: () => invoke(IPC.mcpStatus),
 	mcpReconnect: (name) => invoke(IPC.mcpReconnect, name),
 	mcpHealth: () => invoke(IPC.mcpHealth),
+	mcpServerUpsert: (name, draft) => invoke(IPC.mcpServerUpsert, name, draft),
+	mcpServerRemove: (name) => invoke(IPC.mcpServerRemove, name),
+	mcpServerDetail: (name) => invoke(IPC.mcpServerDetail, name),
+	mcpReload: () => invoke(IPC.mcpReload),
 
 	imagesPick: () => invoke(IPC.imagesPick),
 	imagesFromBytes: (bytes, mediaType) => invoke(IPC.imagesFromBytes, bytes, mediaType),

@@ -929,6 +929,50 @@ describe("desktop workspace IPC and preload", () => {
 		expect(await handler(untrusted, { kind: "tasks" })).toMatchObject({ ok: false, error: { code: "unauthorized" } });
 	});
 
+	it("IPC 新增/删除 MCP server 写回 config.toml 并反映到状态", async () => {
+		const input = await fixture();
+		await mkdir(join(input.homeDir, ".moros"));
+		await writeFile(join(input.homeDir, ".moros", "config.toml"), '# 顶层注释\nprovider = "local"\n', "utf8");
+		const { host } = await openHost(input);
+		const root = await projectDirectory(input, "mcp-project");
+		await host.openProject(root);
+		const client = ipcClient(host);
+
+		const added = await client.request(IPC.mcpServerUpsert, "docs", {
+			type: "stdio",
+			command: process.execPath,
+			args: ["-v"],
+		});
+		if (!added.ok) throw new Error(`upsert failed: ${added.error.message}`);
+		expect(added.value).toMatchObject({ name: "docs", type: "stdio", command: process.execPath });
+
+		const text = await readFile(join(input.homeDir, ".moros", "config.toml"), "utf8");
+		expect(text).toContain("# 顶层注释");
+		expect(text).toContain("[mcp_servers.docs]");
+
+		const status = await client.request(IPC.mcpStatus);
+		if (!status.ok) throw new Error(`status failed: ${status.error.message}`);
+		expect((status.value as readonly { name: string }[]).map((server) => server.name)).toContain("docs");
+
+		const removed = await client.request(IPC.mcpServerRemove, "docs");
+		expect(removed.ok).toBe(true);
+		expect(await readFile(join(input.homeDir, ".moros", "config.toml"), "utf8")).not.toContain("[mcp_servers.docs]");
+	});
+
+	it("IPC 校验拒绝非法 MCP 草稿，不写回配置", async () => {
+		const input = await fixture();
+		await mkdir(join(input.homeDir, ".moros"));
+		await writeFile(join(input.homeDir, ".moros", "config.toml"), 'provider = "local"\n', "utf8");
+		const { host } = await openHost(input);
+		const root = await projectDirectory(input, "mcp-invalid");
+		await host.openProject(root);
+		const client = ipcClient(host);
+
+		const result = await client.request(IPC.mcpServerUpsert, "bad.name", { type: "stdio", command: "npx" });
+		expect(result.ok).toBe(false);
+		expect(await readFile(join(input.homeDir, ".moros", "config.toml"), "utf8")).toBe('provider = "local"\n');
+	});
+
 	it("preload 原样转发新 bridge 的 target/input 与新 IPC 键", async () => {
 		await import("../src/preload/index.ts");
 		const bridge = electronMock.expose.mock.calls[0]?.[1] as DesktopBridge | undefined;
@@ -951,6 +995,10 @@ describe("desktop workspace IPC and preload", () => {
 		await bridge.sessionPin("session-id", true);
 		await bridge.sidebarSetWidth(320);
 		await bridge.chatSend({ sessionId: "session-id", text: "message" });
+		await bridge.mcpServerUpsert("docs", { type: "stdio", command: "npx" });
+		await bridge.mcpServerRemove("docs");
+		await bridge.mcpServerDetail("docs");
+		await bridge.mcpReload();
 
 		expect(electronMock.invoke.mock.calls).toEqual([
 			[IPC.appSelectProjectDialog],
@@ -968,6 +1016,10 @@ describe("desktop workspace IPC and preload", () => {
 			[IPC.sessionPin, "session-id", true],
 			[IPC.sidebarSetWidth, 320],
 			[IPC.chatSend, { sessionId: "session-id", text: "message" }],
+			[IPC.mcpServerUpsert, "docs", { type: "stdio", command: "npx" }],
+			[IPC.mcpServerRemove, "docs"],
+			[IPC.mcpServerDetail, "docs"],
+			[IPC.mcpReload],
 		]);
 	});
 });

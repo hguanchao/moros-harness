@@ -3,9 +3,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type React
 import type { SettingsPatch, SettingsSnapshot } from "@moros/core/config/settings.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
 import type { SkillSummary } from "@moros/core/skills.ts";
-import type { ConfigSummary } from "../shared/contract.ts";
+import type { ConfigSummary, McpServerDetail, McpServerDraftInput } from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
+import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { Dropdown } from "../components/Dropdown.tsx";
+import { McpServerDialog } from "../components/McpServerDialog.tsx";
 import {
 	ArchiveIcon2,
 	ArrowLeftIcon,
@@ -61,6 +63,7 @@ const NAV_GROUPS: readonly NavGroup[] = [
 /** 设置独立视图：自带顶栏与左侧导航，整窗替代主工作区。 */
 export function SettingsApp(): JSX.Element {
 	const { state, dispatch } = useApp();
+	const { confirm } = useConfirm();
 	const [active, setActive] = useState("appearance");
 	const [settings, setSettings] = useState<SettingsSnapshot | undefined>(undefined);
 	const [summary, setSummary] = useState<ConfigSummary | undefined>(undefined);
@@ -68,6 +71,10 @@ export function SettingsApp(): JSX.Element {
 	const [mcp, setMcp] = useState<readonly McpStatus[]>([]);
 	const [mcpHealth, setMcpHealth] = useState<readonly string[]>([]);
 	const [loadError, setLoadError] = useState<string | undefined>(undefined);
+	/** MCP 对话框：undefined 关闭；{ detail } 编辑（detail 为 null 表示新增）。 */
+	const [mcpDialog, setMcpDialog] = useState<{ readonly detail: McpServerDetail | null } | undefined>(undefined);
+	/** 本工作区是否有回合在飞；有则禁用 MCP 增删改（写通道侧也会拒绝，双层保护）。 */
+	const mcpBlocked = Object.values(state.runStates).some((run) => run === "running" || run === "paused");
 
 	const refresh = useCallback(async (): Promise<void> => {
 		try {
@@ -134,6 +141,7 @@ export function SettingsApp(): JSX.Element {
 						skills={skills}
 						mcp={mcp}
 						mcpHealth={mcpHealth}
+						mcpBlocked={mcpBlocked}
 						onHealth={async () => {
 							try {
 								setMcpHealth(await call(window.moros.mcpHealth()));
@@ -145,6 +153,45 @@ export function SettingsApp(): JSX.Element {
 							try {
 								notice("info", await call(window.moros.mcpReconnect(name)));
 								setMcp(await call(window.moros.mcpStatus()));
+							} catch (error) {
+								notice("error", errorMessage(error));
+							}
+						}}
+						onAdd={() => setMcpDialog({ detail: null })}
+						onEdit={async (name) => {
+							try {
+								const detail = await call(window.moros.mcpServerDetail(name));
+								if (detail === null || detail === undefined) {
+									notice("error", `找不到 MCP server：${name}`);
+									return;
+								}
+								setMcpDialog({ detail });
+							} catch (error) {
+								notice("error", errorMessage(error));
+							}
+						}}
+						onDelete={async (name) => {
+							if (
+								!(await confirm({
+									title: "删除 MCP 服务器",
+									message: `删除会从 config.toml 移除 ${name} 并断开连接，不能撤销。`,
+									confirmLabel: "删除",
+									danger: true,
+								}))
+							) {
+								return;
+							}
+							try {
+								await call(window.moros.mcpServerRemove(name));
+								await refresh();
+							} catch (error) {
+								notice("error", errorMessage(error));
+							}
+						}}
+						onReload={async () => {
+							try {
+								await call(window.moros.mcpReload());
+								await refresh();
 							} catch (error) {
 								notice("error", errorMessage(error));
 							}
@@ -181,39 +228,50 @@ export function SettingsApp(): JSX.Element {
 	};
 
 	return (
-		<div className="settings-app">
-			<div className="settings-app-body">
-				<nav className={`settings-nav ${state.sidebarOpen ? "" : "is-collapsed"}`} aria-label="设置导航">
-					<button className="settings-back" onClick={() => dispatch({ type: "page", page: "chat" })}>
-						<ArrowLeftIcon size={15} />
-						<span>返回工作区</span>
-					</button>
-					<div className="settings-nav-scroll">
-						{NAV_GROUPS.map((group) => (
-							<div className="settings-nav-group" key={group.title}>
-								<div className="settings-nav-group-title">{group.title}</div>
-								{group.items.map(([key, label, Icon]) => (
-									<button
-										key={key}
-										className={`settings-nav-item ${active === key ? "is-active" : ""}`}
-										onClick={() => setActive(key)}
-									>
-										<Icon size={16} />
-										<span>{label}</span>
-									</button>
-								))}
-							</div>
-						))}
-					</div>
-				</nav>
-				<main className="settings-content">
-					<div className={`settings-content-inner ${active === "providers" ? "is-wide" : ""}`}>
-						{active !== "providers" ? <h1 className="settings-page-title">{activeLabel}</h1> : null}
-						{renderContent()}
-					</div>
-				</main>
+		<>
+			<div className="settings-app">
+				<div className="settings-app-body">
+					<nav className={`settings-nav ${state.sidebarOpen ? "" : "is-collapsed"}`} aria-label="设置导航">
+						<button className="settings-back" onClick={() => dispatch({ type: "page", page: "chat" })}>
+							<ArrowLeftIcon size={15} />
+							<span>返回工作区</span>
+						</button>
+						<div className="settings-nav-scroll">
+							{NAV_GROUPS.map((group) => (
+								<div className="settings-nav-group" key={group.title}>
+									<div className="settings-nav-group-title">{group.title}</div>
+									{group.items.map(([key, label, Icon]) => (
+										<button
+											key={key}
+											className={`settings-nav-item ${active === key ? "is-active" : ""}`}
+											onClick={() => setActive(key)}
+										>
+											<Icon size={16} />
+											<span>{label}</span>
+										</button>
+									))}
+								</div>
+							))}
+						</div>
+					</nav>
+					<main className="settings-content">
+						<div className={`settings-content-inner ${active === "providers" ? "is-wide" : ""}`}>
+							{active !== "providers" ? <h1 className="settings-page-title">{activeLabel}</h1> : null}
+							{renderContent()}
+						</div>
+					</main>
+				</div>
 			</div>
-		</div>
+			<McpServerDialog
+				open={mcpDialog !== undefined}
+				detail={mcpDialog?.detail ?? undefined}
+				onClose={() => setMcpDialog(undefined)}
+				onSave={async (name, draft: McpServerDraftInput) => {
+					await call(window.moros.mcpServerUpsert(name, draft));
+					await refresh();
+				}}
+			/>
+		</>
 	);
 }
 
@@ -772,15 +830,25 @@ function ExtensionsPanel({
 	skills,
 	mcp,
 	mcpHealth,
+	mcpBlocked,
 	onHealth,
 	onReconnect,
+	onAdd,
+	onEdit,
+	onDelete,
+	onReload,
 }: {
 	readonly summary: ConfigSummary | undefined;
 	readonly skills: readonly SkillSummary[];
 	readonly mcp: readonly McpStatus[];
 	readonly mcpHealth: readonly string[];
+	readonly mcpBlocked: boolean;
 	readonly onHealth: () => Promise<void>;
 	readonly onReconnect: (name: string) => Promise<void>;
+	readonly onAdd: () => void;
+	readonly onEdit: (name: string) => Promise<void>;
+	readonly onDelete: (name: string) => Promise<void>;
+	readonly onReload: () => Promise<void>;
 }): JSX.Element {
 	const [tab, setTab] = useState<ExtensionTab>("skills");
 	const tabs: readonly { readonly key: ExtensionTab; readonly label: string }[] = [
@@ -809,7 +877,17 @@ function ExtensionsPanel({
 				{tab === "plugins" ? <PluginsEmpty /> : null}
 				{tab === "skills" ? <SkillsPanel skills={skills} summary={summary} /> : null}
 				{tab === "mcp" ? (
-					<McpPanel mcp={mcp} mcpHealth={mcpHealth} onHealth={onHealth} onReconnect={onReconnect} />
+					<McpPanel
+						mcp={mcp}
+						mcpHealth={mcpHealth}
+						mcpBlocked={mcpBlocked}
+						onHealth={onHealth}
+						onReconnect={onReconnect}
+						onAdd={onAdd}
+						onEdit={onEdit}
+						onDelete={onDelete}
+						onReload={onReload}
+					/>
 				) : null}
 			</div>
 		</div>
@@ -867,24 +945,31 @@ function SkillsPanel({
 	);
 }
 
-/** MCP：外部工具服务器的连接状态，支持健康检查与重连。 */
+/** MCP：外部工具服务器的连接状态与管理，回合运行中禁止增删改。 */
 function McpPanel({
 	mcp,
 	mcpHealth,
+	mcpBlocked,
 	onHealth,
 	onReconnect,
+	onAdd,
+	onEdit,
+	onDelete,
+	onReload,
 }: {
 	readonly mcp: readonly McpStatus[];
 	readonly mcpHealth: readonly string[];
+	readonly mcpBlocked: boolean;
 	readonly onHealth: () => Promise<void>;
 	readonly onReconnect: (name: string) => Promise<void>;
+	readonly onAdd: () => void;
+	readonly onEdit: (name: string) => Promise<void>;
+	readonly onDelete: (name: string) => Promise<void>;
+	readonly onReload: () => Promise<void>;
 }): JSX.Element {
 	const connected = mcp.filter((server) => server.status === "connected").length;
 	return (
-		<SettingsSection
-			title="MCP"
-			description="外部工具服务器为 Agent 提供额外工具；在配置文件中添加 server 后在此查看连接状态。"
-		>
+		<SettingsSection title="MCP" description="外部工具服务器为 Agent 提供额外工具；添加或编辑后连接到下一回合生效。">
 			<div className="section-head">
 				<span className="mcp-summary">
 					{mcp.length === 0 ? "未配置 server" : `${connected} / ${mcp.length} 已连接`}
@@ -893,22 +978,45 @@ function McpPanel({
 					<RefreshIcon size={13} />
 					健康检查
 				</button>
+				<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onReload()}>
+					<RefreshIcon size={13} />
+					重新加载
+				</button>
+				<button className="primary-button small" disabled={mcpBlocked} onClick={onAdd}>
+					<PlusIcon size={14} />
+					添加连接器
+				</button>
 			</div>
+			{mcpBlocked ? (
+				<div className="mcp-busy-hint">当前有回合正在运行，期间不能新增、编辑或删除 MCP 服务器。</div>
+			) : null}
 			{mcp.length === 0 ? (
-				<div className="settings-empty-hint">没有配置 MCP server。在配置文件中添加后，连接状态会显示在这里。</div>
+				<div className="settings-empty-hint">没有配置 MCP server。点「添加连接器」新建一个。</div>
 			) : (
 				<div className="mcp-list">
 					{mcp.map((server) => {
 						const isConnected = server.status === "connected";
 						return (
-							<div className="mcp-row" key={server.name}>
+							<div className={`mcp-row ${mcpBlocked ? "is-busy" : ""}`} key={server.name}>
 								<span className={`status-dot status-${isConnected ? "ok" : "error"}`} />
 								<strong>{server.name}</strong>
 								<span className="pill">{server.status}</span>
 								<span className="mcp-detail">{server.detail}</span>
-								<button className="ghost-button small" onClick={() => void onReconnect(server.name)}>
-									重连
-								</button>
+								<span className="mcp-actions">
+									<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onEdit(server.name)}>
+										编辑
+									</button>
+									<button className="ghost-button small" onClick={() => void onReconnect(server.name)}>
+										重连
+									</button>
+									<button
+										className="ghost-button small"
+										disabled={mcpBlocked}
+										onClick={() => void onDelete(server.name)}
+									>
+										删除
+									</button>
+								</span>
 							</div>
 						);
 					})}
