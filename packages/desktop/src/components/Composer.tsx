@@ -26,8 +26,10 @@ import {
 	PlugIcon,
 	PlusIcon,
 	PointerIcon,
+	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
+	SparklesIcon,
 	StopIcon,
 	TerminalIcon,
 	XIcon,
@@ -687,6 +689,15 @@ export function Composer(): JSX.Element {
 								<span key={index}>{segment.text}</span>
 							) : (
 								<span className={`inline-chip inline-chip-${segment.chip.kind}`} key={index}>
+									<span className="inline-chip-icon">
+										{segment.chip.kind === "quote" ? (
+											<QuoteIcon size={10} />
+										) : segment.chip.kind === "file" ? (
+											<FolderIcon size={10} />
+										) : (
+											<SparklesIcon size={10} />
+										)}
+									</span>
 									{segment.text}
 									<button
 										type="button"

@@ -143,47 +143,62 @@
 	color: var(--text-primary);
 }
 
-/* 同排胶囊：用 box-shadow 撑出灰底与左右内边距，不改变文字宽度 → 光标精确对齐 */
+/* 同排胶囊：背景向左右各扩出 14px 容纳图标/×；文字本身宽度不变 → 光标精确对齐 */
 .inline-chip {
 	position: relative;
 	background: #e0e0e0;
 	border-radius: 4px;
-	box-shadow: 0 0 0 2px #e0e0e0;
+	box-shadow:
+		-14px 0 0 0 #e0e0e0,
+		14px 0 0 0 #e0e0e0;
 	color: var(--text-primary);
 }
 
 .inline-chip-skill {
 	background: var(--accent-soft);
-	box-shadow: 0 0 0 2px var(--accent-soft);
+	box-shadow:
+		-14px 0 0 0 var(--accent-soft),
+		14px 0 0 0 var(--accent-soft);
 }
 
 .inline-chip-quote {
 	background: var(--fill-soft);
-	box-shadow: 0 0 0 2px var(--fill-soft);
+	box-shadow:
+		-14px 0 0 0 var(--fill-soft),
+		14px 0 0 0 var(--fill-soft);
 }
 
-/* × 绝对定位在胶囊右端外侧，不占布局宽度，保证镜像文字与 textarea 光标对齐 */
-.inline-chip-remove {
+/* 图标与 × 绝对定位在胶囊左右两侧，始终可见，不占布局宽度 */
+.inline-chip-icon {
 	position: absolute;
-	right: -14px;
+	left: -13px;
 	top: 50%;
 	transform: translateY(-50%);
-	display: none;
+	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 12px;
-	height: 12px;
+	width: 11px;
+	height: 14px;
+	color: var(--text-faint);
+}
+
+.inline-chip-remove {
+	position: absolute;
+	right: -13px;
+	top: 50%;
+	transform: translateY(-50%);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 11px;
+	height: 14px;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
-	background: var(--surface-chrome);
-	color: var(--text-muted);
+	background: transparent;
+	color: var(--text-faint);
 	pointer-events: auto;
 	cursor: pointer;
-}
-
-.inline-chip:hover .inline-chip-remove {
-	display: inline-flex;
 }
 
 .inline-chip-remove:hover {
