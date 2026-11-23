@@ -70,6 +70,8 @@ import {
 	type SessionListQuery,
 	type SessionPage,
 	type SessionView,
+	type SkillDocumentResult,
+	type SkillDraftInput,
 	type TraceTurn,
 	type WorkspaceTarget,
 	type WorkspaceTrustView,
@@ -1006,6 +1008,38 @@ export class DesktopHost {
 		return this.#requiredCore().listSkills(this.#requiredProject());
 	}
 
+	/**
+	 * 新增或更新用户技能：path 省略时新建（draft.name 为目录名），传入时更新该路径的技能。
+	 * 写操作前检查工作区是否有回合在飞，避免运行中技能清单变化。
+	 */
+	async upsertSkill(draft: SkillDraftInput, path?: string): Promise<SkillSummary> {
+		this.#assertNoPendingWork();
+		const core = this.#requiredCore();
+		return path === undefined
+			? core.createSkill(draft.name, { description: draft.description, body: draft.body })
+			: core.updateSkill(path, { description: draft.description, body: draft.body });
+	}
+
+	async removeSkill(path: string): Promise<void> {
+		this.#assertNoPendingWork();
+		await this.#requiredCore().deleteSkill(path);
+	}
+
+	async skillDetail(path: string): Promise<SkillDocumentResult> {
+		return this.#requiredCore().getSkillDocument(path);
+	}
+
+	/** 弹出原生目录选择器，把选中的技能目录导入 ~/.moros/skills；取消返回 null。 */
+	async importSkill(): Promise<SkillSummary | null> {
+		this.#assertNoPendingWork();
+		const result = await showOpenDialog(this.#getWindow(), {
+			title: "选择技能目录（需含 SKILL.md）",
+			properties: ["openDirectory"],
+		});
+		if (result.canceled || result.filePaths[0] === undefined) return null;
+		return this.#requiredCore().importSkill(result.filePaths[0]);
+	}
+
 	async trustAccept(remember: boolean): Promise<WorkspaceTrustView> {
 		const core = this.#requiredCore();
 		const root = this.#requiredProject();
@@ -1045,15 +1079,15 @@ export class DesktopHost {
 		return this.#requiredCore().healthCheckMcp(this.#requiredProject());
 	}
 
-	/** 当前工作区是否有回合在飞；有则拒绝改 MCP 配置，避免运行中工具面不一致。 */
-	#assertMcpIdle(): void {
+	/** 当前工作区是否有回合在飞；有则拒绝改 MCP/Skills 配置，避免运行中能力面不一致。 */
+	#assertNoPendingWork(): void {
 		const root = this.#requiredProject();
 		if (this.#hasWorkInRoot(root))
-			throw new Error("A turn is running; wait for it to finish before changing MCP servers");
+			throw new Error("A turn is running; wait for it to finish before changing MCP servers or skills");
 	}
 
 	async upsertMcpServer(name: string, draft: McpServerDraftInput): Promise<McpServerDetail> {
-		this.#assertMcpIdle();
+		this.#assertNoPendingWork();
 		const core = this.#requiredCore();
 		const config = await core.upsertMcpServer(this.#requiredProject(), name, draft);
 		await this.#refreshCatalog();
@@ -1065,14 +1099,14 @@ export class DesktopHost {
 	}
 
 	async removeMcpServer(name: string): Promise<void> {
-		this.#assertMcpIdle();
+		this.#assertNoPendingWork();
 		await this.#requiredCore().removeMcpServer(this.#requiredProject(), name);
 		await this.#refreshCatalog();
 		await this.#pushViewIfCurrent(this.#current?.meta.id);
 	}
 
 	async reloadMcp(): Promise<void> {
-		this.#assertMcpIdle();
+		this.#assertNoPendingWork();
 		await this.#requiredCore().reloadMcp(this.#requiredProject());
 		await this.#refreshCatalog();
 		await this.#pushViewIfCurrent(this.#current?.meta.id);

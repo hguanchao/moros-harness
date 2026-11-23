@@ -959,6 +959,61 @@ describe("desktop workspace IPC and preload", () => {
 		expect(await readFile(join(input.homeDir, ".moros", "config.toml"), "utf8")).not.toContain("[mcp_servers.docs]");
 	});
 
+	it("IPC 新增/编辑/删除技能写回 ~/.moros/skills 并反映到列表", async () => {
+		const input = await fixture();
+		const { host } = await openHost(input);
+		const root = await projectDirectory(input, "skill-project");
+		await host.openProject(root);
+		const client = ipcClient(host);
+
+		const created = await client.request(IPC.skillUpsert, {
+			name: "ipc-skill",
+			description: "IPC 技能",
+			body: "\n正文\n",
+		});
+		if (!created.ok) throw new Error(`skill upsert failed: ${created.error.message}`);
+		expect(created.value).toMatchObject({ name: "ipc-skill", scope: "user" });
+		const skillPath = (created.value as { path: string }).path;
+		expect(await readFile(skillPath, "utf8")).toContain("IPC 技能");
+
+		const detail = await client.request(IPC.skillDetail, skillPath);
+		if (!detail.ok) throw new Error(`skill detail failed: ${detail.error.message}`);
+		expect(detail.value).toMatchObject({ name: "ipc-skill", body: "\n正文\n" });
+
+		const updated = await client.request(
+			IPC.skillUpsert,
+			{ name: "ipc-skill", description: "新描述", body: "\n新正文\n" },
+			skillPath,
+		);
+		expect(updated.ok).toBe(true);
+		expect(await readFile(skillPath, "utf8")).toContain("新描述");
+
+		const removed = await client.request(IPC.skillRemove, skillPath);
+		expect(removed.ok).toBe(true);
+		const listed = await client.request(IPC.skillsList);
+		if (!listed.ok) throw new Error(`skills list failed: ${listed.error.message}`);
+		expect((listed.value as readonly { name: string }[]).map((skill) => skill.name)).not.toContain("ipc-skill");
+	});
+
+	it("IPC 技能导入走原生目录选择器，非法名称被拒", async () => {
+		const input = await fixture();
+		const { host } = await openHost(input);
+		const root = await projectDirectory(input, "skill-import-project");
+		await host.openProject(root);
+		const source = join(input.directory, "import-source");
+		await mkdir(source);
+		await writeFile(join(source, "SKILL.md"), "---\nname: imported-skill\ndescription: 导入\n---\n\n正文\n", "utf8");
+		electronMock.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: [source] });
+
+		const client = ipcClient(host);
+		const imported = await client.request(IPC.skillImport);
+		if (!imported.ok) throw new Error(`skill import failed: ${imported.error.message}`);
+		expect(imported.value).toMatchObject({ name: "imported-skill", scope: "user" });
+
+		const bad = await client.request(IPC.skillUpsert, { name: "Bad_Name", description: "", body: "x" });
+		expect(bad.ok).toBe(false);
+	});
+
 	it("IPC 校验拒绝非法 MCP 草稿，不写回配置", async () => {
 		const input = await fixture();
 		await mkdir(join(input.homeDir, ".moros"));
@@ -999,6 +1054,10 @@ describe("desktop workspace IPC and preload", () => {
 		await bridge.mcpServerRemove("docs");
 		await bridge.mcpServerDetail("docs");
 		await bridge.mcpReload();
+		await bridge.skillUpsert({ name: "demo", description: "", body: "" });
+		await bridge.skillRemove("/path/SKILL.md");
+		await bridge.skillDetail("/path/SKILL.md");
+		await bridge.skillImport();
 
 		expect(electronMock.invoke.mock.calls).toEqual([
 			[IPC.appSelectProjectDialog],
@@ -1020,6 +1079,10 @@ describe("desktop workspace IPC and preload", () => {
 			[IPC.mcpServerRemove, "docs"],
 			[IPC.mcpServerDetail, "docs"],
 			[IPC.mcpReload],
+			[IPC.skillUpsert, { name: "demo", description: "", body: "" }, undefined],
+			[IPC.skillRemove, "/path/SKILL.md"],
+			[IPC.skillDetail, "/path/SKILL.md"],
+			[IPC.skillImport],
 		]);
 	});
 });

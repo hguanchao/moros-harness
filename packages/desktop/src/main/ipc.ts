@@ -58,6 +58,20 @@ const McpServerDraftSchema = z.discriminatedUnion("type", [
 const ReasoningEffortSchema = z.enum(["off", "minimal", "low", "medium", "high", "max"]);
 const ApprovalModeSchema = z.enum(["ask", "auto", "yolo"]);
 
+/** 技能草稿：名称 kebab-case、描述单行有界、正文 64KB 内。 */
+const SkillDraftSchema = z
+	.object({
+		name: z
+			.string()
+			.min(1)
+			.max(64)
+			.regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+		description: z.string().max(500),
+		body: z.string().max(64 * 1024),
+	})
+	.strict();
+const SkillPathSchema = z.string().min(1).max(4096);
+
 const SessionCreateInputSchema = z
 	.object({
 		target: WorkspaceTargetSchema,
@@ -347,6 +361,12 @@ export function registerIpc(host: DesktopHost, getWindow: () => BrowserWindow | 
 	handle(IPC.sessionSelectApproval, getWindow, z.tuple([ApprovalModeSchema]), ([mode]) => host.selectApproval(mode));
 	handle(IPC.sessionSetPlan, getWindow, z.tuple([z.boolean()]), ([enabled]) => host.setPlan(enabled));
 	handle(IPC.skillsList, getWindow, z.tuple([]), () => host.skills());
+	handle(IPC.skillUpsert, getWindow, z.tuple([SkillDraftSchema, SkillPathSchema.optional()]), ([draft, path]) =>
+		host.upsertSkill(draft, path),
+	);
+	handle(IPC.skillRemove, getWindow, z.tuple([SkillPathSchema]), ([path]) => host.removeSkill(path));
+	handle(IPC.skillDetail, getWindow, z.tuple([SkillPathSchema]), ([path]) => host.skillDetail(path));
+	handle(IPC.skillImport, getWindow, z.tuple([]), () => host.importSkill());
 	handle(IPC.trustAccept, getWindow, z.tuple([z.boolean()]), ([remember]) => host.trustAccept(remember));
 	handle(IPC.trustDeny, getWindow, z.tuple([]), () => host.trustDeny());
 	handle(IPC.mcpStatus, getWindow, z.tuple([]), () => host.mcpStatus());

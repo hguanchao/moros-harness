@@ -90,6 +90,10 @@ export const IPC = {
 	sessionSelectApproval: "moros:session-select-approval",
 	sessionSetPlan: "moros:session-set-plan",
 	skillsList: "moros:skills-list",
+	skillUpsert: "moros:skill-upsert",
+	skillRemove: "moros:skill-remove",
+	skillDetail: "moros:skill-detail",
+	skillImport: "moros:skill-import",
 	trustAccept: "moros:trust-accept",
 	trustDeny: "moros:trust-deny",
 	mcpStatus: "moros:mcp-status",
@@ -382,6 +386,20 @@ export type McpServerDraftInput =
 /** MCP server 详情（编辑表单回填用；只有表单暴露的字段，高级项不回传）。 */
 export type McpServerDetail = McpServerDraftInput & { readonly name: string };
 
+/** 技能草稿（设置页表单→IPC）：新增带 name，编辑复用同一结构但忽略 name（以 path 为准）。 */
+export interface SkillDraftInput {
+	readonly name: string;
+	readonly description: string;
+	readonly body: string;
+}
+
+/** 技能完整文档（编辑表单回填）。 */
+export interface SkillDocumentResult {
+	readonly name: string;
+	readonly description: string;
+	readonly body: string;
+}
+
 export type PushMessage =
 	| { readonly type: "event"; readonly sessionId: string; readonly event: EventRecord }
 	| {
@@ -549,6 +567,10 @@ export interface DesktopBridge {
 	sessionSelectApproval(mode: ApprovalMode): Promise<RpcResult<void>>;
 	sessionSetPlan(enabled: boolean): Promise<RpcResult<boolean>>;
 	skillsList(): Promise<RpcResult<readonly SkillSummary[]>>;
+	skillUpsert(draft: SkillDraftInput, path?: string): Promise<RpcResult<SkillSummary>>;
+	skillRemove(path: string): Promise<RpcResult<void>>;
+	skillDetail(path: string): Promise<RpcResult<SkillDocumentResult>>;
+	skillImport(): Promise<RpcResult<SkillSummary | null>>;
 	trustAccept(remember: boolean): Promise<RpcResult<WorkspaceTrustView>>;
 	trustDeny(): Promise<RpcResult<WorkspaceTrustView>>;
 	mcpStatus(): Promise<RpcResult<readonly McpStatus[]>>;

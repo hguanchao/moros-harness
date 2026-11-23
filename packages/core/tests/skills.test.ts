@@ -1,9 +1,19 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { listSkills, readSkillBody, userSkillDirectories, type SkillSummary } from "../src/skills.ts";
+import {
+	createUserSkill,
+	deleteUserSkill,
+	importSkillFromFolder,
+	listSkills,
+	readSkillBody,
+	readSkillDocument,
+	updateUserSkill,
+	userSkillDirectories,
+	type SkillSummary,
+} from "../src/skills.ts";
 
 describe("用户级技能目录", () => {
 	let homeDir: string;
@@ -116,5 +126,79 @@ describe("readSkillBody 按名称加载正文", () => {
 		const path = join(homeDir, "huge.md");
 		await writeFile(path, "x".repeat(64 * 1024 + 1), "utf8");
 		await expect(readSkillBody(summary(path))).rejects.toThrow("超过 64 KB");
+	});
+});
+
+describe("用户技能写管理", () => {
+	let homeDir: string;
+
+	beforeEach(async () => {
+		homeDir = await mkdtemp(join(tmpdir(), "moros-skill-write-"));
+	});
+
+	afterEach(async () => {
+		await rm(homeDir, { recursive: true, force: true });
+	});
+
+	it("create → readSkillDocument → listSkills → update → delete 往返", async () => {
+		const created = await createUserSkill(homeDir, "greet", { description: "问候用户", body: "\n请说你好。\n" });
+		expect(created.name).toBe("greet");
+		expect(created.scope).toBe("user");
+
+		const doc = await readSkillDocument(created.path);
+		expect(doc).toEqual({ name: "greet", description: "问候用户", body: "\n请说你好。\n" });
+		expect((await listSkills({ homeDir })).map((skill) => skill.name)).toContain("greet");
+
+		const updated = await updateUserSkill(homeDir, created.path, { description: "新描述", body: "\n新正文\n" });
+		expect(updated.description).toBe("新描述");
+		expect((await readSkillDocument(created.path)).body).toBe("\n新正文\n");
+
+		await deleteUserSkill(homeDir, created.path);
+		expect((await listSkills({ homeDir })).map((skill) => skill.name)).not.toContain("greet");
+	});
+
+	it("拒绝非法名称与重复创建", async () => {
+		await expect(createUserSkill(homeDir, "Bad_Name", { description: "", body: "" })).rejects.toThrow("kebab-case");
+		await expect(createUserSkill(homeDir, "-bad", { description: "", body: "" })).rejects.toThrow("kebab-case");
+		await createUserSkill(homeDir, "valid-name", { description: "", body: "" });
+		await expect(createUserSkill(homeDir, "valid-name", { description: "", body: "" })).rejects.toThrow("已存在");
+	});
+
+	it("描述里的特殊字符序列化后能正确读回", async () => {
+		const created = await createUserSkill(homeDir, "quotes", {
+			description: '含 "引号" 与\n换行',
+			body: "\n正文\n",
+		});
+		expect((await readSkillDocument(created.path)).description).toBe('含 "引号" 与\n换行');
+	});
+
+	it("拒绝操作用户技能目录之外的路径", async () => {
+		const outside = join(homeDir, "outside-skill", "SKILL.md");
+		await mkdir(join(homeDir, "outside-skill"));
+		await writeFile(outside, "---\nname: outside\n---\nbody", "utf8");
+		await expect(updateUserSkill(homeDir, outside, { description: "x", body: "y" })).rejects.toThrow("用户技能目录");
+		await expect(deleteUserSkill(homeDir, outside)).rejects.toThrow("用户技能目录");
+	});
+
+	it("从文件夹导入技能，含附属文件；缺 SKILL.md 或非法名被拒", async () => {
+		const source = join(homeDir, "source");
+		await mkdir(join(source, "extra"), { recursive: true });
+		await writeFile(
+			join(source, "SKILL.md"),
+			"---\nname: imported\ndescription: 导入的技能\n---\n\n导入正文\n",
+			"utf8",
+		);
+		await writeFile(join(source, "extra", "data.txt"), "data", "utf8");
+
+		const imported = await importSkillFromFolder(homeDir, source);
+		expect(imported.name).toBe("imported");
+		expect((await readSkillDocument(imported.path)).description).toBe("导入的技能");
+		expect(await readFile(join(homeDir, ".moros", "skills", "imported", "extra", "data.txt"), "utf8")).toBe("data");
+
+		const badSource = join(homeDir, "bad-source");
+		await mkdir(badSource);
+		await expect(importSkillFromFolder(homeDir, badSource)).rejects.toThrow("SKILL.md");
+		await writeFile(join(badSource, "SKILL.md"), "---\nname: Bad_Name\n---\nbody", "utf8");
+		await expect(importSkillFromFolder(homeDir, badSource)).rejects.toThrow("kebab-case");
 	});
 });

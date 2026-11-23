@@ -86,10 +86,17 @@ import {
 import { loadWorkspaceInstructions } from "./instructions.ts";
 import { normalizeProjectRoot } from "./session/project-dir.ts";
 import {
+	createUserSkill,
+	deleteUserSkill,
+	importSkillFromFolder,
 	listSkills as collectSkills,
 	projectSkillsDirectory,
+	readSkillDocument,
+	updateUserSkill,
 	userSkillDirectories,
 	userSkillsDirectory,
+	type SkillDocument,
+	type SkillDraft,
 	type SkillSummary,
 } from "./skills.ts";
 import {
@@ -2135,6 +2142,31 @@ export class Core {
 			allUser: userSkillDirectories(this.#homeDir),
 			...(projectRoot === undefined ? {} : { project: projectSkillsDirectory(projectRoot) }),
 		};
+	}
+
+	/** 新建用户技能（仅 ~/.moros/skills 可写）。 */
+	async createSkill(name: string, draft: SkillDraft): Promise<SkillSummary> {
+		return createUserSkill(this.#homeDir, name, draft);
+	}
+
+	/** 更新用户技能的描述与正文；路径由调用方从 SkillSummary.path 传入，core 做目录约束校验。 */
+	async updateSkill(skillPath: string, draft: SkillDraft): Promise<SkillSummary> {
+		return updateUserSkill(this.#homeDir, skillPath, draft);
+	}
+
+	/** 删除用户技能（整个目录）。 */
+	async deleteSkill(skillPath: string): Promise<void> {
+		return deleteUserSkill(this.#homeDir, skillPath);
+	}
+
+	/** 读取技能完整文档，供编辑表单回填。 */
+	async getSkillDocument(skillPath: string): Promise<SkillDocument> {
+		return readSkillDocument(skillPath);
+	}
+
+	/** 从本地目录导入技能到 ~/.moros/skills。 */
+	async importSkill(sourceDir: string): Promise<SkillSummary> {
+		return importSkillFromFolder(this.#homeDir, sourceDir);
 	}
 
 	async #getConfig(projectRoot: string): Promise<LoadedConfig> {

@@ -3,11 +3,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type React
 import type { SettingsPatch, SettingsSnapshot } from "@moros/core/config/settings.ts";
 import type { McpStatus } from "@moros/core/mcp/types.ts";
 import type { SkillSummary } from "@moros/core/skills.ts";
-import type { ConfigSummary, McpServerDetail, McpServerDraftInput } from "../shared/contract.ts";
+import type {
+	ConfigSummary,
+	McpServerDetail,
+	McpServerDraftInput,
+	SkillDocumentResult,
+	SkillDraftInput,
+} from "../shared/contract.ts";
 import { call, errorMessage } from "../api/api.ts";
 import { useConfirm } from "../components/ConfirmDialog.tsx";
 import { Dropdown } from "../components/Dropdown.tsx";
 import { McpServerDialog } from "../components/McpServerDialog.tsx";
+import { SkillDialog } from "../components/SkillDialog.tsx";
 import {
 	ArchiveIcon2,
 	ArrowLeftIcon,
@@ -73,6 +80,10 @@ export function SettingsApp(): JSX.Element {
 	const [loadError, setLoadError] = useState<string | undefined>(undefined);
 	/** MCP 对话框：undefined 关闭；{ detail } 编辑（detail 为 null 表示新增）。 */
 	const [mcpDialog, setMcpDialog] = useState<{ readonly detail: McpServerDetail | null } | undefined>(undefined);
+	/** 技能对话框：undefined 关闭；detail 为编辑目标，path 为编辑时原 SKILL.md 路径（新增时省略）。 */
+	const [skillDialog, setSkillDialog] = useState<
+		{ readonly detail: SkillDocumentResult | null; readonly path?: string } | undefined
+	>(undefined);
 	/** 本工作区是否有回合在飞；有则禁用 MCP 增删改（写通道侧也会拒绝，双层保护）。 */
 	const mcpBlocked = Object.values(state.runStates).some((run) => run === "running" || run === "paused");
 
@@ -196,6 +207,41 @@ export function SettingsApp(): JSX.Element {
 								notice("error", errorMessage(error));
 							}
 						}}
+						onSkillAdd={() => setSkillDialog({ detail: null })}
+						onSkillEdit={async (path) => {
+							try {
+								const detail = await call(window.moros.skillDetail(path));
+								setSkillDialog({ detail, path });
+							} catch (error) {
+								notice("error", errorMessage(error));
+							}
+						}}
+						onSkillDelete={async (path) => {
+							if (
+								!(await confirm({
+									title: "删除技能",
+									message: "删除会移除该技能的目录与 SKILL.md，不能撤销。",
+									confirmLabel: "删除",
+									danger: true,
+								}))
+							) {
+								return;
+							}
+							try {
+								await call(window.moros.skillRemove(path));
+								await refresh();
+							} catch (error) {
+								notice("error", errorMessage(error));
+							}
+						}}
+						onSkillImport={async () => {
+							try {
+								const imported = await call(window.moros.skillImport());
+								if (imported !== null && imported !== undefined) await refresh();
+							} catch (error) {
+								notice("error", errorMessage(error));
+							}
+						}}
 					/>
 				);
 			case "workspace":
@@ -268,6 +314,15 @@ export function SettingsApp(): JSX.Element {
 				onClose={() => setMcpDialog(undefined)}
 				onSave={async (name, draft: McpServerDraftInput) => {
 					await call(window.moros.mcpServerUpsert(name, draft));
+					await refresh();
+				}}
+			/>
+			<SkillDialog
+				open={skillDialog !== undefined}
+				detail={skillDialog?.detail ?? undefined}
+				onClose={() => setSkillDialog(undefined)}
+				onSave={async (draft: SkillDraftInput) => {
+					await call(window.moros.skillUpsert(draft, skillDialog?.path));
 					await refresh();
 				}}
 			/>
@@ -837,6 +892,10 @@ function ExtensionsPanel({
 	onEdit,
 	onDelete,
 	onReload,
+	onSkillAdd,
+	onSkillEdit,
+	onSkillDelete,
+	onSkillImport,
 }: {
 	readonly summary: ConfigSummary | undefined;
 	readonly skills: readonly SkillSummary[];
@@ -849,6 +908,10 @@ function ExtensionsPanel({
 	readonly onEdit: (name: string) => Promise<void>;
 	readonly onDelete: (name: string) => Promise<void>;
 	readonly onReload: () => Promise<void>;
+	readonly onSkillAdd: () => void;
+	readonly onSkillEdit: (path: string) => Promise<void>;
+	readonly onSkillDelete: (path: string) => Promise<void>;
+	readonly onSkillImport: () => Promise<void>;
 }): JSX.Element {
 	const [tab, setTab] = useState<ExtensionTab>("skills");
 	const tabs: readonly { readonly key: ExtensionTab; readonly label: string }[] = [
@@ -875,7 +938,17 @@ function ExtensionsPanel({
 			{/* key 绑定标签，切换时重挂载子视图以播放入场动画 */}
 			<div className="extensions-body" key={tab}>
 				{tab === "plugins" ? <PluginsEmpty /> : null}
-				{tab === "skills" ? <SkillsPanel skills={skills} summary={summary} /> : null}
+				{tab === "skills" ? (
+					<SkillsPanel
+						skills={skills}
+						summary={summary}
+						mcpBlocked={mcpBlocked}
+						onAdd={onSkillAdd}
+						onEdit={onSkillEdit}
+						onDelete={onSkillDelete}
+						onImport={onSkillImport}
+					/>
+				) : null}
 				{tab === "mcp" ? (
 					<McpPanel
 						mcp={mcp}
@@ -909,19 +982,42 @@ function PluginsEmpty(): JSX.Element {
 	);
 }
 
-/** Skills：展示用户级与项目级技能；技能通过文件系统中的 SKILL.md 添加。 */
+/** Skills：用户技能可增删改/导入；项目与共享目录技能只读。 */
 function SkillsPanel({
 	skills,
 	summary,
+	mcpBlocked,
+	onAdd,
+	onEdit,
+	onDelete,
+	onImport,
 }: {
 	readonly skills: readonly SkillSummary[];
 	readonly summary: ConfigSummary | undefined;
+	readonly mcpBlocked: boolean;
+	readonly onAdd: () => void;
+	readonly onEdit: (path: string) => Promise<void>;
+	readonly onDelete: (path: string) => Promise<void>;
+	readonly onImport: () => Promise<void>;
 }): JSX.Element {
 	return (
-		<SettingsSection title="Skills" description="来自用户目录与当前项目的技能，模型按各技能的 SKILL.md 读取完整说明。">
+		<SettingsSection
+			title="Skills"
+			description="用户技能可在此添加与编辑；项目与共享目录技能只读，模型按需加载其 SKILL.md。"
+		>
+			<div className="section-head">
+				<button className="primary-button small" disabled={mcpBlocked} onClick={onAdd}>
+					<PlusIcon size={14} />
+					添加技能
+				</button>
+				<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onImport()}>
+					从文件夹导入
+				</button>
+			</div>
+			{mcpBlocked ? <div className="mcp-busy-hint">当前有回合正在运行，期间不能新增、编辑或删除技能。</div> : null}
 			{skills.length === 0 ? (
 				<div className="settings-empty-hint">
-					没有可用技能。在用户技能目录或项目的 <code>.moros/skills</code> 下添加 <code>SKILL.md</code> 即可被发现。
+					没有可用技能。点「添加技能」新建，或从文件夹导入一个含 <code>SKILL.md</code> 的目录。
 				</div>
 			) : (
 				<div className="skill-list">
@@ -932,6 +1028,22 @@ function SkillsPanel({
 							</span>
 							<strong>{skill.name}</strong>
 							<span>{skill.description}</span>
+							{skill.scope === "user" ? (
+								<span className="mcp-actions">
+									<button className="ghost-button small" disabled={mcpBlocked} onClick={() => void onEdit(skill.path)}>
+										编辑
+									</button>
+									<button
+										className="ghost-button small"
+										disabled={mcpBlocked}
+										onClick={() => void onDelete(skill.path)}
+									>
+										删除
+									</button>
+								</span>
+							) : (
+								<span className="m">只读</span>
+							)}
 						</div>
 					))}
 				</div>
