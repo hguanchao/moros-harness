@@ -375,7 +375,8 @@ export function Composer(): JSX.Element {
 					const skills = await call(window.moros.skillsList());
 					skillOptions = filterSkills(skills, detected.query).map((skill) => ({
 						value: skill.name,
-						label: skill.name,
+						// 展示带 $ 前缀（与 $mention 一致）；value 保持原名供 chip 序列化。
+						label: `$${skill.name}`,
 						description: skill.description || skill.scope,
 						group: "技能",
 						kind: "skill",
