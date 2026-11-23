@@ -159,7 +159,7 @@
 	align-items: center;
 	gap: 4px;
 	margin-bottom: 2px;
-	max-width: 200px;
+	max-width: 160px;
 	padding: 0 6px;
 	border-radius: var(--r-md);
 	background: var(--fill-strong);
@@ -172,7 +172,16 @@
 	spellcheck: false;
 }
 
+/* 图标和删除按钮固定尺寸，文本独占可收缩空间。 */
+.editor-chip > .editor-chip-icon > svg {
+	flex: none;
+}
+
 .editor-chip-text {
+	/* flex 子项默认 min-width:auto 不收缩，长文本会把 chip 撑到 max-width 后
+	   被直接裁掉而不显示省略号；min-width:0 允许收缩，ellipsis 才会生效。 */
+	min-width: 0;
+	flex: 1;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -192,6 +201,7 @@
 	justify-content: center;
 	width: 12px;
 	height: 12px;
+	flex: none;
 	padding: 0;
 	border: 0;
 	border-radius: 50%;
