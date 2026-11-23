@@ -45,7 +45,7 @@ import {
 	type SettingsPatch,
 	type SettingsSnapshot,
 } from "./config/settings.ts";
-import { createBuiltinTools, createPresentPlanTool, detectEnvironment } from "./tools/index.ts";
+import { createBuiltinTools, createPresentPlanTool, createSkillTool, detectEnvironment } from "./tools/index.ts";
 import { ToolPipeline } from "./harness/pipeline.ts";
 import { createPolicy } from "./harness/policy.ts";
 import type {
@@ -1360,6 +1360,9 @@ export class Core {
 		}
 		const imageAttachments = await this.#storeImages(session.directory, imageInputs);
 		const plan = this.#sessionPlans.get(sessionId) === true;
+		// 技能清单要在构造工具面之前拿到：有技能才注入 skill 工具，且工具与系统提示词
+		// 必须基于同一份清单（否则清单里列了技能、工具却查不到）。
+		const skills = await this.listSkills(projectRoot);
 		// MCP 工具只进主会话：子代理的任务是收敛的独立工作，给它一套远端工具会扩大权限面，
 		// 也让「子代理工具面受限」这条约束失效。主代理可以先调 MCP 再把结果写进任务说明。
 		const mcp = options.subagent ? undefined : await this.#ensureMcpManager(projectRoot);
@@ -1375,7 +1378,13 @@ export class Core {
 					...(config.shellPath ? { shellPath: config.shellPath } : {}),
 					taskRunner: (task, context) => this.#runSubagent(session, projectRoot, task, context, options),
 				});
-		const tools = [...baseTools, ...mcpTools, ...(plan ? [createPresentPlanTool()] : [])];
+		const tools = [
+			...baseTools,
+			...mcpTools,
+			// 有技能才装配 skill 工具：模型按清单里的名字加载正文，绕开工作区外的路径沙箱。
+			...(skills.length > 0 ? [createSkillTool(skills)] : []),
+			...(plan ? [createPresentPlanTool()] : []),
+		];
 		const pipeline = await this.createPipeline({
 			session,
 			projectRoot,
@@ -1393,7 +1402,6 @@ export class Core {
 				parameters: tool.parameters ?? (z.toJSONSchema(tool.schema) as Record<string, unknown>),
 			}),
 		);
-		const skills = await this.listSkills(projectRoot);
 		// 工作区指令（ADR-16）：用户级直接生效；项目级仅在已信任时读取（未信任=提示词注入面）
 		const instructions = await loadWorkspaceInstructions({
 			homeDir: this.#homeDir,

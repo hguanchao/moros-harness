@@ -18,7 +18,7 @@ export interface SkillSummary {
 	readonly description: string;
 	/** 用户级还是项目级 */
 	readonly scope: "user" | "project";
-	/** SKILL.md 的绝对路径；模型按此读取全文 */
+	/** SKILL.md 的绝对路径；skill 工具据此加载正文（不注入提示词，模型无需按路径读取） */
 	readonly path: string;
 }
 
@@ -91,6 +91,30 @@ export async function listSkills(options: {
 		skills.push(...(await scanSkills(projectSkillsDirectory(options.projectRoot), "project")));
 	}
 	return skills.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+/** SKILL.md 正文上限：与技能清单扫描的解耦读取，防止单个技能撑爆工具结果。 */
+const MAX_SKILL_BODY_BYTES = 64 * 1024;
+
+/**
+ * 读取一个技能的 SKILL.md 正文（去掉开头的 YAML frontmatter）。
+ *
+ * frontmatter 只在 `---` 成对出现时剥离；未闭合时按正文原样返回，与
+ * `frontmatter()` 的解析语义保持一致。BOM 不是正文，一并去掉。
+ * @throws SKILL.md 不存在或超过 {@link MAX_SKILL_BODY_BYTES} 时抛错。
+ */
+export async function readSkillBody(skill: SkillSummary): Promise<string> {
+	const raw = await readFile(skill.path, "utf8");
+	if (Buffer.byteLength(raw, "utf8") > MAX_SKILL_BODY_BYTES) {
+		throw new Error(`SKILL.md 超过 ${MAX_SKILL_BODY_BYTES / 1024} KB: ${skill.name}`);
+	}
+	const content = raw.replace(/^\uFEFF/, "");
+	const lines = content.split(/\r?\n/);
+	if ((lines[0] ?? "").trim() !== "---") return content;
+	const close = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
+	// 没有闭合围栏时整段都是正文，与 frontmatter() 的判定一致。
+	if (close < 0) return content;
+	return lines.slice(close + 1).join("\n");
 }
 
 /**

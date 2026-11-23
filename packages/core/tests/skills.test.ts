@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { listSkills, userSkillDirectories } from "../src/skills.ts";
+import { listSkills, readSkillBody, userSkillDirectories, type SkillSummary } from "../src/skills.ts";
 
 describe("用户级技能目录", () => {
 	let homeDir: string;
@@ -76,5 +76,45 @@ describe("用户级技能目录", () => {
 		const skills = await listSkills({ homeDir });
 		expect(skills).toHaveLength(2);
 		expect(new Set(skills.map((skill) => skill.path))).toEqual(new Set([morosPath, codexPath]));
+	});
+});
+
+describe("readSkillBody 按名称加载正文", () => {
+	let homeDir: string;
+
+	beforeEach(async () => {
+		homeDir = await mkdtemp(join(tmpdir(), "moros-skill-body-"));
+	});
+
+	afterEach(async () => {
+		await rm(homeDir, { recursive: true, force: true });
+	});
+
+	function summary(path: string): SkillSummary {
+		return { name: "demo", description: "", scope: "user", path };
+	}
+
+	it("剥离 frontmatter 与 BOM，只返回正文", async () => {
+		const path = join(homeDir, "SKILL.md");
+		await writeFile(path, "\uFEFF---\nname: demo\ndescription: 说明\n---\n\n第一行\n第二行\n", "utf8");
+		expect(await readSkillBody(summary(path))).toBe("\n第一行\n第二行\n");
+	});
+
+	it("没有 frontmatter 时原样返回正文", async () => {
+		const path = join(homeDir, "plain.md");
+		await writeFile(path, "直接是正文\n", "utf8");
+		expect(await readSkillBody(summary(path))).toBe("直接是正文\n");
+	});
+
+	it("frontmatter 未闭合时整段按正文返回，与解析语义一致", async () => {
+		const path = join(homeDir, "unclosed.md");
+		await writeFile(path, "---\nname: demo\n没有闭合\n", "utf8");
+		expect(await readSkillBody(summary(path))).toBe("---\nname: demo\n没有闭合\n");
+	});
+
+	it("正文超过 64KB 时抛错", async () => {
+		const path = join(homeDir, "huge.md");
+		await writeFile(path, "x".repeat(64 * 1024 + 1), "utf8");
+		await expect(readSkillBody(summary(path))).rejects.toThrow("超过 64 KB");
 	});
 });

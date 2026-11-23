@@ -68,7 +68,9 @@ The task tool starts a separate worker that cannot see this conversation and can
 const PLAN_MODE = `## Plan mode
 Plan mode is active. This turn is read-only: inspect the workspace, but do not edit files or run mutating commands. Submit the complete plan with present_plan, covering the goal, steps, files, risks, and how you will verify.`;
 
-const SKILLS_HEADER = "## Skills\nBefore following a skill, read the SKILL.md at its path.";
+// 技能正文在工作区外，模型用 read 工具会被路径沙箱拒绝；指引它改调 skill 工具按名加载。
+const SKILLS_HEADER =
+	"## Skills\nUse the skill tool with a skill's name to load its full instructions before following it.";
 
 /**
  * 工作区指令节（ADR-16）：用户级 + 项目级 AGENTS.md，项目级在后。
@@ -102,10 +104,12 @@ export function formatInstructionsSection(instructions: WorkspaceInstructions): 
  */
 export function formatSkillsSection(skills: readonly SkillSummary[]): string | undefined {
 	if (skills.length === 0) return undefined;
+	// 清单不放 SKILL.md 绝对路径：一是工作区外的路径会被沙箱拒，二是提示词里出现路径会
+	// 诱导模型去 read；只给名称与描述，正文交给 skill 工具按名加载。
 	const items = skills
 		.map(
 			(skill) =>
-				`- ${skill.name} (${skill.scope}): ${skill.description.length > 0 ? skill.description : "no description"} — ${skill.path}`,
+				`- ${skill.name} (${skill.scope}): ${skill.description.length > 0 ? skill.description : "no description"}`,
 		)
 		.join("\n");
 	return `${SKILLS_HEADER}\n${items}`;

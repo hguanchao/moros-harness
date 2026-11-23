@@ -5,6 +5,7 @@ export * from "./builtins/glob.ts";
 export * from "./builtins/grep.ts";
 export * from "./builtins/present-plan.ts";
 export * from "./builtins/read.ts";
+export * from "./builtins/skill.ts";
 export * from "./builtins/task.ts";
 export * from "./builtins/todo.ts";
 export * from "./builtins/web-fetch.ts";
