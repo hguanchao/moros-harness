@@ -271,7 +271,7 @@ export function reducer(state: AppState, action: Action): AppState {
 			if (state.current === undefined) {
 				return state.page === "chat" ? state : { ...state, page: "chat" };
 			}
-			return { ...newTaskState(state), ...pushHistory(state, { type: "new-task" }) };
+			return { ...newTaskState(state, true), ...pushHistory(state, { type: "new-task" }) };
 		case "view-new-task":
 			return {
 				...state,
@@ -656,7 +656,7 @@ function applyPush(state: AppState, message: PushMessage): AppState {
 				sessionsVersion: state.sessionsVersion + 1,
 			};
 			return state.current?.meta.id === message.sessionId
-				? { ...newTaskState(next), ...resetHistory({ type: "new-task" }) }
+				? { ...newTaskState(next, false), ...resetHistory({ type: "new-task" }) }
 				: next;
 		}
 		case "session-view": {
@@ -737,10 +737,36 @@ function sameHistoryEntry(left: HistoryEntry, right: HistoryEntry): boolean {
 	return left.type === "new-task" || (right.type === "session" && left.sessionId === right.sessionId);
 }
 
-function newTaskState(state: AppState): AppState {
-	// 新任务草稿沿用上一会话的模型与推理强度，避免每次新建都回退到全局默认；
-	// 审批档位与计划模式仍回默认，不隐式带入上一会话的高危设置。
-	const seed = state.current === undefined ? {} : { model: state.current.model, effort: state.current.effort };
+/**
+ * 回到「新建任务」时重置视图状态。
+ * @param preserveDraft true（用户主动点新建任务）保留已输入的草稿，切会话再回来不丢内容；
+ *   false（当前会话被删除）用空草稿并从被删会话继承模型/强度。
+ */
+function newTaskState(state: AppState, preserveDraft: boolean): AppState {
+	if (!preserveDraft) {
+		const seed = state.current === undefined ? {} : { model: state.current.model, effort: state.current.effort };
+		return {
+			...state,
+			current: undefined,
+			page: "chat",
+			loadError: undefined,
+			isNavigating: false,
+			review: undefined,
+			draft: createTaskDraft(seed),
+			draftGeneration: state.draftGeneration + 1,
+			draftRevision: 0,
+			draftWorkspace: undefined,
+		};
+	}
+	// 用户主动「新建任务」：草稿是显式编辑的状态，切回时原样保留（含正文、chip、
+	// 项目、审批档位、模型与推理强度）。只有从未显式选过模型/强度时才从当前会话补默认值。
+	const inherited =
+		state.current === undefined
+			? {}
+			: {
+					...(state.draft.model === undefined ? { model: state.current.model } : {}),
+					...(state.draft.effort === undefined ? { effort: state.current.effort } : {}),
+				};
 	return {
 		...state,
 		current: undefined,
@@ -748,9 +774,8 @@ function newTaskState(state: AppState): AppState {
 		loadError: undefined,
 		isNavigating: false,
 		review: undefined,
-		draft: createTaskDraft(seed),
+		draft: { ...state.draft, ...inherited },
 		draftGeneration: state.draftGeneration + 1,
-		draftRevision: 0,
 		draftWorkspace: undefined,
 	};
 }

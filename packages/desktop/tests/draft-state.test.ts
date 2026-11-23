@@ -114,7 +114,7 @@ describe("renderer task draft state", () => {
 		expect(next.ready).toBe(true);
 	});
 
-	it("new-task 离开项目会话，重置未关联草稿但沿用该会话的模型与思考强度", () => {
+	it("new-task 保留已输入的草稿内容与选项，不被会话值覆盖", () => {
 		const before: AppState = {
 			...activeState(),
 			page: "settings",
@@ -137,30 +137,43 @@ describe("renderer task draft state", () => {
 		};
 		const next = reducer(before, { type: "new-task" });
 
-		// 模型与思考强度取自上一会话的当前选择，而非旧草稿残留值；审批档位与计划模式不继承
-		expect(next.draft).toEqual({
-			text: "",
-			images: [],
-			quotes: [],
-			mentions: [],
-			commands: [],
-			branch: undefined,
-			project: null,
-			model: SESSION.model,
-			effort: SESSION.effort,
-			approval: undefined,
-			plan: false,
-		});
+		// 草稿是用户显式编辑的状态，切回新建任务时原样保留（含审批/计划/模型）。
+		expect(next.draft).toEqual(before.draft);
 		expect(next).toMatchObject({
 			current: undefined,
 			page: "chat",
 			isNavigating: false,
 			draftGeneration: before.draftGeneration + 1,
-			draftRevision: 0,
 			draftWorkspace: undefined,
 		});
 		expect(next.sessions).toBe(before.sessions);
 		expect(next.project).toBe(before.project);
+	});
+
+	it("new-task 在草稿未显式选模型/强度时从当前会话补默认值", () => {
+		const before: AppState = {
+			...activeState(),
+			draft: {
+				text: "draft text",
+				images: [],
+				quotes: [],
+				mentions: [],
+				commands: [],
+				project: null,
+				branch: undefined,
+				model: undefined,
+				effort: undefined,
+				approval: undefined,
+				plan: false,
+			},
+		};
+		const next = reducer(before, { type: "new-task" });
+		expect(next.draft.text).toBe("draft text");
+		expect(next.draft.model).toEqual(SESSION.model);
+		expect(next.draft.effort).toBe(SESSION.effort);
+		// 审批档位不从会话继承：草稿没选就保持未选，沿用工作区配置。
+		expect(next.draft.approval).toBeUndefined();
+		expect(next.draft.plan).toBe(false);
 	});
 
 	it("new-task 无上一会话时不携带模型与思考强度", () => {
