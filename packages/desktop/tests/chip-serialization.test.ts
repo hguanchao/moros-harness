@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEditor } from "lexical";
+import { createEditor, $getSelection, $isRangeSelection } from "lexical";
 
 import { ChipNode, $createChipNode, $isChipNode } from "../src/components/editor/ChipNode.tsx";
 import {
@@ -52,6 +52,23 @@ describe("serializeEditor / rebuildEditorFromDraft 往返", () => {
 		expect(result.text).toBe("");
 		expect(result.quotes).toEqual([]);
 		expect(result.mentions).toEqual([]);
+	});
+
+	it("重建后光标落在末尾（最后一个 chip 之后），不是开头", () => {
+		const editor = setup(sample);
+		editor.getEditorState().read(() => {
+			const selection = $getSelection();
+			expect($isRangeSelection(selection)).toBe(true);
+			if ($isRangeSelection(selection)) {
+				const anchorNode = selection.anchor.getNode();
+				// 末尾是 paragraph element，offset 指向子节点数（最后一个 chip 之后）。
+				expect(anchorNode.getType()).toBe("paragraph");
+				expect("getChildrenSize" in anchorNode).toBe(true);
+				if ("getChildrenSize" in anchorNode) {
+					expect(selection.anchor.offset).toBe(anchorNode.getChildrenSize());
+				}
+			}
+		});
 	});
 
 	it("chip 是原子节点（$isChipNode 可判定）", () => {

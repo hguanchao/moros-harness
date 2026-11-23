@@ -72,6 +72,7 @@ export function rebuildEditorFromDraft(draft: EditorDraft): void {
 	const chips: readonly ChipData[] = [...draft.quotes, ...draft.mentions];
 	if (chips.length === 0 && draft.text.length === 0) {
 		root.append(paragraph);
+		paragraph.selectEnd();
 		return;
 	}
 	// 简化：chip 追加在正文之后（外部同步路径，如划词引用/示例，通常 chip 在末尾）。
@@ -80,4 +81,7 @@ export function rebuildEditorFromDraft(draft: EditorDraft): void {
 		paragraph.append($createChipNode(chip.id, chip.kind, chip.value, chip.label));
 	}
 	root.append(paragraph);
+	// 全量重建会丢掉原 selection，必须显式把光标放回末尾（最后一个 chip 之后），
+	// 否则划词引用加进来后光标停在开头，与 @/$ 补全插入 chip 的行为不一致。
+	paragraph.selectEnd();
 }
