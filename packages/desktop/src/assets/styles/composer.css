@@ -172,7 +172,15 @@
 	spellcheck: false;
 }
 
-/* 图标和删除按钮固定尺寸，文本独占可收缩空间。 */
+/* 图标容器需自身也用 flex 居中：它作为 chip 的 flex 子项被拉伸到 chip 全高（18px），
+   里面的 svg 只有 12px，若容器不居中 svg 会贴在顶部、比文字高 1px。 */
+.editor-chip-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+}
+
 .editor-chip > .editor-chip-icon > svg {
 	flex: none;
 }
