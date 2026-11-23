@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import {
-	activeChips,
 	buildModelInput,
 	stringifyTagSafeJson,
 	truncateToBudget,
@@ -17,16 +16,6 @@ describe("stringifyTagSafeJson 标签安全序列化", () => {
 		expect(result).not.toContain("<script>");
 		expect(result).toContain("\\u003c");
 		expect(result).toContain("\\u0026");
-	});
-});
-
-describe("activeChips 以正文为准", () => {
-	it("只保留 display 仍在正文里的 chip", () => {
-		const quotes: DraftQuote[] = [
-			{ id: "q1", text: "原文一", display: "引用：原文一" },
-			{ id: "q2", text: "原文二", display: "引用：原文二" },
-		];
-		expect(activeChips("正文里有 引用：原文一 ", quotes).map((q) => q.id)).toEqual(["q1"]);
 	});
 });
 

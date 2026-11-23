@@ -1,13 +1,4 @@
-import {
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-	type ClipboardEvent,
-	type DragEvent,
-	type JSX,
-	type KeyboardEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type JSX, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
 import type { PreparedImage, SessionView } from "../shared/contract.ts";
@@ -26,27 +17,25 @@ import {
 	PlugIcon,
 	PlusIcon,
 	PointerIcon,
-	QuoteIcon,
 	ShieldAlertIcon,
 	ShieldCheckIcon,
-	SparklesIcon,
 	StopIcon,
 	TerminalIcon,
 	XIcon,
 } from "./Icons.tsx";
 import { useApp } from "../store/state.tsx";
-import type { DraftMention } from "../store/draft.ts";
-import { segmentInput, type ChipRef } from "../utils/input-chips.ts";
+import type { DraftMention, DraftQuote } from "../store/draft.ts";
 import { availableModel, clampEffortToModel, configuredModel } from "../utils/model.ts";
 import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 import {
-	activeChips,
 	buildModelInput,
 	MAX_FILE_INLINE_BYTES,
 	MAX_TOTAL_INLINE_BYTES,
 	truncateToBudget,
 	type InlineFile,
 } from "../utils/model-input.ts";
+import { ComposerEditor, type ComposerEditorHandle } from "./editor/ComposerEditor.tsx";
+import type { ChipData } from "./editor/ChipNode.tsx";
 import {
 	filterCommands,
 	filterFiles,
@@ -54,9 +43,6 @@ import {
 	findAtToken,
 	findSkillToken,
 	findSlashToken,
-	formatFileReference,
-	formatSkillReference,
-	removeTriggerText,
 	type TriggerToken,
 } from "../utils/inline-completion.ts";
 import { DESKTOP_COMMANDS } from "../utils/command-list.ts";
@@ -65,51 +51,6 @@ import { InlineCompletion, type CompletionOption, type CompletionTrigger } from 
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
-/** 用镜像元素量出 textarea 中 [start,end) 片段的屏幕矩形。 */
-function tokenRect(
-	element: HTMLTextAreaElement,
-	start: number,
-	end: number,
-): { left: number; bottom: number; top: number } {
-	const computed = window.getComputedStyle(element);
-	const mirror = document.createElement("div");
-	for (const property of [
-		"fontFamily",
-		"fontSize",
-		"fontWeight",
-		"lineHeight",
-		"letterSpacing",
-		"paddingTop",
-		"paddingRight",
-		"paddingBottom",
-		"paddingLeft",
-		"borderTopWidth",
-		"borderLeftWidth",
-		"whiteSpace",
-		"wordWrap",
-		"wordBreak",
-	] as const) {
-		mirror.style[property] = computed[property];
-	}
-	mirror.style.position = "absolute";
-	mirror.style.visibility = "hidden";
-	mirror.style.whiteSpace = "pre-wrap";
-	mirror.style.overflowWrap = "break-word";
-	mirror.style.width = `${element.clientWidth}px`;
-	mirror.textContent = element.value.slice(0, start);
-	const marker = document.createElement("span");
-	marker.textContent = element.value.slice(start, Math.max(start + 1, end));
-	mirror.appendChild(marker);
-	document.body.appendChild(mirror);
-	const parentRect = element.getBoundingClientRect();
-	const markerRect = marker.getBoundingClientRect();
-	const mirrorRect = mirror.getBoundingClientRect();
-	const left = parentRect.left + (markerRect.left - mirrorRect.left);
-	const top = parentRect.top + (markerRect.top - mirrorRect.top);
-	document.body.removeChild(mirror);
-	return { left, top, bottom: top + markerRect.height };
-}
-
 /** 输入框与首发/运行控制；信任页由 ChatPage 负责，新任务首次有效发送才创建会话。 */
 export function Composer(): JSX.Element {
 	const { state, dispatch } = useApp();
@@ -117,30 +58,40 @@ export function Composer(): JSX.Element {
 	const current = state.current;
 	const project = state.project;
 	const { text, images, quotes, mentions } = state.draft;
-	// 同排混排的胶囊：以正文里的 display 文字为准（用户删掉即消失）。
-	const chips: ChipRef[] = [
-		...quotes.map((quote) => ({
-			id: quote.id,
-			kind: "quote" as const,
-			display: quote.display,
-			tooltip: quote.text,
-		})),
-		...mentions.map((mention) => ({
-			id: mention.id,
-			kind: mention.kind === "file" ? ("file" as const) : ("skill" as const),
-			display: mention.display,
-		})),
-	];
-	const segments = segmentInput(text, chips);
 	const isSending = state.isSending;
 	const [dragging, setDragging] = useState(false);
 	const [attachMenu, setAttachMenu] = useState(false);
 	const [showUrlInput, setShowUrlInput] = useState(false);
 	const [imageUrl, setImageUrl] = useState("");
 	const [yoloConfirmOpen, setYoloConfirmOpen] = useState(false);
-	const textarea = useRef<HTMLTextAreaElement | null>(null);
-	const displayMirror = useRef<HTMLDivElement | null>(null);
+	const editorRef = useRef<ComposerEditorHandle | null>(null);
 	const isSubmitting = useRef(false);
+	// 编辑器 draft：正文 + chip（编辑器是 chip 真相，回写 draft.quotes/mentions）。
+	const editorDraft = useMemo(
+		() => ({
+			text,
+			quotes: quotes.map((q) => ({ id: q.id, kind: "quote" as const, value: q.text, label: q.display })),
+			mentions: mentions.map((m) => ({ id: m.id, kind: m.kind, value: m.value, label: m.display })),
+		}),
+		[text, quotes, mentions],
+	);
+	const handleEditorChange = useCallback(
+		(next: { text: string; quotes: readonly ChipData[]; mentions: readonly ChipData[] }): void => {
+			const nextQuotes: DraftQuote[] = next.quotes.map((c) => ({
+				id: c.id,
+				text: c.value,
+				display: c.label,
+			}));
+			const nextMentions: DraftMention[] = next.mentions.map((c) => ({
+				id: c.id,
+				kind: c.kind === "skill" ? "skill" : "file",
+				value: c.value,
+				display: c.label,
+			}));
+			dispatch({ type: "draft-sync", text: next.text, quotes: nextQuotes, mentions: nextMentions });
+		},
+		[dispatch],
+	);
 	// 行内补全状态；Esc 关闭后记住 dismissed，输入变化才重置。
 	const [completion, setCompletion] = useState<
 		| {
@@ -183,14 +134,7 @@ export function Composer(): JSX.Element {
 	const plan = current?.plan ?? state.draft.plan;
 
 	useEffect(() => {
-		const element = textarea.current;
-		if (element === null) return;
-		element.style.height = "auto";
-		element.style.height = `${Math.min(element.scrollHeight, 140)}px`;
-	}, [text]);
-
-	useEffect(() => {
-		if (!disabled) textarea.current?.focus();
+		if (!disabled) editorRef.current?.focus();
 	}, [current?.meta.id, state.draftGeneration, disabled]);
 
 	const report = (error: unknown): void => {
@@ -310,12 +254,9 @@ export function Composer(): JSX.Element {
 				if (context === undefined || epoch !== currentNavigationEpoch()) return;
 				session = context.session;
 			}
-			// 以正文为准：只有内联显示文字仍在正文里的 chip 才生效。
-			const activeQuotes = activeChips(text, quotes);
-			const activeMentions = activeChips(text, mentions);
-			// 工作区已确定，此时读取 @file 内容并组装最终送给模型的文本。
-			const files = await collectInlineFilesFromMentions(activeMentions);
-			const message = buildModelInput({ text: text.trim(), quotes: activeQuotes, mentions: activeMentions, files });
+			// chip 由编辑器真相同步到 draft，直接全用；text 已是纯正文（不含 chip 显示文字）。
+			const files = await collectInlineFilesFromMentions(mentions);
+			const message = buildModelInput({ text: text.trim(), quotes, mentions, files });
 			await call(
 				window.moros.chatSend({
 					sessionId: session.meta.id,
@@ -332,8 +273,8 @@ export function Composer(): JSX.Element {
 		}
 	};
 
-	/** 根据当前输入与光标重算补全浮层。 */
-	const updateCompletion = (value: string, cursor: number): void => {
+	/** 根据编辑器提供的正文/光标/位置重算补全浮层。 */
+	const updateCompletion = (value: string, cursor: number, rect: DOMRect | undefined): void => {
 		if (completionDismissed.current) return;
 		// 光标紧跟空白时不算活动 token：插入 @path/$name 后的尾随空格不该再弹补全。
 		if (cursor > 0 && /\s/.test(value[cursor - 1] ?? "")) {
@@ -341,15 +282,12 @@ export function Composer(): JSX.Element {
 			return;
 		}
 		const detected = findSlashToken(value, cursor) ?? findAtToken(value, cursor) ?? findSkillToken(value, cursor);
-		if (detected === undefined) {
+		if (detected === undefined || rect === undefined) {
 			setCompletion(undefined);
 			return;
 		}
 		const trigger: CompletionTrigger = value[detected.start] === "/" ? "/" : value[detected.start] === "@" ? "@" : "$";
-		const element = textarea.current;
-		if (element === null) return;
-		// 用镜像元素量出 trigger 片段的屏幕位置（textarea 无法直接量局部文本）。
-		const rect = tokenRect(element, detected.start, detected.end);
+		const anchor = { left: rect.left, bottom: rect.bottom, top: rect.top };
 		void (async () => {
 			let options: CompletionOption[] = [];
 			if (trigger === "/") {
@@ -373,11 +311,11 @@ export function Composer(): JSX.Element {
 					options = [];
 				}
 			}
-			setCompletion({ trigger, token: detected, options, activeIndex: 0, rect });
+			setCompletion({ trigger, token: detected, options, activeIndex: 0, rect: anchor });
 		})();
 	};
 
-	/** 选中补全项：命令立即执行；文件/技能把内联文字插入 textarea 并登记 chip。 */
+	/** 选中补全项：命令删 token 并执行；文件/技能插入真正的 chip 节点。 */
 	const selectCompletion = (index: number): void => {
 		if (completion === undefined) return;
 		const option = completion.options[index];
@@ -386,31 +324,24 @@ export function Composer(): JSX.Element {
 		completionDismissed.current = true;
 		setCompletion(undefined);
 		if (trigger === "/") {
-			const cleaned = removeTriggerText(text, token);
-			dispatch({ type: "draft-text", text: cleaned.text });
-			requestAnimationFrame(() => elementFocusAndCursor(cleaned.cursor));
+			// 删除已输入的 /xxx（token.end - token.start 个字符）
+			editorRef.current?.deleteTriggerToken(token.end - token.start);
 			void runDesktopCommand(option.value, "", commandHandlers);
 			return;
 		}
-		// 显示文字内联插入（替换触发片段），chip 记录 display 供发送时判断有效性。
-		const display = trigger === "@" ? formatFileReference(option.value) : formatSkillReference(option.value);
-		const next = text.slice(0, token.start) + display + " " + text.slice(token.end);
-		const cursor = token.start + display.length + 1;
-		dispatch({ type: "draft-text", text: next });
-		dispatch({
-			type: "draft-mention-added",
-			mention: {
-				id: crypto.randomUUID(),
-				kind: trigger === "@" ? "file" : "skill",
-				value: option.value,
-				display,
-			},
-		});
-		requestAnimationFrame(() => elementFocusAndCursor(cursor));
+		const chip: ChipData = {
+			id: crypto.randomUUID(),
+			kind: trigger === "@" ? "file" : "skill",
+			value: option.value,
+			label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
+		};
+		// 先删触发 token，再插入 chip（编辑器原生保证光标与原子删除）。
+		editorRef.current?.deleteTriggerToken(token.end - token.start);
+		requestAnimationFrame(() => editorRef.current?.insertChip(chip));
 	};
 
-	/** textarea 键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
-	const handleCompletionKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>): boolean => {
+	/** 编辑器键盘：补全打开时拦截方向键/Enter/Tab/Esc；返回是否已消费。 */
+	const handleCompletionKeyDown = (event: KeyboardEvent<HTMLElement>): boolean => {
 		if (completion === undefined) return false;
 		if (event.key === "ArrowDown") {
 			event.preventDefault();
@@ -437,24 +368,6 @@ export function Composer(): JSX.Element {
 			return true;
 		}
 		return false;
-	};
-
-	/** 清除正文里的全部引用/文件/技能显示文字，并清空对应结构化 chip。 */
-	/** 删除单个胶囊：从正文移除其 display 文字，并移除对应 chip。 */
-	const removeChip = (id: string): void => {
-		const chip = chips.find((item) => item.id === id);
-		if (chip === undefined) return;
-		const next = text.replace(chip.display, "");
-		dispatch({ type: "draft-text", text: next.trim() });
-		if (quotes.some((quote) => quote.id === id)) dispatch({ type: "draft-quote-removed", id });
-		else dispatch({ type: "draft-mention-removed", id });
-	};
-
-	const elementFocusAndCursor = (cursor: number): void => {
-		const element = textarea.current;
-		if (element === null) return;
-		element.focus();
-		element.setSelectionRange(cursor, cursor);
 	};
 
 	const addImage = (image: PreparedImage, generation: number): void => {
@@ -500,13 +413,6 @@ export function Composer(): JSX.Element {
 		} catch (error) {
 			report(error);
 		}
-	};
-
-	const onPaste = (event: ClipboardEvent<HTMLTextAreaElement>): void => {
-		const files = [...event.clipboardData.files].filter((file) => file.type.startsWith("image/"));
-		if (files.length === 0) return;
-		event.preventDefault();
-		void addFiles(files);
 	};
 
 	const onDrop = (event: DragEvent<HTMLDivElement>): void => {
@@ -660,76 +566,29 @@ export function Composer(): JSX.Element {
 						))}
 					</div>
 				) : null}
-				<div className="composer-input-wrap">
-					<textarea
-						className="composer-input"
-						ref={textarea}
-						value={text}
-						rows={1}
-						spellCheck={false}
-						disabled={disabled}
-						placeholder={
-							trustBlocked
-								? "请先确认工作区信任"
-								: readOnly
-									? "该会话正在另一个窗口中使用，当前为只读"
-									: "描述你的任务，/调用指令，@文件，$技能"
-						}
-						onChange={(event) => {
-							const value = event.target.value;
-							dispatch({ type: "draft-text", text: value });
-							completionDismissed.current = false;
-							updateCompletion(value, event.target.selectionStart);
-						}}
-						onSelect={(event) => updateCompletion(event.currentTarget.value, event.currentTarget.selectionStart)}
-						onScroll={(event) => {
-							if (displayMirror.current !== null) displayMirror.current.scrollTop = event.currentTarget.scrollTop;
-						}}
-						onPaste={onPaste}
-						onKeyDown={(event) => {
-							if (handleCompletionKeyDown(event)) return;
-							if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
-							event.preventDefault();
-							void send();
-						}}
-					/>
-					{/* 镜像层：与 textarea 同排，把 display 文字画成灰色胶囊（textarea 文字透明） */}
-					<div className="input-mirror" ref={displayMirror} aria-hidden="true">
-						{segments.map((segment, index) =>
-							segment.chip === undefined ? (
-								<span key={index}>{segment.text}</span>
-							) : (
-								<span className="inline-chip-slot" key={index}>
-									{/* 隐藏的完整文字：撑出与 textarea 一致的布局宽度，保证光标对齐 */}
-									<span className="inline-chip-measure">{segment.text}</span>
-									<span
-										className={`inline-chip inline-chip-${segment.chip.kind}`}
-										data-tooltip={segment.chip.tooltip ?? segment.text}
-									>
-										<span className="inline-chip-icon">
-											{segment.chip.kind === "quote" ? (
-												<QuoteIcon size={12} />
-											) : segment.chip.kind === "file" ? (
-												<FolderIcon size={12} />
-											) : (
-												<SparklesIcon size={12} />
-											)}
-										</span>
-										<span className="inline-chip-text">{segment.text}</span>
-										<button
-											type="button"
-											className="inline-chip-remove"
-											aria-label="移除此引用"
-											onClick={() => removeChip(segment.chip!.id)}
-										>
-											<XIcon size={12} />
-										</button>
-									</span>
-								</span>
-							),
-						)}
-					</div>
-				</div>
+				<ComposerEditor
+					ref={editorRef}
+					draft={editorDraft}
+					onChange={handleEditorChange}
+					disabled={disabled}
+					placeholder={
+						trustBlocked
+							? "请先确认工作区信任"
+							: readOnly
+								? "该会话正在另一个窗口中使用，当前为只读"
+								: "描述你的任务，/调用指令，@文件，$技能"
+					}
+					onKeyDown={(event) => {
+						if (handleCompletionKeyDown(event)) return;
+						if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+						event.preventDefault();
+						void send();
+					}}
+					onSelectionChange={(value, cursor, rect) => {
+						completionDismissed.current = false;
+						updateCompletion(value, cursor, rect);
+					}}
+				/>
 				{completion === undefined ? null : (
 					<InlineCompletion
 						trigger={completion.trigger}

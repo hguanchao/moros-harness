@@ -107,6 +107,13 @@ export type Action =
 	| { readonly type: "navigation-loading"; readonly isLoading: boolean }
 	| { readonly type: "sending"; readonly isSending: boolean }
 	| { readonly type: "draft-text"; readonly text: string }
+	/** 富文本编辑器整体验回写（正文 + chip 列表一次同步）。 */
+	| {
+			readonly type: "draft-sync";
+			readonly text: string;
+			readonly quotes: readonly DraftQuote[];
+			readonly mentions: readonly DraftMention[];
+	  }
 	/** 追加文本到草稿末尾（划词引用显示文字）。 */
 	| { readonly type: "draft-text-append"; readonly text: string }
 	/** 划词引用 chip：加入 / 移除；引用原文发送时才格式化为 `> ` 块。 */
@@ -277,6 +284,12 @@ export function reducer(state: AppState, action: Action): AppState {
 			return { ...state, isNavigating: action.isLoading };
 		case "sending":
 			return { ...state, isSending: action.isSending };
+		case "draft-sync":
+			return {
+				...state,
+				draft: { ...state.draft, text: action.text, quotes: action.quotes, mentions: action.mentions },
+				draftRevision: state.draftRevision + 1,
+			};
 		case "draft-text":
 			return action.text === state.draft.text
 				? state

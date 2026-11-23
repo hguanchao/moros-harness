@@ -11,7 +11,7 @@ export const MAX_DRAFT_IMAGES = 8;
 export interface DraftQuote {
 	readonly id: string;
 	readonly text: string;
-	/** 插入到 textarea 的内联显示文字。 */
+	/** 编辑器 chip 显示文字。 */
 	readonly display: string;
 	/** 来源 assistant 消息的事件 seq（拿不到时省略）。 */
 	readonly sourceSeq?: number;
@@ -23,7 +23,7 @@ export interface DraftMention {
 	readonly kind: "file" | "skill";
 	/** 用于序列化的值（文件路径 / 技能名）。 */
 	readonly value: string;
-	/** 插入到 textarea 的内联显示文字（如 @a.txt / $skill）。 */
+	/** 编辑器 chip 显示文字（如 @a.txt / $skill）。 */
 	readonly display: string;
 }
 

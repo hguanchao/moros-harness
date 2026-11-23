@@ -59,14 +59,6 @@ function formatFiles(files: readonly InlineFile[]): string {
 }
 
 /**
- * 筛出"仍然生效"的富元素：只有其 display 内联文字还在正文里时，chip 才生效。
- * 用户在 textarea 里删掉显示文字即取消该引用（以文字为准）。
- */
-export function activeChips<T extends { readonly display: string }>(text: string, chips: readonly T[]): readonly T[] {
-	return chips.filter((chip) => text.includes(chip.display));
-}
-
-/**
  * 构造送给模型的 user message。
  * 内联显示文字保留在正文中（对齐 ZCode：可见文本即模型文本）；
  * 结构化材料（引用 JSON + 文件内容）作为额外块附在正文之前。

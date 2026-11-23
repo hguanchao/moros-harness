@@ -541,23 +541,6 @@ pre.is-error {
 	border-color: var(--text-faint);
 }
 
-.composer textarea {
-	width: 100%;
-	min-height: 26px;
-	max-height: 220px;
-	resize: none;
-	border: none;
-	outline: none;
-	background: transparent;
-	padding: 3px 4px;
-	line-height: 1.55;
-	font-size: var(--text-body);
-}
-
-.composer textarea::placeholder {
-	color: var(--text-faint);
-}
-
 .attachments {
 	display: flex;
 	flex-wrap: wrap;

@@ -11,11 +11,13 @@
 		"smoke": "electron-vite build && node scripts/desktop-smoke.mjs"
 	},
 	"dependencies": {
+		"@lexical/react": "^0.53.0",
 		"@mixmark-io/domino": "^2.2.0",
 		"@mogeko/maple-mono-cn": "^7.9.0",
 		"@moros/core": "workspace:*",
 		"dompurify": "^3.4.18",
 		"highlight.js": "11.11.2",
+		"lexical": "^0.53.0",
 		"lowlight": "^3.3.0",
 		"lucide-react": "^1.76.0",
 		"lxgw-wenkai-screen-webfont": "^1.7.0",

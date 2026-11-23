@@ -65,9 +65,8 @@ export function ChatPage(): JSX.Element {
 	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
 	const handleQuote = useCallback(
 		(text: string, span?: { start: number; end: number; sourceSeq?: number }): void => {
-			// 正文只放短摘要（光标紧贴胶囊）；完整原文存在 quote.text，发送时注入模型，内容不丢。
+			// 登记引用 chip（编辑器会把 draft.quotes 重建为真正的 chip 节点，正文不含显示文字）。
 			const display = `引用：${text.replace(/\s+/g, " ").trim().slice(0, 10)}`;
-			dispatch({ type: "draft-text-append", text: `${display} ` });
 			dispatch({
 				type: "draft-quote-added",
 				quote: {
@@ -77,7 +76,7 @@ export function ChatPage(): JSX.Element {
 					...(span?.sourceSeq === undefined ? {} : { sourceSeq: span.sourceSeq }),
 				},
 			});
-			document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+			document.querySelector<HTMLElement>(".composer .composer-input")?.focus();
 		},
 		[dispatch],
 	);
@@ -230,7 +229,7 @@ export function ChatPage(): JSX.Element {
 					<EmptyBrand
 						onExample={(text) => {
 							dispatch({ type: "draft-text", text });
-							document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+							document.querySelector<HTMLElement>(".composer .composer-input")?.focus();
 						}}
 					/>
 					{dock}
@@ -269,7 +268,7 @@ export function ChatPage(): JSX.Element {
 										onApprovePlan={approvePlan}
 										onRevisePlan={() => {
 											if (activePlan === undefined) return;
-											document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+											document.querySelector<HTMLElement>(".composer .composer-input")?.focus();
 										}}
 									/>
 								</div>

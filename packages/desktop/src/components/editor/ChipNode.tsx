@@ -1,0 +1,137 @@
+import {
+	DecoratorNode,
+	type DOMConversionMap,
+	type LexicalNode,
+	type SerializedLexicalNode,
+	type Spread,
+	$applyNodeReplacement,
+	$getNodeByKey,
+} from "lexical";
+import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
+import { useCallback, type JSX } from "react";
+
+import { FileIcon, QuoteIcon, SparklesIcon, XIcon } from "../Icons.tsx";
+
+/** chip 种类：划词引用 / @文件 / $技能。 */
+export type ChipKind = "quote" | "file" | "skill";
+
+/** 序列化后的 chip 数据（落 draft.quotes/mentions 用）。 */
+export interface ChipData {
+	readonly id: string;
+	readonly kind: ChipKind;
+	readonly value: string;
+	readonly label: string;
+}
+
+export type SerializedChipNode = Spread<
+	{ chipId: string; chipKind: ChipKind; chipValue: string; chipLabel: string },
+	SerializedLexicalNode
+>;
+
+const CHIP_ICONS = { quote: QuoteIcon, file: FileIcon, skill: SparklesIcon } as const;
+
+/**
+ * 行内原子 chip 节点（DecoratorNode）：图标 + 文本 + ×，光标不能进入，退格整体删除。
+ * 与正文同排由浏览器同一次布局计算，光标天然对齐。
+ */
+export class ChipNode extends DecoratorNode<JSX.Element> {
+	__chipId: string;
+	__chipKind: ChipKind;
+	__chipValue: string;
+	__chipLabel: string;
+
+	constructor(id: string, kind: ChipKind, value: string, label: string, key?: string) {
+		super(key);
+		this.__chipId = id;
+		this.__chipKind = kind;
+		this.__chipValue = value;
+		this.__chipLabel = label;
+	}
+
+	static getType(): string {
+		return "chip";
+	}
+
+	static clone(node: ChipNode): ChipNode {
+		return new ChipNode(node.__chipId, node.__chipKind, node.__chipValue, node.__chipLabel, node.__key);
+	}
+
+	static importJSON(serialized: SerializedChipNode): ChipNode {
+		return $createChipNode(serialized.chipId, serialized.chipKind, serialized.chipValue, serialized.chipLabel);
+	}
+
+	exportJSON(): SerializedChipNode {
+		return {
+			chipId: this.__chipId,
+			chipKind: this.__chipKind,
+			chipValue: this.__chipValue,
+			chipLabel: this.__chipLabel,
+			type: "chip",
+			version: 1,
+		};
+	}
+
+	isInline(): boolean {
+		return true;
+	}
+
+	createDOM(): HTMLElement {
+		const dom = document.createElement("span");
+		dom.className = "editor-chip-host";
+		dom.setAttribute("data-chip-id", this.__chipId);
+		return dom;
+	}
+
+	updateDOM(): boolean {
+		return false; // DOM 由 React decorate 管理
+	}
+
+	decorate(): JSX.Element {
+		return <ChipDecoration nodeKey={this.getKey()} kind={this.__chipKind} label={this.__chipLabel} />;
+	}
+
+	static importDOM(): DOMConversionMap | null {
+		return null; // 粘贴 HTML 时 chip 当普通文本，不还原
+	}
+}
+
+/** 创建 chip 节点。 */
+export function $createChipNode(id: string, kind: ChipKind, value: string, label: string): ChipNode {
+	return $applyNodeReplacement(new ChipNode(id, kind, value, label));
+}
+
+export function $isChipNode(node: LexicalNode | null | undefined): node is ChipNode {
+	return node instanceof ChipNode;
+}
+
+/** 装饰组件：图标 + 文本 + ×，× 删除整块 chip。 */
+function ChipDecoration({
+	nodeKey,
+	kind,
+	label,
+}: {
+	readonly nodeKey: string;
+	readonly kind: ChipKind;
+	readonly label: string;
+}): JSX.Element {
+	const [editor] = useLexicalComposerContext();
+	const remove = useCallback(() => {
+		editor.update(() => {
+			$getNodeByKey(nodeKey)?.remove();
+		});
+	}, [editor, nodeKey]);
+	const Icon = CHIP_ICONS[kind];
+	return (
+		<span className={`editor-chip editor-chip-${kind}`}>
+			<span className="editor-chip-icon">
+				<Icon size={12} />
+			</span>
+			<span className="editor-chip-text" title={label}>
+				{label}
+			</span>
+			<button type="button" className="editor-chip-remove" aria-label="移除引用" onClick={remove}>
+				<XIcon size={10} />
+			</button>
+		</span>
+	);
+}

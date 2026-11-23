@@ -220,7 +220,7 @@ try {
 		process.stdout.write(`[pageerror] ${error.stack ?? error.message}\n`);
 	});
 
-	await page.waitForSelector(".composer textarea", { timeout: 20_000 });
+	await page.waitForSelector(".composer .composer-input", { timeout: 20_000 });
 	await page.waitForSelector(".trust-card", { timeout: 15_000 });
 	await page.screenshot({ path: join(shots, "01-trust.png") });
 	await page.getByRole("button", { name: "信任并记住" }).click();
@@ -322,7 +322,7 @@ try {
 	);
 	process.stdout.write(`sidebar toggle: ${sidebarOpen.width}px -> 0 -> back, width animated\n`);
 
-	await page.fill(".composer textarea", "写一个说明文件");
+	await page.fill(".composer .composer-input", "写一个说明文件");
 	await page.click(".send-button");
 	await page.waitForSelector(".approval-card", { timeout: 20_000 });
 	await page.screenshot({ path: join(shots, "03-approval.png") });
@@ -339,7 +339,7 @@ try {
 	}
 
 	await page.getByRole("button", { name: "计划", exact: true }).click();
-	await page.fill(".composer textarea", "请提交计划");
+	await page.fill(".composer .composer-input", "请提交计划");
 	await page.click(".send-button");
 	await page.waitForSelector(".plan-card", { timeout: 20_000 });
 	await page.screenshot({ path: join(shots, "05-plan.png") });
@@ -470,7 +470,7 @@ try {
 
 	// 返回工作区：独立视图应能回到聊天页
 	await page.getByRole("button", { name: "返回工作区" }).click();
-	await page.waitForSelector(".composer textarea", { timeout: 10_000 });
+	await page.waitForSelector(".composer .composer-input", { timeout: 10_000 });
 	process.stdout.write("settings: back to workspace ok\n");
 
 	const { Core } = await import("@moros/core");
