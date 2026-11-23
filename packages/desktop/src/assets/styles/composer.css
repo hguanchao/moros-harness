@@ -161,7 +161,7 @@
 	margin-bottom: 2px;
 	max-width: 200px;
 	padding: 0 6px;
-	border-radius: var(--r-pill);
+	border-radius: var(--r-md);
 	background: var(--fill-strong);
 	color: var(--text-primary);
 	font-size: var(--text-caption);
