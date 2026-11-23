@@ -2,10 +2,33 @@ import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } fr
 
 import { CheckIcon, CopyIcon, QuoteIcon } from "./Icons.tsx";
 
+/** 选区在其所属消息正文内的字符偏移与来源消息 seq。 */
+export interface QuoteSpan {
+	readonly start: number;
+	readonly end: number;
+	readonly sourceSeq?: number;
+}
+
 interface QuoteAnchor {
 	readonly text: string;
 	readonly x: number;
 	readonly y: number;
+	readonly span?: QuoteSpan;
+}
+
+/**
+ * 计算 range 起点/终点相对 root 的纯文本字符偏移。
+ * 用 Range.cloneRange 从 root 开头选到目标点，取 toString 长度（与 UTF-16 偏移一致）。
+ */
+function offsetWithin(root: Element, node: Node, nodeOffset: number): number {
+	const range = document.createRange();
+	range.selectNodeContents(root);
+	try {
+		range.setEnd(node, nodeOffset);
+	} catch {
+		return 0;
+	}
+	return range.toString().length;
 }
 
 /**
@@ -20,8 +43,8 @@ export function SelectionQuote({
 	onQuote,
 	children,
 }: {
-	/** 选中文本原文插入引用 chip 的回调。 */
-	readonly onQuote: (text: string) => void;
+	/** 选中文本原文插入引用 chip 的回调；span 尽量带上，取不到则省略。 */
+	readonly onQuote: (text: string, span?: QuoteSpan) => void;
 	readonly children: ReactNode;
 }): JSX.Element {
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -65,7 +88,19 @@ export function SelectionQuote({
 					return;
 				}
 				const rect = range.getBoundingClientRect();
-				setAnchor({ text, x: rect.left + rect.width / 2, y: rect.top });
+				// 找最近的 [data-message-seq] 祖先作为偏移基准与来源消息。
+				const startNode = range.startContainer;
+				const startElement = startNode instanceof Element ? startNode : startNode.parentElement;
+				const messageEl = startElement?.closest<HTMLElement>("[data-message-seq]") ?? null;
+				let span: QuoteSpan | undefined;
+				if (messageEl !== null) {
+					span = {
+						start: offsetWithin(messageEl, range.startContainer, range.startOffset),
+						end: offsetWithin(messageEl, range.endContainer, range.endOffset),
+						...(messageEl.dataset.messageSeq === undefined ? {} : { sourceSeq: Number(messageEl.dataset.messageSeq) }),
+					};
+				}
+				setAnchor({ text, x: rect.left + rect.width / 2, y: rect.top, ...(span === undefined ? {} : { span }) });
 			});
 		};
 
@@ -89,7 +124,7 @@ export function SelectionQuote({
 		const text = anchor.text;
 		window.getSelection()?.removeAllRanges();
 		hide();
-		if (text.trim().length > 0) onQuote(text);
+		if (text.trim().length > 0) onQuote(text, anchor.span);
 	};
 
 	const handleCopy = (): void => {

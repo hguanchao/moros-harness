@@ -40,6 +40,13 @@ import { workspaceTarget, workspaceTargetsMatch } from "../utils/workspace.ts";
 import { buildQuote } from "../utils/message-actions.ts";
 import { firstLine } from "../utils/format.ts";
 import {
+	buildModelInput,
+	MAX_FILE_INLINE_BYTES,
+	MAX_TOTAL_INLINE_BYTES,
+	truncateToBudget,
+	type InlineFile,
+} from "../utils/model-input.ts";
+import {
 	filterCommands,
 	filterFiles,
 	filterSkills,
@@ -217,17 +224,40 @@ export function Composer(): JSX.Element {
 		},
 	};
 
+	/**
+	 * 读取 file mention 的内容并按预算内联；失败/二进制/超预算降级为占位文本，不阻断发送。
+	 * 必须在会话确定（工作区已切换）之后调用，否则首条消息会读到旧工作区。
+	 */
+	const collectInlineFilesFromMentions = async (): Promise<InlineFile[]> => {
+		const files: InlineFile[] = [];
+		let used = 0;
+		for (const mention of mentions) {
+			if (mention.kind !== "file") continue;
+			try {
+				const result = await call(window.moros.workspaceRead(mention.value));
+				if (result.binary || result.text === null) {
+					files.push({ path: mention.value, text: "", note: `(binary or unreadable; use the Read tool)` });
+					continue;
+				}
+				const remaining = MAX_TOTAL_INLINE_BYTES - used;
+				const budget = Math.min(MAX_FILE_INLINE_BYTES, remaining);
+				if (budget <= 0) {
+					files.push({ path: mention.value, text: "", note: `(skipped: inline budget reached; use the Read tool)` });
+					continue;
+				}
+				const clipped = truncateToBudget(result.text, budget);
+				used += new TextEncoder().encode(clipped.text).length;
+				files.push({ path: mention.value, text: clipped.text, truncated: clipped.truncated || result.truncated });
+			} catch {
+				files.push({ path: mention.value, text: "", note: `(not found or unreadable; use the Read tool)` });
+			}
+		}
+		return files;
+	};
+
 	const send = async (): Promise<void> => {
 		if (disabled || isSending || isSubmitting.current) return;
-		// 引用 chip 在发送时才序列化：`> ` 引用块 + `@path` / `$name`，拼在正文之前。
-		const quoteText = quotes.map((quote) => buildQuote(quote.text)).join("");
-		const mentionText = mentions
-			.map((mention) =>
-				mention.kind === "file" ? formatFileReference(mention.value) : formatSkillReference(mention.value),
-			)
-			.join(" ");
-		const message = `${quoteText}${mentionText.length === 0 ? "" : `${mentionText}\n`}${text.trim()}`;
-		if (message.length === 0 && images.length === 0) return;
+		if (text.trim().length === 0 && images.length === 0 && quotes.length === 0 && mentions.length === 0) return;
 		const epoch = currentNavigationEpoch();
 		const generation = state.draftGeneration;
 		const revision = state.draftRevision;
@@ -263,6 +293,9 @@ export function Composer(): JSX.Element {
 				if (context === undefined || epoch !== currentNavigationEpoch()) return;
 				session = context.session;
 			}
+			// 工作区已确定，此时读取 @file 内容并组装最终送给模型的文本。
+			const files = await collectInlineFilesFromMentions();
+			const message = buildModelInput({ text: text.trim(), quotes, mentions, files });
 			await call(
 				window.moros.chatSend({
 					sessionId: session.meta.id,
@@ -339,6 +372,8 @@ export function Composer(): JSX.Element {
 					kind: trigger === "@" ? "file" : "skill",
 					value: option.value,
 					label: trigger === "@" ? (option.value.split("/").at(-1) ?? option.value) : option.value,
+					start: token.start,
+					end: token.end,
 				},
 			});
 		}

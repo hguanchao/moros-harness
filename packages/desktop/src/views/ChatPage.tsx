@@ -64,8 +64,16 @@ export function ChatPage(): JSX.Element {
 	// 反馈状态由事件流还原（唯一事实源），随事件推送自动刷新。
 	const feedbacks = useMemo(() => resolveFeedbacks(events), [events]);
 	const handleQuote = useCallback(
-		(text: string): void => {
-			dispatch({ type: "draft-quote-added", quote: { id: crypto.randomUUID(), text } });
+		(text: string, span?: { start: number; end: number; sourceSeq?: number }): void => {
+			dispatch({
+				type: "draft-quote-added",
+				quote: {
+					id: crypto.randomUUID(),
+					text,
+					...(span === undefined ? {} : { start: span.start, end: span.end }),
+					...(span?.sourceSeq === undefined ? {} : { sourceSeq: span.sourceSeq }),
+				},
+			});
 			document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
 		},
 		[dispatch],

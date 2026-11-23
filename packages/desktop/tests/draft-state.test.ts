@@ -643,3 +643,23 @@ describe("draft-mention 文件/技能引用 chip", () => {
 		expect(sent.draft.mentions).toEqual([]);
 	});
 });
+
+describe("chip span 元数据", () => {
+	it("引用 chip 带 span 与 sourceSeq 原样保留", () => {
+		const base = reducer(activeState(), { type: "new-task" });
+		const added = reducer(base, {
+			type: "draft-quote-added",
+			quote: { id: "q1", text: "原文", start: 2, end: 4, sourceSeq: 7 },
+		});
+		expect(added.draft.quotes[0]).toEqual({ id: "q1", text: "原文", start: 2, end: 4, sourceSeq: 7 });
+	});
+
+	it("mention chip 带 span 原样保留", () => {
+		const base = reducer(activeState(), { type: "new-task" });
+		const added = reducer(base, {
+			type: "draft-mention-added",
+			mention: { id: "m1", kind: "file", value: "src/a.ts", label: "a.ts", start: 0, end: 10 },
+		});
+		expect(added.draft.mentions[0]).toMatchObject({ start: 0, end: 10 });
+	});
+});

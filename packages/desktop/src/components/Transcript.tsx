@@ -715,7 +715,11 @@ function BlockList({
 						} else {
 							// 最终答案正文；操作栏在循环后统一追加（用有实质内容的正文，避免空白块）。
 							rendered.push(
-								<div className="answer-block" key={`answer-${key++}`}>
+								<div
+									className="answer-block"
+									key={`answer-${key++}`}
+									{...(block.seq === undefined ? {} : { "data-message-seq": String(block.seq) })}
+								>
 									{markdown}
 								</div>,
 							);
