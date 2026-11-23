@@ -525,38 +525,32 @@
 	margin-bottom: 12px;
 }
 
+/* 搜索框与常规页输入框（如 HTTP 代理）同款：用 .text-input 的边框、
+   圆角、背景与聚焦态；只在左侧叠一个搜索图标。 */
 .ext-search {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
+	position: relative;
 	width: 200px;
-	height: 26px;
-	padding: 0 9px;
-	border: 1px solid var(--line-strong);
-	border-radius: var(--r-lg);
-	background: var(--surface-chrome);
+	flex: none;
 	color: var(--text-faint);
 }
 
-.ext-search input {
-	flex: 1;
-	min-width: 0;
-	height: 100%;
-	border: none;
-	outline: none;
-	background: transparent;
-	color: var(--text-primary);
-	font-size: var(--text-small);
+.ext-search > svg {
+	position: absolute;
+	left: 10px;
+	top: 50%;
+	transform: translateY(-50%);
+	pointer-events: none;
 }
 
-.ext-search:focus-within {
-	border-color: var(--accent);
+.ext-search input.text-input {
+	width: 100%;
+	padding-left: 30px;
 }
 
-/* 图标按钮与搜索框等高（26px），尺寸一致；圆角沿用 small 按钮。 */
+/* 图标按钮与搜索框等高（36px），保持一致。 */
 .ext-icon-button {
-	width: 26px;
-	height: 26px;
+	width: 36px;
+	height: 36px;
 	flex: none;
 	padding: 0;
 	justify-content: center;

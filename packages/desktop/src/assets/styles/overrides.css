@@ -88,24 +88,3 @@
 	width: 0;
 	height: 0;
 }
-
-/* ---------- 全局输入框焦点样式 ---------- */
-/* 所有文本输入统一：聚焦时一圈柔和外发光，失焦平滑淡出。
-   不覆盖各输入框自身的边框（有些是无边框内联输入），只补统一的焦点反馈。 */
-input:not([disabled]):not([type="checkbox"]):not([type="radio"]),
-textarea:not([disabled]) {
-	outline: none;
-	transition: box-shadow var(--duration-fast) var(--ease-standard);
-}
-
-input:not([disabled]):not([type="checkbox"]):not([type="radio"]):focus,
-textarea:not([disabled]):focus,
-.ext-search:focus-within {
-	box-shadow: 0 0 0 2px var(--accent-soft);
-}
-
-/* 无边框的内联输入（如项目名重命名）不需要外发光。 */
-input.is-inline:focus,
-input[type="text"].is-inline:focus {
-	box-shadow: none;
-}

@@ -1041,20 +1041,21 @@ function SkillsPanel({
 		<>
 			<div className="ext-toolbar">
 				<div className="ext-search">
-					<SearchIcon size={13} />
+					<SearchIcon size={14} />
 					<input
+						className="text-input"
 						value={query}
 						onChange={(event) => setQuery(event.target.value)}
 						placeholder="搜索技能"
 						aria-label="搜索技能"
 					/>
 				</div>
-				<button className="ghost-button small ext-icon-button" aria-label="刷新技能" onClick={() => void onRefresh()}>
-					<RefreshIcon size={14} />
+				<button className="ghost-button ext-icon-button" aria-label="刷新技能" onClick={() => void onRefresh()}>
+					<RefreshIcon size={16} />
 				</button>
 				<div className="ext-add-menu" ref={addMenuRef}>
 					<button
-						className="primary-button small ext-icon-button"
+						className="primary-button ext-icon-button"
 						aria-label="添加技能"
 						aria-expanded={addMenuOpen}
 						disabled={mcpBlocked}
