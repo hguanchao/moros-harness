@@ -611,3 +611,48 @@
 	font-size: var(--text-caption);
 	color: var(--text-faint);
 }
+
+/* ---------- 命令菜单（参考 IDE 命令面板排版） ---------- */
+
+.completion-group-label {
+	padding: 5px 7px 4px;
+	font-size: var(--text-micro);
+	color: var(--text-faint);
+}
+
+/* 命令行：命令名与说明同一行；命令名用浅色块强调，说明右侧省略 */
+.completion-option.is-command {
+	gap: 10px;
+	padding: 5px 7px;
+}
+
+.completion-command-label {
+	flex: none;
+	padding: 1px 7px;
+	border-radius: var(--r-sm);
+	background: var(--fill-soft);
+	color: var(--text-primary);
+	font-size: var(--text-caption);
+	white-space: nowrap;
+}
+
+.completion-option.is-command.is-active .completion-command-label {
+	background: var(--fill-strong);
+}
+
+.completion-option.is-command .completion-desc {
+	flex: 1;
+	min-width: 0;
+	font-size: var(--text-caption);
+}
+
+.completion-hint {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+	padding: 7px 7px 3px;
+	border-top: 1px solid var(--line);
+	color: var(--text-faint);
+	font-size: var(--text-micro);
+}
