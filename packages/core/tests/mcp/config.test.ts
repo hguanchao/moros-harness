@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { normalizeConfigKeys } from "@moros/core/config/keys.ts";
 import { loadConfig } from "@moros/core/config/loader.ts";
 import { parseConfig } from "@moros/core/config/schema.ts";
-import { resolveMcpEnvironment } from "@moros/core/mcp/config.ts";
+import { resolveMcpEnvironment, validateMcpServerDraft } from "@moros/core/mcp/config.ts";
 import type { McpServerConfig } from "@moros/core/mcp/types.ts";
 
 const roots: string[] = [];
@@ -161,5 +161,24 @@ describe("MCP 环境变量解析", () => {
 
 	it("缺失变量时抛错，由管理器标记该 server 不可用", async () => {
 		await expect(resolveMcpEnvironment(server, { env: { FROM_ENV: "ok" } })).rejects.toThrow("DOCS_TOKEN");
+	});
+});
+
+describe("validateMcpServerDraft 草稿校验", () => {
+	it("复用 parseMcpServers 的规则，规范化默认值", () => {
+		const config = validateMcpServerDraft("docs", { command: "npx", args: ["-y", "docs-mcp"] });
+		expect(config).toMatchObject({
+			name: "docs",
+			type: "stdio",
+			command: "npx",
+			args: ["-y", "docs-mcp"],
+			disabled: false,
+		});
+	});
+
+	it("非法名称或互斥字段抛错", () => {
+		expect(() => validateMcpServerDraft("bad.name", { command: "npx" })).toThrow("只能包含字母");
+		expect(() => validateMcpServerDraft("docs", { command: "npx", url: "https://example.com/mcp" })).toThrow();
+		expect(() => validateMcpServerDraft("docs", { type: "http" })).toThrow();
 	});
 });

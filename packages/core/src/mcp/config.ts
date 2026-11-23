@@ -11,8 +11,35 @@ import type { McpServerConfig, McpServerType } from "./types.ts";
  * 的同一张表在装载层被忽略——MCP 决定启动哪个本地进程，只允许用户级配置。
  */
 
-const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+export const SERVER_NAME_PATTERN = /^[A-Za-z0-9_-]+$/;
 const SERVER_TYPES = ["stdio", "http", "sse"] as const satisfies readonly McpServerType[];
+
+/**
+ * 设置页写回 config.toml 的 MCP server 草稿（字段名与 TOML 一致）。
+ * 校验直接复用 parseMcpServers，避免两处规则漂移。
+ */
+export interface McpServerDraft {
+	readonly type?: "stdio" | "http" | "sse";
+	readonly command?: string;
+	readonly args?: readonly string[];
+	readonly url?: string;
+	readonly headers?: Readonly<Record<string, string>>;
+	readonly env?: Readonly<Record<string, string>>;
+	readonly timeout?: number;
+	readonly disabled?: boolean;
+}
+
+/** 校验并规范化一个 server 草稿；非法时抛错（消息可直接展示给使用者）。 */
+export function validateMcpServerDraft(name: string, draft: McpServerDraft): McpServerConfig {
+	if (!SERVER_NAME_PATTERN.test(name)) {
+		throw new Error("server 名称只能包含字母、数字、- 和 _");
+	}
+	const { servers, skipped } = parseMcpServers({ [name]: draft });
+	if (skipped.length > 0 || servers.length !== 1) {
+		throw new Error(skipped[0]?.reason ?? "server 配置无效");
+	}
+	return servers[0]!;
+}
 
 const McpServerEntrySchema = z
 	.object({

@@ -150,3 +150,66 @@ describe("MCP manager（真实 stdio fixture）", () => {
 		}
 	});
 });
+
+describe("MCP manager 运行时增删", () => {
+	it("addServer 后出现状态与工具，同名忽略", async () => {
+		const mcp = new McpManager({
+			projectRoot,
+			servers: [],
+			version: "0.0.0-test",
+			reconnectDelaysMs: [],
+			startupSettleMs: 5_000,
+		});
+		try {
+			expect(mcp.hasServer("fixture")).toBe(false);
+			mcp.addServer(server());
+			mcp.addServer(server()); // 同名忽略，不会重复
+			expect(mcp.hasServer("fixture")).toBe(true);
+			expect(mcp.status()).toHaveLength(1);
+
+			await mcp.awaitStartup();
+			expect(mcp.tools().some((tool) => tool.name.startsWith("mcp__fixture__"))).toBe(true);
+		} finally {
+			await mcp.close();
+		}
+	});
+
+	it("removeServer 停止连接并清掉工具，可再次 add 重建", async () => {
+		const mcp = manager();
+		try {
+			mcp.start();
+			await mcp.awaitStartup();
+			expect(mcp.tools().length).toBeGreaterThan(0);
+
+			expect(await mcp.removeServer("fixture")).toBe(true);
+			expect(mcp.hasServer("fixture")).toBe(false);
+			expect(mcp.status()).toEqual([]);
+			expect(mcp.tools()).toEqual([]);
+			expect(await mcp.removeServer("fixture")).toBe(false);
+
+			// 移除后的连接是终结态；add 用新连接重建，工具重新出现。
+			mcp.addServer(server());
+			await mcp.awaitStartup();
+			expect(mcp.tools().length).toBeGreaterThan(0);
+		} finally {
+			await mcp.close();
+		}
+	});
+
+	it("replaceServer 用新配置替换同名 server 并重连", async () => {
+		const mcp = manager();
+		try {
+			mcp.start();
+			await mcp.awaitStartup();
+			// 同名不同配置：替换后仍是 fixture，但连接是新建的（stop 是终结态）。
+			await mcp.replaceServer({ ...server(["--replaced"]) });
+
+			expect(mcp.hasServer("fixture")).toBe(true);
+			expect(mcp.status().map((entry) => entry.name)).toEqual(["fixture"]);
+			await mcp.awaitStartup();
+			expect(mcp.tools().some((tool) => tool.name.startsWith("mcp__fixture__"))).toBe(true);
+		} finally {
+			await mcp.close();
+		}
+	});
+});

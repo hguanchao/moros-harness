@@ -49,7 +49,7 @@ type TransportFactory = NonNullable<McpManagerOptions["transportFactory"]>;
  * 重连，耗尽后停在 unreachable，由 `/mcps` 的 r 手动重连。
  */
 export class McpManager {
-	readonly #projectRoot: string;
+	readonly #options: McpManagerOptions;
 	readonly #connections: McpConnection[];
 	readonly #startupSettleMs: number;
 	#closed = false;
@@ -59,19 +59,22 @@ export class McpManager {
 	readonly #usedNames = new Set<string>();
 
 	constructor(options: McpManagerOptions) {
-		this.#projectRoot = options.projectRoot;
+		this.#options = options;
 		this.#startupSettleMs = options.startupSettleMs ?? STARTUP_SETTLE_MS;
-		this.#connections = options.servers.map(
-			(config) =>
-				new McpConnection(config, {
-					projectRoot: options.projectRoot,
-					version: options.version,
-					...(options.env ? { env: options.env } : {}),
-					...(options.fetch ? { fetch: options.fetch } : {}),
-					...(options.transportFactory ? { transportFactory: options.transportFactory } : {}),
-					reconnectDelaysMs: options.reconnectDelaysMs ?? RECONNECT_DELAYS_MS,
-				}),
-		);
+		this.#connections = options.servers.map((config) => this.#createConnection(config));
+	}
+
+	/** 用与构造时相同的注入选项创建一个连接；运行时增删复用，保证测试注入仍然生效。 */
+	#createConnection(config: McpServerConfig): McpConnection {
+		const options = this.#options;
+		return new McpConnection(config, {
+			projectRoot: options.projectRoot,
+			version: options.version,
+			...(options.env ? { env: options.env } : {}),
+			...(options.fetch ? { fetch: options.fetch } : {}),
+			...(options.transportFactory ? { transportFactory: options.transportFactory } : {}),
+			reconnectDelaysMs: options.reconnectDelaysMs ?? RECONNECT_DELAYS_MS,
+		});
 	}
 
 	/** 后台启动全部启用的 server；重复调用是幂等的。 */
@@ -116,6 +119,48 @@ export class McpManager {
 			if (this.#connections.every((connection) => connection.status().status !== "connecting")) return;
 			await new Promise<void>((resolve) => setTimeout(resolve, STARTUP_POLL_MS));
 		}
+	}
+
+	/** 是否已有同名 server；运行时增删前去重。 */
+	hasServer(name: string): boolean {
+		return this.#connections.some((connection) => connection.name === name);
+	}
+
+	/**
+	 * 运行时新增一个 server 并立即后台连接。同名已存在时忽略。
+	 * 配置写回后调用，使变更在无进程重启的情况下生效。
+	 */
+	addServer(config: McpServerConfig): void {
+		if (this.#closed || this.hasServer(config.name)) return;
+		this.#connections.push(this.#createConnection(config));
+		// 新增的 server 也要参与后续启动收口（若有等待中的 awaitStartup）。
+		this.#startupSettled = false;
+		if (!this.#closed) void this.#connections.at(-1)!.start();
+	}
+
+	/**
+	 * 运行时移除一个 server：停止连接并清掉它的工具名缓存。
+	 * McpConnection.stop() 是终结态，移除后不可再启动，需要时用 addServer 重建。
+	 * @returns 是否命中并移除了该 server。
+	 */
+	async removeServer(name: string): Promise<boolean> {
+		const connection = this.#connections.find((candidate) => candidate.name === name);
+		if (connection === undefined) return false;
+		await connection.stop();
+		this.#connections.splice(this.#connections.indexOf(connection), 1);
+		for (const key of [...this.#toolNames.keys()]) {
+			if (key.startsWith(`${name}\0`)) {
+				this.#usedNames.delete(this.#toolNames.get(key)!);
+				this.#toolNames.delete(key);
+			}
+		}
+		return true;
+	}
+
+	/** 用新配置替换一个 server（先移除旧连接再新增），保持运行时与配置一致。 */
+	async replaceServer(config: McpServerConfig): Promise<void> {
+		await this.removeServer(config.name);
+		this.addServer(config);
 	}
 
 	/** 手动重连一个 server；返回给使用者看的结果说明。 */

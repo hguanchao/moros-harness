@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { stringify as stringifyToml } from "smol-toml";
 
 import { isMissingPath } from "../fs-error.ts";
+import type { McpServerDraft } from "../mcp/config.ts";
 
 /** 允许由产品写回全局 config.toml 的顶层键；其余键仍由使用者手工维护。 */
 export interface GlobalConfigPatch {
@@ -245,6 +246,12 @@ const SCALAR_CANONICAL: Readonly<Record<keyof ScalarSettingsPatch, string>> = {
 /** 可写入 TOML 的设置值；布尔用于 ui.codeWorkspace 等开关。 */
 type SettingValue = string | number | boolean;
 
+/** `[mcp_servers]` 补丁：按 server 名设置或删除整个表。 */
+export interface McpServersPatch {
+	readonly set?: Readonly<Record<string, McpServerDraft>> | undefined;
+	readonly remove?: readonly string[] | undefined;
+}
+
 /** 嵌套表设置补丁；null 表示删除该键。 */
 export type SectionSettingsPatch = {
 	readonly [S in SectionName]?:
@@ -399,8 +406,127 @@ const SECTION_CANONICAL: Readonly<Record<SectionName, Readonly<Record<string, st
 
 /** 借助 smol-toml 序列化生成带正确转义的右侧值。 */
 function formatValue(value: SettingValue): string {
+	return formatAnyValue(value);
+}
+
+/**
+ * 把任意 TOML 值（标量/数组/内联表）序列化成「=」右侧文本。
+ * 复用 smol-toml 保证字符串转义与数组格式正确，不自己拼引号。
+ * 对象要显式序列化成内联表：stringifyToml 对嵌套对象会生成 `[value.xxx]` 子表，
+ * 取「=」右侧会得到错乱文本；这里逐键格式化后拼成 `{ k = v, ... }`。
+ */
+function formatAnyValue(value: unknown): string {
+	if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+		const entries = Object.entries(value as Record<string, unknown>);
+		if (entries.length === 0) return "{}";
+		return `{ ${entries.map(([key, item]) => `${key} = ${formatAnyValue(item)}`).join(", ")} }`;
+	}
 	const serialized = stringifyToml({ value }).trimEnd();
 	return serialized.slice(serialized.indexOf("=") + 1).trim();
+}
+
+/** 把 server 草稿按固定字段顺序序列化成 `[mcp_servers.<name>]` 表的行。 */
+function mcpServerLines(draft: McpServerDraft): string[] {
+	const fields: readonly (readonly [string, unknown])[] = [
+		["type", draft.type],
+		["command", draft.command],
+		["args", draft.args],
+		["url", draft.url],
+		["headers", draft.headers],
+		["env", draft.env],
+		["timeout", draft.timeout],
+		["disabled", draft.disabled],
+	];
+	return fields.filter((entry) => entry[1] !== undefined).map(([key, value]) => `${key} = ${formatAnyValue(value)}`);
+}
+
+/**
+ * 把 MCP server 写回全局 config.toml 的 `[mcp_servers]` 表。
+ *
+ * 每个 server 是一个独立表 `[mcp_servers.<name>]`：已存在则逐字段原位替换（保留注释行
+ * 与其他字段顺序），新字段追加到表尾；不存在则在文件末尾新建；remove 命中整段删除。
+ * 与 updateGlobalTrusts 一致按行补写，其余注释与排版不动，临时名 → rename 原子写。
+ * headers/env 写成内联表，避免生成 `[mcp_servers.x.env]` 子表干扰边界判定。
+ * @param patch 要设置/删除的 server；调用方应先用 validateMcpServerDraft 校验。
+ * @param options.homeDir 用户主目录。
+ */
+export async function updateGlobalMcpServers(patch: McpServersPatch, options: { homeDir: string }): Promise<void> {
+	const entries = Object.entries(patch.set ?? {});
+	const removals = new Set(patch.remove ?? []);
+	if (entries.length === 0 && removals.size === 0) return;
+	const path = configPath(options.homeDir);
+	const lines = await readConfigLines(path);
+
+	/** 定位某个 `[mcp_servers.<name>]` 表，返回 [start, end)；找不到返回 undefined。 */
+	const locate = (name: string): { start: number; end: number } | undefined => {
+		const header = new RegExp(`^\\s*\\[mcp_servers\\.${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\s*(?:#.*)?$`);
+		for (const [index, line] of lines.entries()) {
+			if (!header.test(line)) continue;
+			let end = lines.length;
+			for (let next = index + 1; next < lines.length; next += 1) {
+				if (/^\s*\[/.test(lines[next] ?? "")) {
+					end = next;
+					break;
+				}
+			}
+			return { start: index, end };
+		}
+		return undefined;
+	};
+
+	/** 表内一行赋值行的字段名；注释/空行/表头返回 undefined。 */
+	const fieldName = (line: string): string | undefined => /^\s*([A-Za-z0-9_-]+)\s*=/.exec(line)?.[1];
+
+	const desired = new Map(entries);
+	for (const name of removals) {
+		const section = locate(name);
+		if (section !== undefined) lines.splice(section.start, section.end - section.start);
+	}
+	for (const [name, draft] of desired) {
+		const newLines = mcpServerLines(draft);
+		const section = locate(name);
+		if (section !== undefined) {
+			const kept: string[] = [];
+			const seen = new Set<string>();
+			for (let index = section.start + 1; index < section.end; index += 1) {
+				const line = lines[index] ?? "";
+				const key = fieldName(line);
+				// 非赋值行（注释/空行）保留；已知字段原位替换为新值；其余字段也保留
+				// （例如调用方没覆盖的 timeout/disabled），避免一次编辑丢配置。
+				if (key === undefined || !mcpDraftHasField(draft, key)) {
+					kept.push(line);
+					continue;
+				}
+				const value = mcpDraftField(draft, key);
+				if (value === undefined) {
+					kept.push(line);
+					continue;
+				}
+				seen.add(key);
+				kept.push(`${key} = ${formatAnyValue(value)}`);
+			}
+			for (const line of newLines) {
+				const key = fieldName(line);
+				if (key !== undefined && !seen.has(key)) kept.push(line);
+			}
+			lines.splice(section.start + 1, section.end - section.start - 1, ...kept);
+		} else {
+			if (lines.length > 0 && (lines.at(-1) ?? "").trim().length > 0) lines.push("");
+			lines.push(`[mcp_servers.${name}]`, ...newLines);
+		}
+	}
+	await writeAtomically(path, lines);
+}
+
+/** 判断草稿是否显式给出了某个字段（undefined 视为未给出）。 */
+function mcpDraftHasField(draft: McpServerDraft, key: string): boolean {
+	return mcpDraftField(draft, key) !== undefined;
+}
+
+/** 取草稿里某个字段的值；字段名与 McpServerDraft 键一致。 */
+function mcpDraftField(draft: McpServerDraft, key: string): unknown {
+	if (key in draft) return (draft as Record<string, unknown>)[key];
+	return undefined;
 }
 
 /** 全局配置文件的固定位置。 */

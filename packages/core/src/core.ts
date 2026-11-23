@@ -33,7 +33,7 @@ import {
 	type ProviderConfig,
 	type ProvidersFile,
 } from "./config/schema.ts";
-import { updateGlobalConfig, updateGlobalTrusts } from "./config/writer.ts";
+import { updateGlobalConfig, updateGlobalMcpServers, updateGlobalTrusts } from "./config/writer.ts";
 import {
 	deleteProvider,
 	readSettings,
@@ -59,8 +59,9 @@ import type {
 } from "./harness/types.ts";
 import { LlmClient } from "./llm/client.ts";
 import { MAX_IMAGE_BYTES_PER_REQUEST, MAX_IMAGES_PER_REQUEST, formatImageBytes } from "./llm/image-limits.ts";
+import { validateMcpServerDraft, type McpServerDraft } from "./mcp/config.ts";
 import { McpManager } from "./mcp/manager.ts";
-import type { McpStatus } from "./mcp/types.ts";
+import type { McpServerConfig, McpStatus } from "./mcp/types.ts";
 import { VERSION } from "./version.ts";
 import { AgentLoop, type LoopResult } from "./loop/agent-loop.ts";
 import { replayMessages } from "./loop/message-replay.ts";
@@ -1200,6 +1201,54 @@ export class Core {
 		if (!manager) return [];
 		manager.start();
 		return manager.healthCheck();
+	}
+
+	/**
+	 * 使 MCP 相关缓存失效：配置缓存重读、旧管理器关闭并移除。
+	 * 管理器持有构造时的配置快照，光清配置缓存不会更新已缓存的连接。
+	 */
+	async #invalidateMcp(projectRoot: string): Promise<void> {
+		this.#loadedConfigs.clear();
+		const key = normalizeProjectRoot(resolve(projectRoot));
+		const manager = this.#mcpManagers.get(key);
+		if (manager !== undefined) {
+			await manager.close();
+			this.#mcpManagers.delete(key);
+		}
+	}
+
+	/**
+	 * 新增或更新一个 MCP server：校验 → 写回 config.toml → 重建运行时连接。
+	 * 写盘在缓存失效之前，失败时现有连接不受影响。
+	 * @param name server 名（config.toml 的表名，只允许字母数字 - _）。
+	 * @param draft 传输方式与参数；校验复用 parseMcpServers。
+	 * @returns 规范化后的 server 配置（含推断的 type 与默认值）。
+	 */
+	async upsertMcpServer(projectRoot: string, name: string, draft: McpServerDraft): Promise<McpServerConfig> {
+		if (this.#disposed) throw new Error("Core is disposed");
+		const config = validateMcpServerDraft(name, draft);
+		await updateGlobalMcpServers({ set: { [name]: draft } }, { homeDir: this.#homeDir });
+		await this.#invalidateMcp(projectRoot);
+		const manager = await this.#ensureMcpManager(projectRoot);
+		manager?.start();
+		return config;
+	}
+
+	/** 删除一个 MCP server：写回 config.toml 后重建运行时（删掉最后一个时状态自然为空）。 */
+	async removeMcpServer(projectRoot: string, name: string): Promise<void> {
+		if (this.#disposed) throw new Error("Core is disposed");
+		await updateGlobalMcpServers({ remove: [name] }, { homeDir: this.#homeDir });
+		await this.#invalidateMcp(projectRoot);
+		const manager = await this.#ensureMcpManager(projectRoot);
+		manager?.start();
+	}
+
+	/** 重新加载 MCP 配置并重建运行时连接（使用者手改 config.toml 后调用）。 */
+	async reloadMcp(projectRoot: string): Promise<void> {
+		if (this.#disposed) throw new Error("Core is disposed");
+		await this.#invalidateMcp(projectRoot);
+		const manager = await this.#ensureMcpManager(projectRoot);
+		manager?.start();
 	}
 
 	/**
