@@ -530,9 +530,10 @@
 	align-items: center;
 	gap: 6px;
 	width: 200px;
+	height: 26px;
 	padding: 0 9px;
 	border: 1px solid var(--line-strong);
-	border-radius: var(--r-md);
+	border-radius: var(--r-lg);
 	background: var(--surface-chrome);
 	color: var(--text-faint);
 }
@@ -540,7 +541,7 @@
 .ext-search input {
 	flex: 1;
 	min-width: 0;
-	height: 28px;
+	height: 100%;
 	border: none;
 	outline: none;
 	background: transparent;
@@ -552,10 +553,14 @@
 	border-color: var(--accent);
 }
 
+/* 图标按钮与搜索框等高（26px），尺寸一致；圆角沿用 small 按钮。 */
 .ext-icon-button {
-	width: 28px;
+	width: 26px;
+	height: 26px;
+	flex: none;
 	padding: 0;
 	justify-content: center;
+	border-radius: var(--r-lg);
 }
 
 .ext-add-menu {

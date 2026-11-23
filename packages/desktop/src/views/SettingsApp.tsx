@@ -1049,19 +1049,13 @@ function SkillsPanel({
 						aria-label="搜索技能"
 					/>
 				</div>
-				<button
-					className="ghost-button small ext-icon-button"
-					aria-label="刷新技能"
-					data-tooltip="刷新"
-					onClick={() => void onRefresh()}
-				>
+				<button className="ghost-button small ext-icon-button" aria-label="刷新技能" onClick={() => void onRefresh()}>
 					<RefreshIcon size={14} />
 				</button>
 				<div className="ext-add-menu" ref={addMenuRef}>
 					<button
 						className="primary-button small ext-icon-button"
 						aria-label="添加技能"
-						data-tooltip="添加技能"
 						aria-expanded={addMenuOpen}
 						disabled={mcpBlocked}
 						onClick={() => setAddMenuOpen((open) => !open)}
@@ -1103,12 +1097,7 @@ function SkillsPanel({
 				<div className="settings-empty-hint">没有匹配的技能。</div>
 			) : (
 				<div className="skill-list">
-					{userSkills.length > 0 ? (
-						<>
-							<div className="ext-group-title">用户技能</div>
-							{userSkills.map(renderRow)}
-						</>
-					) : null}
+					{userSkills.map(renderRow)}
 					{readonlySkills.length > 0 ? (
 						<>
 							<div className="ext-group-title">项目与共享技能（只读）</div>
