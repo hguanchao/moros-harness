@@ -292,6 +292,12 @@
 	border-radius: var(--r-lg);
 	background: var(--surface-main);
 	overflow: hidden;
+	transition: border-color var(--duration-fast) var(--ease-standard);
+}
+
+/* 内层 input 无边框，焦点反馈加在整个步进器上；与普通输入框 .text-input:focus 一致。 */
+.settings-stepper:focus-within {
+	border-color: var(--accent-ring);
 }
 
 .settings-stepper button {
