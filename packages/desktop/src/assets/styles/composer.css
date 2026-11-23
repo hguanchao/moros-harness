@@ -201,26 +201,6 @@
 	background: #d7d7d7;
 }
 
-.editor-chip-remove {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 12px;
-	height: 12px;
-	flex: none;
-	padding: 0;
-	border: 0;
-	border-radius: 50%;
-	background: transparent;
-	color: var(--text-muted);
-	cursor: pointer;
-}
-
-.editor-chip-remove:hover {
-	background: var(--fill-hover);
-	color: var(--text-primary);
-}
-
 .composer-toolbar {
 	display: flex;
 	align-items: center;

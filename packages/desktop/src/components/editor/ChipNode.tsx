@@ -5,12 +5,10 @@ import {
 	type SerializedLexicalNode,
 	type Spread,
 	$applyNodeReplacement,
-	$getNodeByKey,
 } from "lexical";
-import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext";
-import { useCallback, type JSX } from "react";
+import type { JSX } from "react";
 
-import { FileIcon, QuoteIcon, SlidersIcon, SparklesIcon, XIcon } from "../Icons.tsx";
+import { FileIcon, QuoteIcon, SlidersIcon, SparklesIcon } from "../Icons.tsx";
 
 /** chip 种类：划词引用 / @文件 / $技能 / /命令。 */
 export type ChipKind = "quote" | "file" | "skill" | "command";
@@ -87,7 +85,7 @@ export class ChipNode extends DecoratorNode<JSX.Element> {
 	}
 
 	decorate(): JSX.Element {
-		return <ChipDecoration nodeKey={this.getKey()} kind={this.__chipKind} label={this.__chipLabel} />;
+		return <ChipDecoration kind={this.__chipKind} label={this.__chipLabel} />;
 	}
 
 	static importDOM(): DOMConversionMap | null {
@@ -105,21 +103,8 @@ export function $isChipNode(node: LexicalNode | null | undefined): node is ChipN
 }
 
 /** 装饰组件：图标 + 文本 + ×，× 删除整块 chip。 */
-function ChipDecoration({
-	nodeKey,
-	kind,
-	label,
-}: {
-	readonly nodeKey: string;
-	readonly kind: ChipKind;
-	readonly label: string;
-}): JSX.Element {
-	const [editor] = useLexicalComposerContext();
-	const remove = useCallback(() => {
-		editor.update(() => {
-			$getNodeByKey(nodeKey)?.remove();
-		});
-	}, [editor, nodeKey]);
+/** 装饰组件：图标 + 文本；chip 为原子节点，用退格整体删除。 */
+function ChipDecoration({ kind, label }: { readonly kind: ChipKind; readonly label: string }): JSX.Element {
 	const Icon = CHIP_ICONS[kind];
 	return (
 		<span className={`editor-chip editor-chip-${kind}`}>
@@ -129,9 +114,6 @@ function ChipDecoration({
 			<span className="editor-chip-text" title={label}>
 				{label}
 			</span>
-			<button type="button" className="editor-chip-remove" aria-label="移除引用" onClick={remove}>
-				<XIcon size={10} />
-			</button>
 		</span>
 	);
 }
